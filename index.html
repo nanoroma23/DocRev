@@ -108,8 +108,8 @@
   table.sheet-grid td.header-row{background:#eef3f0;}
 
   .selection-bar{
-    display:flex; align-items:center; gap:12px; background:#fff8e1; border:1px solid #f0d98c;
-    border-radius:8px; padding:10px 14px; margin-top:12px; font-size:12.5px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px; background:#fff8e1; border:1px solid #f0d98c;
+    border-radius:8px; padding:12px 14px; margin-top:12px; font-size:12.5px;
   }
   .selection-bar .range-tag{font-family:var(--mono); font-weight:600; background:#fff; padding:2px 8px; border-radius:5px; border:1px solid #f0d98c;}
   .selection-bar input[type=text]{flex:1; font-size:13px; padding:7px 10px; border:1px solid var(--line); border-radius:6px;}
@@ -234,19 +234,29 @@
 
       <div class="sheet-toolbar">
         <div class="sheet-tabs" id="sheet-tabs"></div>
-        <div class="range-input">
-          <input type="text" id="manual-range" placeholder="ej. B4:B500 o J7">
-          <button class="btn small ghost" id="btn-apply-range">Usar rango</button>
-        </div>
+        <span style="margin-left:auto;font-size:11.5px;color:var(--ink-soft);">Click en una letra de columna o número de fila para seleccionarla entera · Ctrl+click para sumar/restar celdas sueltas</span>
       </div>
 
       <div class="grid-container" id="grid-container"></div>
 
-      <div class="selection-bar" id="selection-bar" style="display:none;">
-        <span>Rango seleccionado:</span>
-        <span class="range-tag" id="selected-range-label"></span>
-        <input type="text" id="field-name-input" placeholder="Nombre de este campo, ej. &quot;TAG&quot; o &quot;Presión de diseño&quot;">
-        <button class="btn small" id="btn-add-field">Agregar campo</button>
+      <div class="selection-bar" id="selection-bar" style="display:none; flex-wrap:wrap; row-gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;width:100%;">
+          <span>Rango seleccionado:</span>
+          <span class="range-tag" id="selected-range-label"></span>
+          <input type="text" id="manual-range-edit" placeholder="o escribilo así: B4:B500" style="width:150px;font-family:var(--mono);font-size:12px;">
+          <button class="btn small ghost" id="btn-apply-manual-edit">Usar este texto</button>
+          <button class="btn small ghost" id="btn-add-another-range" style="margin-left:auto;">+ Sumar otra columna a este mismo campo</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;width:100%;border-top:1px solid #f0d98c;padding-top:10px;">
+          <span>Nombre del campo:</span>
+          <input type="text" id="field-name-input" placeholder="ej. &quot;TAG&quot; o &quot;Presión de diseño&quot;" style="flex:1;">
+          <button class="btn small" id="btn-add-field">Confirmar campo</button>
+        </div>
+      </div>
+
+      <div id="pending-multirange" style="display:none; margin-top:10px;">
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">Rangos que se van a unir en un solo campo (en este orden, separados por guion):</div>
+        <div id="pending-multirange-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
       </div>
     </div>
 
@@ -374,7 +384,7 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     appState.draft = {
       filename: file.name,
       sheets, sheetNames: wb.SheetNames, activeSheet: wb.SheetNames[0],
-      selecting:false, selStart:null, selEnd:null, fields:[]
+      selectedCells: new Set(), pendingRanges: [], fields:[]
     };
     showScreen('screen-mapeo');
     document.getElementById('mapeo-filename').textContent = file.name;
@@ -408,6 +418,12 @@ function parseManualRange(text){
   return { r1:Math.min(r1,r2), r2:Math.max(r1,r2), c1:Math.min(c1,c2), c2:Math.max(c1,c2) };
 }
 
+// ---------- selección de celdas: ahora es un Set de celdas individuales, no solo un rectángulo ----------
+appState.draft.selectedCells = new Set(); // claves "r-c"
+appState.draft.pendingRanges = []; // rangos ya confirmados para el campo en construcción (multi-columna)
+
+function cellKey(r,c){ return r+'-'+c; }
+
 function renderSheetTabs(){
   const wrap = document.getElementById('sheet-tabs');
   wrap.innerHTML = '';
@@ -415,7 +431,7 @@ function renderSheetTabs(){
     const tab = document.createElement('div');
     tab.className = 'sheet-tab' + (name===appState.draft.activeSheet ? ' active':'');
     tab.textContent = name;
-    tab.addEventListener('click', () => { appState.draft.activeSheet = name; renderSheetTabs(); renderGrid(); });
+    tab.addEventListener('click', () => { appState.draft.activeSheet = name; appState.draft.selectedCells.clear(); renderSheetTabs(); renderGrid(); hideSelectionBar(); });
     wrap.appendChild(tab);
   });
 }
@@ -427,11 +443,11 @@ function renderGrid(){
   for (let r=0;r<maxRows;r++) maxCols = Math.max(maxCols, (sheetData[r]||[]).length);
   maxCols = Math.min(Math.max(maxCols, 10), 30);
 
-  let html = '<table class="sheet-grid"><thead><tr><th class="rownum"></th>';
-  for (let c=0;c<maxCols;c++) html += `<th>${colLetter(c)}</th>`;
+  let html = '<table class="sheet-grid"><thead><tr><th class="rownum" data-selectall="1" title="Seleccionar todo"></th>';
+  for (let c=0;c<maxCols;c++) html += `<th data-colheader="${c}" style="cursor:pointer;" title="Click: seleccionar columna entera">${colLetter(c)}</th>`;
   html += '</tr></thead><tbody>';
   for (let r=0;r<maxRows;r++){
-    html += `<tr><td class="rownum">${r+1}</td>`;
+    html += `<tr><td class="rownum" data-rowheader="${r}" style="cursor:pointer;" title="Click: seleccionar fila entera">${r+1}</td>`;
     const row = sheetData[r] || [];
     for (let c=0;c<maxCols;c++){
       const val = row[c];
@@ -442,81 +458,186 @@ function renderGrid(){
   }
   html += '</tbody></table>';
   document.getElementById('grid-container').innerHTML = html;
-  attachGridSelection();
+  attachGridSelection(maxRows, maxCols);
+  paintSelection();
 }
 function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function attachGridSelection(){
+function attachGridSelection(maxRows, maxCols){
   const cells = document.querySelectorAll('table.sheet-grid td[data-r]');
   let mouseDown = false;
+  let dragAdditive = false;
+  let dragStartCell = null;
+
+  function setRangeRect(r1,c1,r2,c2, additive){
+    if (!additive) appState.draft.selectedCells.clear();
+    for (let r=Math.min(r1,r2); r<=Math.max(r1,r2); r++){
+      for (let c=Math.min(c1,c2); c<=Math.max(c1,c2); c++){
+        appState.draft.selectedCells.add(cellKey(r,c));
+      }
+    }
+  }
+
   cells.forEach(cell => {
     cell.addEventListener('mousedown', (e) => {
       mouseDown = true;
-      appState.draft.selStart = { r:parseInt(cell.dataset.r), c:parseInt(cell.dataset.c) };
-      appState.draft.selEnd = { ...appState.draft.selStart };
-      paintSelection();
+      dragAdditive = e.ctrlKey || e.metaKey;
+      const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+      dragStartCell = {r,c};
+      setRangeRect(r,c,r,c, dragAdditive);
+      renderSelectionPaint();
       e.preventDefault();
     });
     cell.addEventListener('mouseenter', () => {
-      if (mouseDown){
-        appState.draft.selEnd = { r:parseInt(cell.dataset.r), c:parseInt(cell.dataset.c) };
-        paintSelection();
+      if (mouseDown && dragStartCell){
+        const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+        setRangeRect(dragStartCell.r, dragStartCell.c, r, c, dragAdditive ? false : false);
+        // al arrastrar, redefine el último rectángulo arrastrado (no acumulado) salvo modo aditivo desde el inicio
+        if (dragAdditive){
+          // mantenemos lo previo + agregamos el rectángulo actual
+          for (let rr=Math.min(dragStartCell.r,r); rr<=Math.max(dragStartCell.r,r); rr++){
+            for (let cc=Math.min(dragStartCell.c,c); cc<=Math.max(dragStartCell.c,c); cc++){
+              appState.draft.selectedCells.add(cellKey(rr,cc));
+            }
+          }
+        }
+        renderSelectionPaint();
       }
     });
   });
+
+  document.querySelectorAll('th[data-colheader]').forEach(th => {
+    th.addEventListener('click', (e) => {
+      const c = parseInt(th.dataset.colheader);
+      const additive = e.ctrlKey || e.metaKey;
+      if (additive){
+        // si ya está toda seleccionada, la sacamos; si no, la sumamos
+        let allSelected = true;
+        for (let r=0;r<maxRows;r++){ if (!appState.draft.selectedCells.has(cellKey(r,c))){ allSelected=false; break; } }
+        for (let r=0;r<maxRows;r++){
+          if (allSelected) appState.draft.selectedCells.delete(cellKey(r,c));
+          else appState.draft.selectedCells.add(cellKey(r,c));
+        }
+      } else {
+        appState.draft.selectedCells.clear();
+        for (let r=0;r<maxRows;r++) appState.draft.selectedCells.add(cellKey(r,c));
+      }
+      renderSelectionPaint();
+    });
+  });
+
+  document.querySelectorAll('td[data-rowheader]').forEach(td => {
+    td.addEventListener('click', (e) => {
+      const r = parseInt(td.dataset.rowheader);
+      const additive = e.ctrlKey || e.metaKey;
+      if (additive){
+        let allSelected = true;
+        for (let c=0;c<maxCols;c++){ if (!appState.draft.selectedCells.has(cellKey(r,c))){ allSelected=false; break; } }
+        for (let c=0;c<maxCols;c++){
+          if (allSelected) appState.draft.selectedCells.delete(cellKey(r,c));
+          else appState.draft.selectedCells.add(cellKey(r,c));
+        }
+      } else {
+        appState.draft.selectedCells.clear();
+        for (let c=0;c<maxCols;c++) appState.draft.selectedCells.add(cellKey(r,c));
+      }
+      renderSelectionPaint();
+    });
+  });
+
   document.addEventListener('mouseup', () => {
     if (mouseDown){
       mouseDown = false;
+      dragStartCell = null;
       showSelectionBar();
     }
   });
 }
 
+function renderSelectionPaint(){
+  paintSelection();
+  if (appState.draft.selectedCells.size > 0) showSelectionBar();
+  else hideSelectionBar();
+}
+
 function paintSelection(){
   document.querySelectorAll('table.sheet-grid td.selected').forEach(c=>c.classList.remove('selected'));
-  const s = appState.draft.selStart, e = appState.draft.selEnd;
-  if (!s || !e) return;
-  const r1=Math.min(s.r,e.r), r2=Math.max(s.r,e.r), c1=Math.min(s.c,e.c), c2=Math.max(s.c,e.c);
-  document.querySelectorAll('table.sheet-grid td[data-r]').forEach(cell => {
-    const r=parseInt(cell.dataset.r), c=parseInt(cell.dataset.c);
-    if (r>=r1 && r<=r2 && c>=c1 && c<=c2) cell.classList.add('selected');
+  appState.draft.selectedCells.forEach(key => {
+    const [r,c] = key.split('-');
+    const cell = document.querySelector(`table.sheet-grid td[data-r="${r}"][data-c="${c}"]`);
+    if (cell) cell.classList.add('selected');
   });
 }
 
-function showSelectionBar(){
-  const s = appState.draft.selStart, e = appState.draft.selEnd;
-  if (!s || !e) return;
-  const r1=Math.min(s.r,e.r), r2=Math.max(s.r,e.r), c1=Math.min(s.c,e.c), c2=Math.max(s.c,e.c);
-  const label = (r1===r2 && c1===c2)
-    ? `${colLetter(c1)}${r1+1}`
-    : `${colLetter(c1)}${r1+1}:${colLetter(c2)}${r2+1}`;
-  document.getElementById('selected-range-label').textContent = label;
-  document.getElementById('selection-bar').style.display = 'flex';
-  document.getElementById('field-name-input').value = '';
-  document.getElementById('field-name-input').focus();
+function selectionBounds(){
+  let r1=Infinity,r2=-Infinity,c1=Infinity,c2=-Infinity;
+  appState.draft.selectedCells.forEach(key => {
+    const [r,c] = key.split('-').map(Number);
+    r1=Math.min(r1,r); r2=Math.max(r2,r); c1=Math.min(c1,c); c2=Math.max(c2,c);
+  });
+  return {r1,r2,c1,c2};
 }
 
-document.getElementById('btn-apply-range').addEventListener('click', () => {
-  const text = document.getElementById('manual-range').value;
+function rangeLabel(r1,c1,r2,c2){
+  return (r1===r2 && c1===c2) ? `${colLetter(c1)}${r1+1}` : `${colLetter(c1)}${r1+1}:${colLetter(c2)}${r2+1}`;
+}
+
+function showSelectionBar(){
+  if (appState.draft.selectedCells.size === 0) return;
+  const {r1,r2,c1,c2} = selectionBounds();
+  document.getElementById('selected-range-label').textContent = rangeLabel(r1,c1,r2,c2);
+  document.getElementById('manual-range-edit').value = '';
+  document.getElementById('selection-bar').style.display = 'flex';
+}
+function hideSelectionBar(){
+  document.getElementById('selection-bar').style.display = 'none';
+}
+
+document.getElementById('btn-apply-manual-edit').addEventListener('click', () => {
+  const text = document.getElementById('manual-range-edit').value;
   const range = parseManualRange(text);
   if (!range){ alert('Formato no reconocido. Probá algo como B4:B500 o J7.'); return; }
-  appState.draft.selStart = { r:range.r1, c:range.c1 };
-  appState.draft.selEnd = { r:range.r2, c:range.c2 };
+  appState.draft.selectedCells.clear();
+  for (let r=range.r1;r<=range.r2;r++) for (let c=range.c1;c<=range.c2;c++) appState.draft.selectedCells.add(cellKey(r,c));
   paintSelection();
   showSelectionBar();
 });
 
+document.getElementById('btn-add-another-range').addEventListener('click', () => {
+  const {r1,r2,c1,c2} = selectionBounds();
+  if (!isFinite(r1)) return;
+  appState.draft.pendingRanges.push({ sheet: appState.draft.activeSheet, r1, r2, c1, c2 });
+  appState.draft.selectedCells.clear();
+  paintSelection();
+  renderPendingRanges();
+  document.getElementById('selected-range-label').textContent = '(elegí la próxima columna/rango a sumar)';
+});
+
+function renderPendingRanges(){
+  const box = document.getElementById('pending-multirange');
+  const chips = document.getElementById('pending-multirange-chips');
+  if (!appState.draft.pendingRanges.length){ box.style.display='none'; return; }
+  box.style.display = 'block';
+  chips.innerHTML = appState.draft.pendingRanges.map((r,i) =>
+    `<span class="range-tag">${i+1}. ${r.sheet} ${rangeLabel(r.r1,r.c1,r.r2,r.c2)}</span>`
+  ).join('');
+}
+
 document.getElementById('btn-add-field').addEventListener('click', () => {
   const name = document.getElementById('field-name-input').value.trim();
   if (!name){ alert('Asignale un nombre al campo.'); return; }
-  const s = appState.draft.selStart, e = appState.draft.selEnd;
-  const r1=Math.min(s.r,e.r), r2=Math.max(s.r,e.r), c1=Math.min(s.c,e.c), c2=Math.max(s.c,e.c);
-  appState.draft.fields.push({
-    id: uid(), name, sheet: appState.draft.activeSheet,
-    range: { r1, r2, c1, c2 }
-  });
-  document.getElementById('selection-bar').style.display = 'none';
-  document.querySelectorAll('table.sheet-grid td.selected').forEach(c=>c.classList.remove('selected'));
+  const ranges = [...appState.draft.pendingRanges];
+  if (appState.draft.selectedCells.size > 0){
+    const {r1,r2,c1,c2} = selectionBounds();
+    ranges.push({ sheet: appState.draft.activeSheet, r1, r2, c1, c2 });
+  }
+  if (!ranges.length){ alert('Seleccioná al menos un rango.'); return; }
+  appState.draft.fields.push({ id: uid(), name, ranges });
+  appState.draft.selectedCells.clear();
+  appState.draft.pendingRanges = [];
+  hideSelectionBar();
+  document.getElementById('pending-multirange').style.display = 'none';
+  paintSelection();
   renderFieldList();
 });
 
@@ -526,14 +647,12 @@ function renderFieldList(){
   document.getElementById('no-fields-msg').style.display = fields.length ? 'none' : 'block';
   list.innerHTML = '';
   fields.forEach(f => {
-    const label = (f.range.r1===f.range.r2 && f.range.c1===f.range.c2)
-      ? `${colLetter(f.range.c1)}${f.range.r1+1}`
-      : `${colLetter(f.range.c1)}${f.range.r1+1}:${colLetter(f.range.c2)}${f.range.r2+1}`;
+    const labels = f.ranges.map(r => `${r.sheet} ${rangeLabel(r.r1,r.c1,r.r2,r.c2)}`).join(' + ');
     const chip = document.createElement('div');
     chip.className = 'field-chip';
     chip.innerHTML = `
       <span class="fname">${f.name}</span>
-      <span class="frange">${f.sheet} · ${label}</span>
+      <span class="frange">${labels}</span>
       <span class="remove" data-id="${f.id}">✕</span>
     `;
     chip.querySelector('.remove').addEventListener('click', () => {
@@ -545,41 +664,48 @@ function renderFieldList(){
 }
 
 // ---------- procesar documento: extraer filas y volcar a la tabla maestra ----------
+function valueAt(sheetName, r, c){
+  const sheetData = appState.draft.sheets[sheetName];
+  return (sheetData[r] || [])[c];
+}
+
 function extractRowsFromFields(){
   const fields = appState.draft.fields;
   if (!fields.length) return [];
-  // se asume que el primer campo definido (o uno llamado TAG) es la clave de fila
   let keyField = fields.find(f => /tag/i.test(f.name)) || fields[0];
-  const keyRange = keyField.range;
-  const keySheetData = appState.draft.sheets[keyField.sheet];
-  const nRows = keyRange.r2 - keyRange.r1 + 1;
+  // el numero de filas de datos lo definimos por el rango mas largo del campo clave
+  const keySpan = keyField.ranges.reduce((max, r) => Math.max(max, r.r2 - r.r1 + 1), 1);
+  const nRows = keySpan;
+
+  function valueForField(f, i){
+    if (f.ranges.length === 1){
+      const r = f.ranges[0];
+      const isSingleCell = (r.r1===r.r2 && r.c1===r.c2) && (r.r2-r.r1+1) !== nRows;
+      if (isSingleCell) return valueAt(r.sheet, r.r1, r.c1);
+      const rr = r.r1 + i;
+      if (rr > r.r2) return null;
+      if (r.c1 === r.c2) return valueAt(r.sheet, rr, r.c1);
+      const parts = [];
+      for (let c=r.c1;c<=r.c2;c++) parts.push(valueAt(r.sheet, rr, c) ?? '');
+      return parts.join(' ');
+    }
+    // multi-rango: concatenar el valor de cada rango para esta fila i, separado por guion
+    const parts = f.ranges.map(r => {
+      const isSingleCell = (r.r1===r.r2) && (r.r2-r.r1+1) !== nRows;
+      const rr = isSingleCell ? r.r1 : r.r1 + i;
+      if (rr > r.r2 && !isSingleCell) return '';
+      if (r.c1 === r.c2) return valueAt(r.sheet, rr, r.c1) ?? '';
+      const sub = [];
+      for (let c=r.c1;c<=r.c2;c++) sub.push(valueAt(r.sheet, rr, c) ?? '');
+      return sub.join(' ');
+    });
+    return parts.join('-').replace(/\s+/g,'');
+  }
 
   const rows = [];
   for (let i=0;i<nRows;i++){
-    const r = keyRange.r1 + i;
     const rowObj = { __tag:null };
-    fields.forEach(f => {
-      const sheetData = appState.draft.sheets[f.sheet];
-      let val;
-      const isSingleCell = (f.range.r1===f.range.r2 && f.range.c1===f.range.c2) && (f.range.r2-f.range.r1+1) !== nRows;
-      if (isSingleCell){
-        val = (sheetData[f.range.r1]||[])[f.range.c1];
-      } else {
-        const rr = f.range.r1 + i;
-        if (rr > f.range.r2){ val = null; }
-        else {
-          const colSpanSingle = f.range.c1 === f.range.c2;
-          if (colSpanSingle){
-            val = (sheetData[rr]||[])[f.range.c1];
-          } else {
-            const parts = [];
-            for (let c=f.range.c1;c<=f.range.c2;c++) parts.push((sheetData[rr]||[])[c] ?? '');
-            val = parts.join(' ');
-          }
-        }
-      }
-      rowObj[f.name] = (val===undefined) ? null : val;
-    });
+    fields.forEach(f => { rowObj[f.name] = valueForField(f, i); });
     rowObj.__tag = rowObj[keyField.name];
     if (rowObj.__tag !== null && rowObj.__tag !== undefined && String(rowObj.__tag).trim() !== ''){
       rows.push(rowObj);
