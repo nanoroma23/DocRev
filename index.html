@@ -72,8 +72,16 @@
   .doc-item .status.mapped{background:var(--accent-soft); color:var(--accent);}
   .doc-item .status.pending{background:#faf0e3; color:#a35b1f;}
 
-  .upload-drop{
-    border:1.5px dashed var(--line); border-radius:10px; padding:30px; text-align:center;
+  .mode-card{
+    flex:1; border:1.5px solid var(--line); border-radius:9px; padding:14px 16px; cursor:pointer; position:relative;
+  }
+  .mode-card input[type=radio]{position:absolute; top:14px; right:14px;}
+  .mode-card:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
+  .mode-card .mc-title{font-size:13px; font-weight:600; margin-bottom:4px; padding-right:20px;}
+  .mode-card .mc-desc{font-size:11.5px; color:var(--ink-soft);}
+
+
+    display:block; width:100%; border:1.5px dashed var(--line); border-radius:10px; padding:30px; text-align:center;
     cursor:pointer; color:var(--ink-soft); font-size:13px;
   }
   .upload-drop:hover{border-color:var(--accent); background:var(--accent-soft);}
@@ -229,8 +237,31 @@
   </div>
   <div class="wrap">
     <div class="panel">
+      <h2>¿Cómo está organizada la información en este documento?</h2>
+      <p class="desc">Elegí el modo según cómo está armado el archivo.</p>
+      <div style="display:flex; gap:12px;">
+        <label class="mode-card" id="mode-card-tabla">
+          <input type="radio" name="docmode" value="tabla" checked>
+          <div class="mc-title">Tabla (una fila = un instrumento)</div>
+          <div class="mc-desc">Ej. Listado de Líneas, Listado de Instrumentos, I/O List. Cada columna es un dato, cada fila es un objeto distinto.</div>
+        </label>
+        <label class="mode-card" id="mode-card-hojas">
+          <input type="radio" name="docmode" value="hojas">
+          <div class="mc-title">Una hoja = un instrumento</div>
+          <div class="mc-desc">Ej. hojas de datos repetidas, una por cada equipo. La misma celda (ej. J7) tiene el mismo dato en cada hoja, pero referido a un instrumento distinto.</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-hojas-selector" style="display:none;">
+      <h2>¿Qué hojas representan instrumentos?</h2>
+      <p class="desc">Desmarcá las que no correspondan (portada, índice, notas, etc.).</p>
+      <div id="hojas-checklist" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
+    <div class="panel">
       <h2>Seleccioná los rangos de datos</h2>
-      <p class="desc">Hacé click y arrastrá sobre la grilla para marcar un rango (por ejemplo, columna B desde la fila 4), o escribilo directamente como en Excel (ej. <span style="font-family:var(--mono)">B4:B500</span> o <span style="font-family:var(--mono)">J7</span>). Después asignale un nombre — ese nombre es lo que se compara entre documentos.</p>
+      <p class="desc" id="mapeo-instructions">Hacé click y arrastrá sobre la grilla para marcar un rango (por ejemplo, columna B desde la fila 4), o escribilo directamente como en Excel (ej. <span style="font-family:var(--mono)">B4:B500</span> o <span style="font-family:var(--mono)">J7</span>). Después asignale un nombre — ese nombre es lo que se compara entre documentos.</p>
 
       <div class="sheet-toolbar">
         <div class="sheet-tabs" id="sheet-tabs"></div>
@@ -243,13 +274,15 @@
         <div style="display:flex;align-items:center;gap:10px;width:100%;">
           <span>Rango seleccionado:</span>
           <span class="range-tag" id="selected-range-label"></span>
-          <input type="text" id="manual-range-edit" placeholder="o escribilo así: B4:B500" style="width:150px;font-family:var(--mono);font-size:12px;">
-          <button class="btn small ghost" id="btn-apply-manual-edit">Usar este texto</button>
+          <input type="text" id="manual-range-edit" placeholder="o escribilo así: B4:B500 (Enter para aplicar)" style="width:220px;font-family:var(--mono);font-size:12px;">
           <button class="btn small ghost" id="btn-add-another-range" style="margin-left:auto;">+ Sumar otra columna a este mismo campo</button>
         </div>
         <div style="display:flex;align-items:center;gap:10px;width:100%;border-top:1px solid #f0d98c;padding-top:10px;">
           <span>Nombre del campo:</span>
           <input type="text" id="field-name-input" placeholder="ej. &quot;TAG&quot; o &quot;Presión de diseño&quot;" style="flex:1;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-soft);white-space:nowrap;">
+            <input type="checkbox" id="field-is-tag"> es el campo TAG
+          </label>
           <button class="btn small" id="btn-add-field">Confirmar campo</button>
         </div>
       </div>
@@ -265,6 +298,10 @@
       <p class="desc">Estos son los campos que se van a comparar o agregar a la base del proyecto.</p>
       <div class="field-list" id="field-list"></div>
       <div id="no-fields-msg" class="empty-state" style="display:none;padding:20px;">Todavía no definiste ningún campo.</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);margin-top:14px;padding:10px 12px;background:#fafaf8;border-radius:7px;">
+        <input type="checkbox" id="is-master-source">
+        Este documento es el <strong>Listado de Instrumentos</strong> del proyecto (define qué TAGs existen oficialmente)
+      </label>
       <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
         <button class="btn ghost" onclick="goToProyectoDocs()">Cancelar</button>
         <button class="btn" id="btn-process-doc">Procesar y comparar con la base →</button>
@@ -291,7 +328,7 @@ const appState = {
     selEnd: null,
     fields: []           // [{ name, sheet, range:{r1,c1,r2,c2}, repeatAcrossSheets:false }]
   },
-  masterTable: { columns: [], rows: [] } // rows: [{ tag, __sources:{field: [{docName, value}]}, ...campos }]
+  masterTable: { columns: [], rows: [], tagsOficiales: null } // tagsOficiales: null hasta que se cargue un Listado de Instrumentos; luego Set
 };
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
@@ -384,10 +421,14 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     appState.draft = {
       filename: file.name,
       sheets, sheetNames: wb.SheetNames, activeSheet: wb.SheetNames[0],
-      selectedCells: new Set(), pendingRanges: [], fields:[]
+      selectedCells: new Set(), pendingRanges: [], fields:[],
+      mode: 'tabla', hojasValidas: new Set(wb.SheetNames)
     };
     showScreen('screen-mapeo');
     document.getElementById('mapeo-filename').textContent = file.name;
+    document.querySelector('#mode-card-tabla input').checked = true;
+    document.getElementById('panel-hojas-selector').style.display = 'none';
+    renderHojasChecklist();
     renderSheetTabs();
     renderGrid();
     renderFieldList();
@@ -421,8 +462,43 @@ function parseManualRange(text){
 // ---------- selección de celdas: ahora es un Set de celdas individuales, no solo un rectángulo ----------
 appState.draft.selectedCells = new Set(); // claves "r-c"
 appState.draft.pendingRanges = []; // rangos ya confirmados para el campo en construcción (multi-columna)
+appState.draft.mode = 'tabla'; // 'tabla' | 'hojas'
+appState.draft.hojasValidas = new Set(); // para modo 'hojas': qué hojas representan instrumentos
 
 function cellKey(r,c){ return r+'-'+c; }
+
+function renderHojasChecklist(){
+  const box = document.getElementById('hojas-checklist');
+  box.innerHTML = '';
+  appState.draft.sheetNames.forEach(name => {
+    const id = 'hojachk-' + name.replace(/\W/g,'');
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;';
+    const checked = appState.draft.hojasValidas.has(name);
+    label.innerHTML = `<input type="checkbox" ${checked?'checked':''} data-sheetname="${name}"> ${name}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) appState.draft.hojasValidas.add(name);
+      else appState.draft.hojasValidas.delete(name);
+    });
+    box.appendChild(label);
+  });
+}
+
+document.querySelectorAll('input[name="docmode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    appState.draft.mode = e.target.value;
+    const esHojas = e.target.value === 'hojas';
+    document.getElementById('panel-hojas-selector').style.display = esHojas ? 'block' : 'none';
+    document.getElementById('mapeo-instructions').textContent = esHojas
+      ? 'Elegí una celda (ej. J7) que tenga siempre el mismo dato en la misma posición, en cada hoja que representa un instrumento. Vas a definir un campo por cada celda fija que quieras extraer (TAG, presión, etc.).'
+      : 'Hacé click y arrastrá sobre la grilla para marcar un rango (por ejemplo, columna B desde la fila 4), o escribilo directamente como en Excel (ej. B4:B500 o J7). Después asignale un nombre — ese nombre es lo que se compara entre documentos.';
+    appState.draft.selectedCells.clear();
+    appState.draft.pendingRanges = [];
+    paintSelection();
+    hideSelectionBar();
+    document.getElementById('pending-multirange').style.display = 'none';
+  });
+});
 
 function renderSheetTabs(){
   const wrap = document.getElementById('sheet-tabs');
@@ -468,6 +544,7 @@ function attachGridSelection(maxRows, maxCols){
   let mouseDown = false;
   let dragAdditive = false;
   let dragStartCell = null;
+  let dragToggleMode = null;
 
   function setRangeRect(r1,c1,r2,c2, additive){
     if (!additive) appState.draft.selectedCells.clear();
@@ -484,22 +561,37 @@ function attachGridSelection(maxRows, maxCols){
       dragAdditive = e.ctrlKey || e.metaKey;
       const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
       dragStartCell = {r,c};
-      setRangeRect(r,c,r,c, dragAdditive);
+      dragToggleMode = null; // se define al primer toggle del drag: 'add' o 'remove'
+      if (dragAdditive){
+        const key = cellKey(r,c);
+        if (appState.draft.selectedCells.has(key)){
+          appState.draft.selectedCells.delete(key);
+          dragToggleMode = 'remove';
+        } else {
+          appState.draft.selectedCells.add(key);
+          dragToggleMode = 'add';
+        }
+      } else {
+        setRangeRect(r,c,r,c, false);
+      }
       renderSelectionPaint();
       e.preventDefault();
     });
     cell.addEventListener('mouseenter', () => {
       if (mouseDown && dragStartCell){
         const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
-        setRangeRect(dragStartCell.r, dragStartCell.c, r, c, dragAdditive ? false : false);
-        // al arrastrar, redefine el último rectángulo arrastrado (no acumulado) salvo modo aditivo desde el inicio
         if (dragAdditive){
-          // mantenemos lo previo + agregamos el rectángulo actual
-          for (let rr=Math.min(dragStartCell.r,r); rr<=Math.max(dragStartCell.r,r); rr++){
-            for (let cc=Math.min(dragStartCell.c,c); cc<=Math.max(dragStartCell.c,c); cc++){
-              appState.draft.selectedCells.add(cellKey(rr,cc));
+          const r1=Math.min(dragStartCell.r,r), r2=Math.max(dragStartCell.r,r);
+          const c1=Math.min(dragStartCell.c,c), c2=Math.max(dragStartCell.c,c);
+          for (let rr=r1; rr<=r2; rr++){
+            for (let cc=c1; cc<=c2; cc++){
+              const key = cellKey(rr,cc);
+              if (dragToggleMode === 'remove') appState.draft.selectedCells.delete(key);
+              else appState.draft.selectedCells.add(key);
             }
           }
+        } else {
+          setRangeRect(dragStartCell.r, dragStartCell.c, r, c, false);
         }
         renderSelectionPaint();
       }
@@ -593,8 +685,9 @@ function hideSelectionBar(){
   document.getElementById('selection-bar').style.display = 'none';
 }
 
-document.getElementById('btn-apply-manual-edit').addEventListener('click', () => {
-  const text = document.getElementById('manual-range-edit').value;
+document.getElementById('manual-range-edit').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const text = e.target.value;
   const range = parseManualRange(text);
   if (!range){ alert('Formato no reconocido. Probá algo como B4:B500 o J7.'); return; }
   appState.draft.selectedCells.clear();
@@ -626,15 +719,17 @@ function renderPendingRanges(){
 document.getElementById('btn-add-field').addEventListener('click', () => {
   const name = document.getElementById('field-name-input').value.trim();
   if (!name){ alert('Asignale un nombre al campo.'); return; }
+  const isTag = document.getElementById('field-is-tag').checked;
   const ranges = [...appState.draft.pendingRanges];
   if (appState.draft.selectedCells.size > 0){
     const {r1,r2,c1,c2} = selectionBounds();
     ranges.push({ sheet: appState.draft.activeSheet, r1, r2, c1, c2 });
   }
   if (!ranges.length){ alert('Seleccioná al menos un rango.'); return; }
-  appState.draft.fields.push({ id: uid(), name, ranges });
+  appState.draft.fields.push({ id: uid(), name, ranges, isTag, mode: appState.draft.mode });
   appState.draft.selectedCells.clear();
   appState.draft.pendingRanges = [];
+  document.getElementById('field-is-tag').checked = false;
   hideSelectionBar();
   document.getElementById('pending-multirange').style.display = 'none';
   paintSelection();
@@ -672,8 +767,42 @@ function valueAt(sheetName, r, c){
 function extractRowsFromFields(){
   const fields = appState.draft.fields;
   if (!fields.length) return [];
-  let keyField = fields.find(f => /tag/i.test(f.name)) || fields[0];
-  // el numero de filas de datos lo definimos por el rango mas largo del campo clave
+
+  if (appState.draft.mode === 'hojas'){
+    return extractRowsModoHojas(fields);
+  }
+  return extractRowsModoTabla(fields);
+}
+
+function extractRowsModoHojas(fields){
+  // cada hoja válida = un registro. Cada campo es una celda fija (misma posición en todas las hojas).
+  const hojas = appState.draft.sheetNames.filter(n => appState.draft.hojasValidas.has(n));
+  let keyField = fields.find(f => f.isTag) || fields.find(f => /tag/i.test(f.name)) || fields[0];
+
+  const rows = [];
+  hojas.forEach(hoja => {
+    const rowObj = { __tag:null };
+    fields.forEach(f => {
+      const parts = f.ranges.map(r => {
+        if (r.c1 === r.c2 && r.r1 === r.r2) return valueAt(hoja, r.r1, r.c1) ?? '';
+        const sub = [];
+        for (let rr=r.r1; rr<=r.r2; rr++){
+          for (let cc=r.c1; cc<=r.c2; cc++) sub.push(valueAt(hoja, rr, cc) ?? '');
+        }
+        return sub.join(' ');
+      });
+      rowObj[f.name] = parts.join('-').replace(/^-+|-+$/g,'');
+    });
+    rowObj.__tag = rowObj[keyField.name];
+    if (rowObj.__tag !== null && rowObj.__tag !== undefined && String(rowObj.__tag).trim() !== ''){
+      rows.push(rowObj);
+    }
+  });
+  return rows;
+}
+
+function extractRowsModoTabla(fields){
+  let keyField = fields.find(f => f.isTag) || fields.find(f => /tag/i.test(f.name)) || fields[0];
   const keySpan = keyField.ranges.reduce((max, r) => Math.max(max, r.r2 - r.r1 + 1), 1);
   const nRows = keySpan;
 
@@ -721,18 +850,37 @@ document.getElementById('btn-process-doc').addEventListener('click', () => {
   const extracted = extractRowsFromFields();
   const docName = appState.draft.filename;
   const fieldNames = appState.draft.fields.map(f=>f.name);
+  const esFuenteOficial = document.getElementById('is-master-source').checked;
 
   fieldNames.forEach(fn => {
     if (!appState.masterTable.columns.includes(fn)) appState.masterTable.columns.push(fn);
   });
 
+  if (esFuenteOficial){
+    if (!appState.masterTable.tagsOficiales) appState.masterTable.tagsOficiales = new Set();
+    extracted.forEach(r => appState.masterTable.tagsOficiales.add(normTag(r.__tag)));
+    // si había TAGs marcados como "no oficial" que ahora sí aparecen acá, se limpia la marca
+    appState.masterTable.rows.forEach(row => {
+      if (appState.masterTable.tagsOficiales.has(normTag(row.__tag)) && row.__tagNoOficial){
+        row.__tagNoOficial = false;
+      }
+    });
+  }
+
   extracted.forEach(newRow => {
     const tagKey = normTag(newRow.__tag);
     let existing = appState.masterTable.rows.find(r => normTag(r.__tag) === tagKey);
+    const esNuevo = !existing;
     if (!existing){
       existing = { __tag:newRow.__tag, __sources:{} };
       appState.masterTable.columns.forEach(c => { if (!(c in existing)) existing[c] = null; });
       appState.masterTable.rows.push(existing);
+    }
+    // regla: si hay un Listado de Instrumentos oficial cargado y este TAG no está en él, marcar discrepancia
+    if (appState.masterTable.tagsOficiales && !appState.masterTable.tagsOficiales.has(tagKey)){
+      existing.__tagNoOficial = true;
+      existing.__tagNoOficialDocs = existing.__tagNoOficialDocs || [];
+      if (!existing.__tagNoOficialDocs.includes(docName)) existing.__tagNoOficialDocs.push(docName);
     }
     fieldNames.forEach(fn => {
       const newVal = newRow[fn];
@@ -748,7 +896,7 @@ document.getElementById('btn-process-doc').addEventListener('click', () => {
   });
 
   const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
-  p.docs.push({ id:uid(), filename:docName, fields:appState.draft.fields, fecha:new Date().toLocaleDateString('es-AR',{day:'numeric',month:'short'}) });
+  p.docs.push({ id:uid(), filename:docName, fields:appState.draft.fields, fecha:new Date().toLocaleDateString('es-AR',{day:'numeric',month:'short'}), esFuenteOficial });
 
   goToProyectoDocs();
   setTab2('tabla');
@@ -764,13 +912,15 @@ function renderMasterTable(){
     return;
   }
   const conflictCount = mt.rows.filter(r=>r.__conflict && Object.keys(r.__conflict).length).length;
-  document.getElementById('master-stats').textContent = `${mt.rows.length} fila(s) · ${mt.columns.length} columna(s) · ${conflictCount} con discrepancia`;
+  const tagNoOficialCount = mt.rows.filter(r=>r.__tagNoOficial).length;
+  document.getElementById('master-stats').textContent = `${mt.rows.length} fila(s) · ${mt.columns.length} columna(s) · ${conflictCount} con discrepancia de datos · ${tagNoOficialCount} con TAG fuera del Listado de Instrumentos`;
 
   let html = '<table class="master-table"><thead><tr><th>TAG</th>';
   mt.columns.forEach(c => html += `<th>${c}</th>`);
   html += '</tr></thead><tbody>';
   mt.rows.forEach((row, ri) => {
-    html += `<tr><td style="font-family:var(--mono);font-weight:600;">${row.__tag}</td>`;
+    const tagConflict = row.__tagNoOficial ? 'conflict' : '';
+    html += `<tr><td class="${tagConflict}" ${tagConflict?`data-ri="${ri}" data-col="__TAG__"`:''} style="font-family:var(--mono);font-weight:600;${tagConflict?'cursor:pointer;':''}">${row.__tag}</td>`;
     mt.columns.forEach(c => {
       const isConflict = row.__conflict && row.__conflict[c];
       const cls = isConflict ? 'conflict' : '';
@@ -796,7 +946,6 @@ function showConflictPopover(e, td){
   const ri = parseInt(td.dataset.ri);
   const col = td.dataset.col;
   const row = appState.masterTable.rows[ri];
-  const sources = row.__sources[col] || [];
 
   const pop = document.createElement('div');
   pop.className = 'tooltip-popover';
@@ -804,6 +953,24 @@ function showConflictPopover(e, td){
   pop.style.left = (rect.left + window.scrollX) + 'px';
   pop.style.top = (rect.bottom + window.scrollY + 6) + 'px';
 
+  if (col === '__TAG__'){
+    const docs = row.__tagNoOficialDocs || [];
+    pop.innerHTML = `
+      <div class="t-title">TAG no está en el Listado de Instrumentos</div>
+      <div style="margin-bottom:8px;">El TAG <strong>${row.__tag}</strong> aparece en:</div>
+      ${docs.map(d => `<div class="t-row"><span class="t-src">${d}</span></div>`).join('')}
+      <div style="margin-top:8px;color:#9a9f97;">...pero no figura en el Listado de Instrumentos cargado como fuente oficial. Verificar si es un TAG nuevo a agregar, o un error de tipeo.</div>
+      <div class="t-actions">
+        <button class="dismiss">Cerrar</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+    activePopover = pop;
+    pop.querySelector('.dismiss').addEventListener('click', closePopover);
+    return;
+  }
+
+  const sources = row.__sources[col] || [];
   let rowsHtml = sources.map(s => `<div class="t-row"><span class="t-src">${s.doc}</span><span>${escapeHtml(String(s.value ?? ''))}</span></div>`).join('');
 
   pop.innerHTML = `
