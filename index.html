@@ -1212,7 +1212,9 @@ function setTab2(name){
   document.getElementById('tab2-instrumentos').style.display = name==='instrumentos' ? 'block':'none';
   document.getElementById('tab2-exportar').style.display = name==='exportar' ? 'block':'none';
   if (name==='instrumentos') renderMasterTable('instrumentos');
-  if (name==='exportar') actualizarVistaExportar();
+  // La pestaña "Exportar" está en desarrollo: el HTML de export-tabla/export-documento
+  // quedó comentado, así que no inicializamos esos controles.
+  // if (name==='exportar') actualizarVistaExportar();
 }
 document.querySelectorAll('.tab2[data-tab2]').forEach(t=>t.addEventListener('click', ()=>setTab2(t.dataset.tab2)));
 
@@ -3896,8 +3898,13 @@ document.getElementById('btn-export-db').addEventListener('click', () => {
   showExportDatabaseModal();
 });
 
-document.getElementById('btn-export-excel').addEventListener('click', exportarExcel);
-document.getElementById('btn-export-document').addEventListener('click', exportarDocumentoActualizado);
+// btn-export-excel y btn-export-document pertenecen a la sección "Exportar documentos"
+// que todavía está en desarrollo (su HTML está comentado), así que estos elementos
+// pueden no existir en el DOM. Se protegen para no romper el resto del script.
+const btnExportExcel = document.getElementById('btn-export-excel');
+if (btnExportExcel) btnExportExcel.addEventListener('click', exportarExcel);
+const btnExportDocument = document.getElementById('btn-export-document');
+if (btnExportDocument) btnExportDocument.addEventListener('click', exportarDocumentoActualizado);
 
 function exportarExcel(){
   const mt = appState.tablas.instrumentos;
