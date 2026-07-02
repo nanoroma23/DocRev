@@ -882,7 +882,19 @@ function scheduleGuardado(){
 async function cargarProyectos(){
   const { data, error } = await supa.from('proyectos').select('*').order('creado', { ascending:false });
   if (error){ console.error(error); await customAlert('No se pudieron cargar los proyectos: ' + error.message, 'Error de conexión'); return; }
-  const { data: docsCount } = await supa.from('documentos').select('proyecto_id');
+
+  // Paginado de a 1000 (límite por defecto de Supabase/PostgREST)
+  const pageSize = 1000;
+  let from = 0;
+  let docsCount = [];
+  while (true){
+    const { data: page, error: err2 } = await supa.from('documentos').select('proyecto_id').range(from, from + pageSize - 1);
+    if (err2) break;
+    docsCount = docsCount.concat(page || []);
+    if (!page || page.length < pageSize) break;
+    from += pageSize;
+  }
+
   const conteos = {};
   (docsCount||[]).forEach(d => { conteos[d.proyecto_id] = (conteos[d.proyecto_id]||0) + 1; });
   appState.proyectos = (data||[]).map(row => ({
@@ -893,26 +905,52 @@ async function cargarProyectos(){
   }));
 }
 
+
+// Trae TODAS las filas de una tabla para un proyecto, paginando de a 1000
+// (límite por defecto de Supabase/PostgREST por request).
+async function fetchAllRows(tabla, proyectoId, orderCol){
+  const pageSize = 1000;
+  let from = 0;
+  let todas = [];
+  while (true){
+    let query = supa.from(tabla).select('*').eq('proyecto_id', proyectoId).range(from, from + pageSize - 1);
+    if (orderCol) query = query.order(orderCol, { ascending:true });
+    const { data, error } = await query;
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return todas;
+}
+
 // Carga todos los datos de un proyecto puntual (documentos, tablas, prefs) desde Supabase
 async function cargarProyectoCompleto(proyectoId){
-  const [docsRes, instrRes, lineasRes, metaRes, prefsRes] = await Promise.all([
-    supa.from('documentos').select('*').eq('proyecto_id', proyectoId).order('orden', { ascending:true }),
-    supa.from('instrumentos').select('*').eq('proyecto_id', proyectoId),
-    supa.from('lineas').select('*').eq('proyecto_id', proyectoId),
-    supa.from('tablas_meta').select('*').eq('proyecto_id', proyectoId),
-    supa.from('tabla_prefs').select('*').eq('proyecto_id', proyectoId),
-  ]);
+  let docsData, instrData, lineasData, metaRes, prefsRes;
+  try {
+    [docsData, instrData, lineasData, metaRes, prefsRes] = await Promise.all([
+      fetchAllRows('documentos', proyectoId, 'orden'),
+      fetchAllRows('instrumentos', proyectoId),
+      fetchAllRows('lineas', proyectoId),
+      supa.from('tablas_meta').select('*').eq('proyecto_id', proyectoId),
+      supa.from('tabla_prefs').select('*').eq('proyecto_id', proyectoId),
+    ]);
+  } catch (err){
+    console.error(err);
+    await customAlert('No se pudo cargar el proyecto: ' + err.message, 'Error de conexión');
+    throw err;
+  }
 
-  const errores = [docsRes, instrRes, lineasRes, metaRes, prefsRes].map(r=>r.error).filter(Boolean);
-  if (errores.length){
-    console.error(errores);
-    await customAlert('No se pudo cargar el proyecto: ' + errores[0].message, 'Error de conexión');
-    throw errores[0];
+  const erroresMeta = [metaRes, prefsRes].map(r=>r.error).filter(Boolean);
+  if (erroresMeta.length){
+    console.error(erroresMeta);
+    await customAlert('No se pudo cargar el proyecto: ' + erroresMeta[0].message, 'Error de conexión');
+    throw erroresMeta[0];
   }
 
   const p = appState.proyectos.find(x=>x.id===proyectoId);
 
-  p.docs = (docsRes.data||[]).map(row => ({
+  p.docs = (docsData||[]).map(row => ({
     id: row.id,
     filename: row.filename,
     fields: row.fields || [],
@@ -943,8 +981,8 @@ async function cargarProyectoCompleto(proyectoId){
   const metaInstr = (metaRes.data||[]).find(m => m.tipo === 'instrumentos');
   const metaLineas = (metaRes.data||[]).find(m => m.tipo === 'lineas');
   appState.tablas = {
-    instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrRes.data||[]).map(filaARow) },
-    lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasRes.data||[]).map(filaARow) }
+    instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrData||[]).map(filaARow) },
+    lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasData||[]).map(filaARow) }
   };
 
   appState.tableFilters = {}; appState.tableSorts = {}; appState.hiddenColumns = {};
@@ -1212,7 +1250,9 @@ function setTab2(name){
   document.getElementById('tab2-instrumentos').style.display = name==='instrumentos' ? 'block':'none';
   document.getElementById('tab2-exportar').style.display = name==='exportar' ? 'block':'none';
   if (name==='instrumentos') renderMasterTable('instrumentos');
-  if (name==='exportar') actualizarVistaExportar();
+  // La pestaña "Exportar" está en desarrollo: el HTML de export-tabla/export-documento
+  // quedó comentado, así que no inicializamos esos controles.
+  // if (name==='exportar') actualizarVistaExportar();
 }
 document.querySelectorAll('.tab2[data-tab2]').forEach(t=>t.addEventListener('click', ()=>setTab2(t.dataset.tab2)));
 
@@ -3896,8 +3936,13 @@ document.getElementById('btn-export-db').addEventListener('click', () => {
   showExportDatabaseModal();
 });
 
-document.getElementById('btn-export-excel').addEventListener('click', exportarExcel);
-document.getElementById('btn-export-document').addEventListener('click', exportarDocumentoActualizado);
+// btn-export-excel y btn-export-document pertenecen a la sección "Exportar documentos"
+// que todavía está en desarrollo (su HTML está comentado), así que estos elementos
+// pueden no existir en el DOM. Se protegen para no romper el resto del script.
+const btnExportExcel = document.getElementById('btn-export-excel');
+if (btnExportExcel) btnExportExcel.addEventListener('click', exportarExcel);
+const btnExportDocument = document.getElementById('btn-export-document');
+if (btnExportDocument) btnExportDocument.addEventListener('click', exportarDocumentoActualizado);
 
 function exportarExcel(){
   const mt = appState.tablas.instrumentos;
