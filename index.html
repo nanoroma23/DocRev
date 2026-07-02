@@ -224,6 +224,10 @@
     position:fixed; inset:0; background:rgba(245,244,241,0.92); z-index:200;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
   }
+  #overlay-guardando{
+    position:fixed; inset:0; background:rgba(245,244,241,0.96); z-index:500;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
   .overlay-spinner{
     width:38px; height:38px; border:3px solid #e2dfd7; border-top-color:var(--accent);
     border-radius:50%; animation:overlay-spin .8s linear infinite;
@@ -675,6 +679,11 @@
   <div class="overlay-text">Cargando...</div>
 </div>
 
+<div id="overlay-guardando" style="display:none;">
+  <div class="overlay-spinner"></div>
+  <div class="overlay-text" id="overlay-guardando-text">Subiendo cambios a la base de datos...</div>
+</div>
+
 <script>
 // ---------- modales personalizados (reemplazan alert/confirm/prompt de Chrome) ----------
 function customConfirm(message, title = 'Confirmar') {
@@ -876,13 +885,25 @@ function scheduleGuardado(){
   if (!appState.proyectoActualId) return;
   setSaveStatus('● Cambios sin guardar');
   clearTimeout(guardadoTimer);
-  guardadoTimer = setTimeout(() => { guardarProyectoActual(); }, 1200);
+  guardadoTimer = setTimeout(() => { guardadoTimer = null; guardarProyectoActual(); }, 1200);
 }
 
 async function cargarProyectos(){
   const { data, error } = await supa.from('proyectos').select('*').order('creado', { ascending:false });
   if (error){ console.error(error); await customAlert('No se pudieron cargar los proyectos: ' + error.message, 'Error de conexión'); return; }
-  const { data: docsCount } = await supa.from('documentos').select('proyecto_id');
+
+  // Paginado de a 1000 (límite por defecto de Supabase/PostgREST)
+  const pageSize = 1000;
+  let from = 0;
+  let docsCount = [];
+  while (true){
+    const { data: page, error: err2 } = await supa.from('documentos').select('proyecto_id').range(from, from + pageSize - 1);
+    if (err2) break;
+    docsCount = docsCount.concat(page || []);
+    if (!page || page.length < pageSize) break;
+    from += pageSize;
+  }
+
   const conteos = {};
   (docsCount||[]).forEach(d => { conteos[d.proyecto_id] = (conteos[d.proyecto_id]||0) + 1; });
   appState.proyectos = (data||[]).map(row => ({
@@ -893,26 +914,52 @@ async function cargarProyectos(){
   }));
 }
 
+
+// Trae TODAS las filas de una tabla para un proyecto, paginando de a 1000
+// (límite por defecto de Supabase/PostgREST por request).
+async function fetchAllRows(tabla, proyectoId, orderCol){
+  const pageSize = 1000;
+  let from = 0;
+  let todas = [];
+  while (true){
+    let query = supa.from(tabla).select('*').eq('proyecto_id', proyectoId).range(from, from + pageSize - 1);
+    if (orderCol) query = query.order(orderCol, { ascending:true });
+    const { data, error } = await query;
+    if (error) throw error;
+    todas = todas.concat(data || []);
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return todas;
+}
+
 // Carga todos los datos de un proyecto puntual (documentos, tablas, prefs) desde Supabase
 async function cargarProyectoCompleto(proyectoId){
-  const [docsRes, instrRes, lineasRes, metaRes, prefsRes] = await Promise.all([
-    supa.from('documentos').select('*').eq('proyecto_id', proyectoId).order('orden', { ascending:true }),
-    supa.from('instrumentos').select('*').eq('proyecto_id', proyectoId),
-    supa.from('lineas').select('*').eq('proyecto_id', proyectoId),
-    supa.from('tablas_meta').select('*').eq('proyecto_id', proyectoId),
-    supa.from('tabla_prefs').select('*').eq('proyecto_id', proyectoId),
-  ]);
+  let docsData, instrData, lineasData, metaRes, prefsRes;
+  try {
+    [docsData, instrData, lineasData, metaRes, prefsRes] = await Promise.all([
+      fetchAllRows('documentos', proyectoId, 'orden'),
+      fetchAllRows('instrumentos', proyectoId),
+      fetchAllRows('lineas', proyectoId),
+      supa.from('tablas_meta').select('*').eq('proyecto_id', proyectoId),
+      supa.from('tabla_prefs').select('*').eq('proyecto_id', proyectoId),
+    ]);
+  } catch (err){
+    console.error(err);
+    await customAlert('No se pudo cargar el proyecto: ' + err.message, 'Error de conexión');
+    throw err;
+  }
 
-  const errores = [docsRes, instrRes, lineasRes, metaRes, prefsRes].map(r=>r.error).filter(Boolean);
-  if (errores.length){
-    console.error(errores);
-    await customAlert('No se pudo cargar el proyecto: ' + errores[0].message, 'Error de conexión');
-    throw errores[0];
+  const erroresMeta = [metaRes, prefsRes].map(r=>r.error).filter(Boolean);
+  if (erroresMeta.length){
+    console.error(erroresMeta);
+    await customAlert('No se pudo cargar el proyecto: ' + erroresMeta[0].message, 'Error de conexión');
+    throw erroresMeta[0];
   }
 
   const p = appState.proyectos.find(x=>x.id===proyectoId);
 
-  p.docs = (docsRes.data||[]).map(row => ({
+  p.docs = (docsData||[]).map(row => ({
     id: row.id,
     filename: row.filename,
     fields: row.fields || [],
@@ -943,9 +990,14 @@ async function cargarProyectoCompleto(proyectoId){
   const metaInstr = (metaRes.data||[]).find(m => m.tipo === 'instrumentos');
   const metaLineas = (metaRes.data||[]).find(m => m.tipo === 'lineas');
   appState.tablas = {
-    instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrRes.data||[]).map(filaARow) },
-    lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasRes.data||[]).map(filaARow) }
+    instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrData||[]).map(filaARow) },
+    lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasData||[]).map(filaARow) }
   };
+  // Guardamos qué ids existían en Supabase al momento de cargar, para poder borrar
+  // puntualmente solo las filas que realmente se eliminaron (nunca "borrar todo").
+  appState.tablas.instrumentos.__loadedIds = new Set((instrData||[]).map(r => r.id));
+  appState.tablas.lineas.__loadedIds = new Set((lineasData||[]).map(r => r.id));
+  p.__loadedDocIds = new Set((docsData||[]).map(r => r.id));
 
   appState.tableFilters = {}; appState.tableSorts = {}; appState.hiddenColumns = {};
   (prefsRes.data||[]).forEach(row => {
@@ -986,43 +1038,100 @@ async function asegurarOriginalDescargado(doc){
 }
 
 // Guardado completo (snapshot) del proyecto abierto: reemplaza documentos/instrumentos/lineas/meta/prefs
+// Evita que se pierdan datos si el usuario recarga o cierra la pestaña mientras
+// todavía hay un guardado pendiente (debounce) o en curso (subiendo tandas a Supabase).
+window.addEventListener('beforeunload', (e) => {
+  if (guardadoEnCurso || guardadoPendiente || guardadoTimer){
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
+});
+
+function mostrarOverlayGuardando(texto){
+  document.getElementById('overlay-guardando-text').textContent = texto || 'Subiendo cambios a la base de datos...';
+  document.getElementById('overlay-guardando').style.display = 'flex';
+}
+function ocultarOverlayGuardando(){
+  document.getElementById('overlay-guardando').style.display = 'none';
+}
+
 async function guardarProyectoActual(){
-  const proyectoId = appState.proyectoActualId;
-  if (!proyectoId) return;
+  if (!appState.proyectoActualId) return;
   if (guardadoEnCurso){ guardadoPendiente = true; return; }
+  const proyectoId = appState.proyectoActualId; // capturado: no debe cambiar aunque el usuario navegue (igual está bloqueado mientras guarda)
   guardadoEnCurso = true;
+  mostrarOverlayGuardando();
   setSaveStatus('⏳ Guardando...');
   try {
+    // Si mientras subimos se generan más cambios, los volvemos a subir en otra vuelta
+    // ANTES de liberar el bloqueo, para no dejar nunca datos a mitad de subir.
+    do {
+      guardadoPendiente = false;
+      await ejecutarGuardadoProyecto(proyectoId);
+    } while (guardadoPendiente);
+    setSaveStatus('✓ Guardado');
+  } catch (err){
+    console.error(err);
+    setSaveStatus('⚠️ Error al guardar', true);
+    await customAlert('No se pudieron guardar todos los cambios: ' + err.message + '\n\nNo cierres ni recargues la página — vamos a reintentar.', 'Error al guardar');
+    // Reintentar automáticamente en vez de dejar datos a mitad de subir
+    guardadoPendiente = true;
+    guardadoEnCurso = false;
+    scheduleGuardado();
+    return;
+  } finally {
+    guardadoEnCurso = false;
+    ocultarOverlayGuardando();
+  }
+}
+
+async function ejecutarGuardadoProyecto(proyectoId){
+  {
     const p = appState.proyectos.find(x=>x.id===proyectoId);
     if (!p) return;
 
     // 1) subir archivos originales pendientes
     for (const doc of p.docs) { await subirOriginalSiHaceFalta(proyectoId, doc); }
 
-    // 2) documentos: borrar e insertar de nuevo (snapshot completo)
-    await supa.from('documentos').delete().eq('proyecto_id', proyectoId);
+    // 2) documentos: upsert (nunca borramos todo) + borramos puntualmente los que ya no están
+    const idsDocsActuales = new Set(p.docs.map(d => d.id));
+    const idsDocsABorrar = Array.from(p.__loadedDocIds || []).filter(id => !idsDocsActuales.has(id));
+    if (idsDocsABorrar.length){
+      await supa.from('documentos').delete().in('id', idsDocsABorrar);
+    }
     if (p.docs.length){
       const filasDocs = p.docs.map((d, i) => ({
         id: d.id, proyecto_id: proyectoId, filename: d.filename, fields: d.fields,
         mode: d.mode, hojas_validas: d.hojasValidas, rango_filas: d.rangoFilas,
         original_file_path: d.__originalPath || null, orden: i
       }));
-      const { error } = await supa.from('documentos').insert(filasDocs);
+      const { error } = await supa.from('documentos').upsert(filasDocs);
       if (error) throw error;
     }
+    p.__loadedDocIds = idsDocsActuales;
 
-    // 3) instrumentos y líneas: borrar e insertar de nuevo
+    // 3) instrumentos y líneas: upsert por id (nunca borramos todo) + borrado puntual de lo eliminado
     for (const tipo of ['instrumentos','lineas']){
-      await supa.from(tipo).delete().eq('proyecto_id', proyectoId);
       const tabla = appState.tablas[tipo];
+      const idsActuales = new Set(tabla.rows.map(r => r.__dbId).filter(Boolean));
+      const idsABorrar = Array.from(tabla.__loadedIds || []).filter(id => !idsActuales.has(id));
+      if (idsABorrar.length){
+        // Borrar en tandas de 500 para no pasarnos de tamaño de request
+        for (let i=0; i<idsABorrar.length; i+=500){
+          await supa.from(tipo).delete().in('id', idsABorrar.slice(i, i+500));
+        }
+      }
       if (tabla.rows.length){
         const filas = tabla.rows.map(r => {
+          if (!r.__dbId) r.__dbId = crypto.randomUUID(); // fila creada en esta misma sesión, todavía sin id
           const data = {};
           tabla.columns.forEach(c => {
             if (c === '__linea_asociada__') return;
             if (r[c] !== undefined) data[c] = r[c];
           });
           return {
+            id: r.__dbId,
             proyecto_id: proyectoId,
             tag: r.__tag,
             data,
@@ -1037,9 +1146,19 @@ async function guardarProyectoActual(){
             pending_edit: r.__pendingEdit || {}
           };
         });
-        const { error } = await supa.from(tipo).insert(filas);
-        if (error) throw error;
+        // Upsert en tandas de 500, mostrando progreso
+        const totalTandas = Math.ceil(filas.length / 500);
+        for (let i=0, tanda=1; i<filas.length; i+=500, tanda++){
+          mostrarOverlayGuardando(`Subiendo ${tipo} (tanda ${tanda} de ${totalTandas})...`);
+          const { error, count } = await supa.from(tipo).upsert(filas.slice(i, i+500), { count: 'exact' });
+          if (error) throw error;
+          const esperadas = Math.min(500, filas.length - i);
+          if (count !== null && count !== undefined && count < esperadas){
+            throw new Error(`Se esperaban ${esperadas} filas guardadas en "${tipo}" y el servidor confirmó solo ${count}.`);
+          }
+        }
       }
+      tabla.__loadedIds = idsActuales;
     }
 
     // 4) metadata de columnas
@@ -1060,14 +1179,6 @@ async function guardarProyectoActual(){
       });
       if (error) throw error;
     }
-
-    setSaveStatus('✓ Guardado');
-  } catch (err){
-    console.error(err);
-    setSaveStatus('⚠️ Error al guardar', true);
-  } finally {
-    guardadoEnCurso = false;
-    if (guardadoPendiente){ guardadoPendiente = false; guardarProyectoActual(); }
   }
 }
 
@@ -1077,6 +1188,10 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
 }
 async function goToProyectos(){
+  if (guardadoEnCurso || guardadoPendiente || guardadoTimer){
+    await customAlert('Todavía se están subiendo cambios a la base de datos. Esperá a que termine antes de salir.', 'Guardando...');
+    return;
+  }
   appState.proyectoActualId = null;
   showScreen('screen-proyectos');
   mostrarOverlayCarga();
@@ -1090,6 +1205,10 @@ function goToProyectoDocs(){
   renderDocList();
 }
 async function abrirProyecto(id){
+  if (guardadoEnCurso || guardadoPendiente || guardadoTimer){
+    await customAlert('Todavía se están subiendo cambios a la base de datos. Esperá a que termine antes de abrir otro proyecto.', 'Guardando...');
+    return;
+  }
   appState.proyectoActualId = id;
   const p = appState.proyectos.find(x=>x.id===id);
   document.getElementById('proj-title').textContent = p.nombre;
@@ -2570,7 +2689,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
       let existing;
       if (esDuplicadoEnEsteDoc) {
         // Para duplicados del mismo documento: SIEMPRE crear fila nueva
-        existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [docName], __duplicated: true };
+        existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID(), __duplicatedDocs: [docName], __duplicated: true };
         // Agregar info de ubicación
         if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
         if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
@@ -2580,7 +2699,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
         // Para no-duplicados: buscar si ya existe (puede venir de otro documento)
         existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
         if (!existing){
-          existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [] };
+          existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID(), __duplicatedDocs: [] };
           if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
           if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
           tabla.columns.forEach(c => { if (!(c in existing)) existing[c] = null; });
@@ -2690,7 +2809,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
         const tagKey = normTag(tagVal);
         let existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
         if (!existing){
-          existing = { __tag: tagVal, __sources:{} };
+          existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID() };
           tabla.rows.push(existing);
         }
       });
