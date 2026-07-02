@@ -2696,7 +2696,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
   }
 
   const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
-  const newDocId = uid();
+  const newDocId = crypto.randomUUID();
   p.docs.push({
     id: newDocId,
     filename: docName,
