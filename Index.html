@@ -1,0 +1,4161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocRev</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg:#f5f4f1; --panel:#ffffff; --ink:#1f2420; --ink-soft:#666c64; --ink-faint:#9a9f97;
+    --line:#e2dfd7; --accent:#2f5d4f; --accent-soft:#e6ede9;
+    --red:#c0392b; --red-bg:#fbe9e7; --blue:#2563a8; --blue-bg:#e8f0f9;
+    --mono:'SF Mono','Consolas',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--ink); line-height:1.5;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  .topbar{
+    background:#fff; border-bottom:1px solid var(--line); padding:14px 26px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .topbar .back{cursor:pointer; font-size:14px; color:var(--ink-soft); display:flex; align-items:center; gap:4px;}
+  .topbar .back:hover{color:var(--accent);}
+  .topbar h1{font-size:16px; font-weight:600; margin:0;}
+  .topbar .crumb{font-size:12.5px; color:var(--ink-faint);}
+
+  .wrap{max-width:1220px; margin:0 auto; padding:26px;}
+  .wrap-full{padding:26px;}
+
+  .proj-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:20px;}
+  .proj-card{
+    background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px;
+    cursor:pointer; transition:.15s; min-height:95px; box-sizing:border-box;
+  }
+  .proj-card:hover{border-color:var(--accent); box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+  .proj-card .name{font-weight:600; font-size:14.5px; margin-bottom:4px;}
+  .proj-card .meta{font-size:12px; color:var(--ink-soft);}
+  .proj-card.new{
+    border-style:dashed; display:flex; flex-direction:row; align-items:center;
+    justify-content:center; color:var(--ink-faint); gap:8px;
+  }
+  .proj-card.new:hover{color:var(--accent); border-color:var(--accent);}
+  .proj-card.new .plus{font-size:22px; line-height:1;}
+
+  .btn{font-size:13px; font-weight:600; padding:9px 16px; border-radius:7px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer;}
+  .btn:hover{background:#244a3f;}
+  .btn.ghost{background:#fff; color:var(--accent);}
+  .btn.ghost.esperando{background:var(--accent); color:#fff; box-shadow:0 0 0 3px var(--accent-soft);}
+  .btn.ghost:hover{background:var(--accent-soft);}
+  .btn.ghost.danger{color:var(--red);border-color:var(--red);}
+  .btn.ghost.danger:hover{background:var(--red-bg);}
+  .btn.small{font-size:12px; padding:6px 12px;}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  .tabs2{display:flex; gap:2px; margin:18px 0; border-bottom:1px solid var(--line);}
+  .tab2{padding:10px 14px; font-size:13px; font-weight:500; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent;}
+  .tab2.active{color:var(--accent); border-bottom-color:var(--accent);}
+
+  .panel{background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin-bottom:18px;}
+  .panel h2{font-size:14px; margin:0 0 4px; font-weight:600;}
+  .panel .desc{font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;}
+
+  .doclist{display:flex; flex-direction:column; gap:8px;}
+  .doc-item{
+    display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--line);
+    border-radius:8px; cursor:pointer; background:#fafaf8;
+  }
+  .doc-item:hover{border-color:var(--accent);}
+  .doc-item .ico{font-size:18px;}
+  .doc-item .info{flex:1;}
+  .doc-item .info .name{font-size:13px; font-weight:600;}
+  .doc-item .info .sub{font-size:11.5px; color:var(--ink-soft);}
+  .doc-item .status{font-size:11px; padding:2px 8px; border-radius:5px; font-weight:600;}
+  .doc-item .status.mapped{background:var(--accent-soft); color:var(--accent);}
+  .doc-item .status.pending{background:#faf0e3; color:#a35b1f;}
+
+  .col-chip{
+    display:inline-flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line);
+    border-radius:20px; padding:5px 6px 5px 12px; font-size:12px; color:var(--ink);
+  }
+  .col-chip-label{font-family:var(--mono); font-weight:600;}
+  .col-chip-x{
+    cursor:pointer; color:#fff; background:var(--ink-faint); border-radius:50%; width:16px; height:16px;
+    display:flex; align-items:center; justify-content:center; font-size:10px; line-height:1; flex-shrink:0;
+  }
+  .col-chip-x:hover{background:var(--red);}
+  .col-chip-actual{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+  .col-chip-actual .col-chip-x{background:var(--accent);}
+  .col-chip-actual .col-chip-x:hover{background:var(--red);}
+  .col-chip-unificar{
+    background:#fff; border:1.5px dashed #c9c5ba; color:var(--ink-soft); cursor:pointer;
+    padding:5px 14px; font-weight:600; transition:.15s;
+  }
+  .col-chip-unificar:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-soft);}
+  .btn-unificar-col{
+    padding:0 14px; font-size:12px; font-weight:600; border-radius:7px;
+    border:1.5px dashed #c9c5ba; background:#fff; color:var(--ink-soft); cursor:pointer; transition:.15s;
+    display:inline-flex; align-items:center; height:28px;
+  }
+  .btn-unificar-col:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-soft); border-style:solid;}
+
+  /* Menú contextual de columnas */
+  .column-context-menu{
+    position:absolute;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    padding:4px;min-width:180px;z-index:150;
+  }
+  .column-context-menu-item{
+    padding:8px 12px;font-size:12px;cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:8px;
+  }
+  .column-context-menu-item:hover{background:var(--accent-soft);}
+  .column-context-menu-item.danger:hover{background:var(--red-bg);color:var(--red);}
+
+  .mode-card{
+    flex:1; border:1.5px solid var(--line); border-radius:9px; padding:14px 16px; cursor:pointer; position:relative;
+  }
+  .mode-card input[type=radio]{position:absolute; top:14px; right:14px;}
+  .mode-card:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
+  .mode-card .mc-title{font-size:13px; font-weight:600; margin-bottom:4px; padding-right:20px;}
+  .mode-card .mc-desc{font-size:11.5px; color:var(--ink-soft);}
+
+  .upload-drop{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    width:100%; border:1.5px dashed #c9c5ba; border-radius:12px; padding:24px 24px; text-align:center;
+    cursor:pointer; color:var(--ink-soft); font-size:13px; background:#fafaf8; transition:.15s;
+  }
+  .upload-drop:hover{border-color:var(--accent); background:var(--accent-soft);}
+  .upload-drop.dragover{border-color:var(--accent); background:var(--accent-soft); border-style:solid; border-width:2px;}
+  .upload-drop input{display:none;}
+  .upload-drop .updrop-sub{font-size:12.5px; color:var(--ink-faint); text-align:center; width:100%; margin-bottom:10px;}
+  .upload-drop .updrop-select-btn{
+    font-size:14px; font-weight:700; padding:13px 28px; border-radius:9px; border:none;
+    background:var(--accent); color:#fff; cursor:pointer; text-align:center;
+  }
+  .upload-drop .updrop-select-btn:hover{background:#244a3f;}
+
+  /* spreadsheet grid */
+  .sheet-toolbar{display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+  .sheet-tabs{display:flex; gap:2px;}
+  .sheet-tab{padding:6px 12px; font-size:12px; border:1px solid var(--line); border-radius:6px 6px 0 0; cursor:pointer; background:#fafaf8;}
+  .sheet-tab.active{background:#fff; border-bottom-color:#fff; font-weight:600; color:var(--accent);}
+  .range-input{display:flex; align-items:center; gap:6px; margin-left:auto;}
+  .range-input input[type=text]{font-family:var(--mono); font-size:12.5px; padding:6px 9px; border:1px solid var(--line); border-radius:6px; width:160px;}
+  .range-input input[type=text]::placeholder{color:var(--ink-faint);}
+
+  .grid-scroll-top{
+    overflow-x:auto; overflow-y:hidden; height:12px; border:1px solid var(--line); border-bottom:none; border-radius:8px 8px 0 0;
+  }
+  .grid-scroll-top-inner{
+    height:1px;
+  }
+  .grid-container{
+    border:1px solid var(--line); border-top:none; border-radius:0 0 8px 8px; overflow:auto; max-height:480px; position:relative;
+    width:100%;
+  }
+  .grid-container-inner{
+    transform-origin:0 0; display:inline-block; min-width:100%;
+  }
+  table.sheet-grid{border-collapse:collapse; font-size:12px; user-select:none;}
+  table.sheet-grid th{
+    background:#f0eee8; color:var(--ink-soft); font-weight:600; font-size:11px; padding:4px 8px;
+    border:1px solid var(--line); position:sticky; top:0; z-index:2; min-width:80px;
+  }
+  table.sheet-grid th.rownum{position:sticky; left:0; z-index:3; min-width:34px; text-align:center;}
+  table.sheet-grid td{
+    border:1px solid #ece9e3; padding:4px 8px; white-space:nowrap; max-width:220px; overflow:hidden;
+    text-overflow:ellipsis; cursor:cell;
+  }
+  table.sheet-grid td.rownum{
+    background:#f0eee8; color:var(--ink-soft); font-weight:600; text-align:center; position:sticky; left:0; z-index:1;
+  }
+  table.sheet-grid td.selected{background:var(--accent-soft); outline:1.5px solid var(--accent);}
+  table.sheet-grid tr.fila-destacada td{background:var(--accent-soft);}
+  table.sheet-grid tr.fila-destacada td.rownum{background:var(--accent-soft); font-weight:700; color:var(--accent);}
+  table.sheet-grid td.header-row{background:#eef3f0;}
+
+  .selection-bar{
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px; background:var(--accent-soft); border:1px solid var(--accent);
+    border-radius:8px; padding:12px 14px; margin-top:12px; font-size:12.5px;
+  }
+  .selection-bar .range-tag{font-family:var(--mono); font-weight:600; background:#fff; padding:2px 8px; border-radius:5px; border:1px solid var(--accent);}
+  .selection-bar input[type=text]{flex:1; font-size:13px; padding:7px 10px; border:1px solid var(--line); border-radius:6px;}
+  .selection-bar .hdr-row-toggle{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft);}
+
+  .field-list{display:flex; flex-direction:column; gap:8px;}
+  .field-chip{
+    display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fafaf8;
+    border:1px solid var(--line); border-radius:7px; font-size:12.5px;
+  }
+  .field-chip .fname{font-weight:600; flex:1;}
+  .field-chip .frange{font-family:var(--mono); color:var(--accent); font-size:11.5px;}
+  .field-chip .remove{cursor:pointer; color:var(--ink-faint); font-size:14px;}
+  .field-chip .remove:hover{color:var(--red);}
+
+  /* master table */
+  .master-toolbar{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .master-toolbar .stat{font-size:12px; color:var(--ink-soft);}
+  .master-table-container{overflow:auto; max-height:600px; border:1px solid var(--line); border-radius:8px; width:100%;}
+  .master-table-container-inner{transform-origin:0 0; display:inline-block; min-width:100%;}
+  table.master-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.master-table th{
+    text-align:left; padding:8px 10px; background:#fafaf8; border-bottom:1.5px solid var(--line);
+    font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--ink-soft); white-space:nowrap;
+    position:sticky; top:0; z-index:10; cursor:pointer; user-select:none;
+  }
+  table.master-table th:hover{background:#eee8e0;}
+  table.master-table th[data-col]:hover .filter-icon{opacity:0.8;}
+  table.master-table th .filter-icon{float:right; opacity:0.5; font-size:10px; margin-left:4px;}
+  table.master-table th.filtered .filter-icon{opacity:1; color:var(--accent);}
+  table.master-table td{padding:7px 10px; border-bottom:1px solid #ece9e3; position:relative;}
+  table.master-table td.conflict{background:var(--red-bg); color:var(--red); font-weight:600; cursor:pointer;}
+  table.master-table td.pending-edit{background:var(--blue-bg); color:var(--blue); font-weight:600; cursor:pointer;}
+  table.master-table tr.error-row td{background:#ffc1c1; border-top:2px solid var(--red); border-bottom:2px solid var(--red);}
+  table.master-table tr.error-row td:first-child{border-left:2px solid var(--red);}
+  table.master-table tr.error-row td:last-child{border-right:2px solid var(--red);}
+  table.master-table tr:hover td{background:#fafaf8;}
+  table.master-table tr:hover td.conflict{background:#f8d9d5;}
+  table.master-table tr:hover td.pending-edit{background:#d9e8f7;}
+  table.master-table tr.error-row:hover td{background:#ffb0b0;}
+
+  #overlay-carga{
+    position:fixed; inset:0; background:rgba(245,244,241,0.92); z-index:200;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  .overlay-spinner{
+    width:38px; height:38px; border:3px solid #e2dfd7; border-top-color:var(--accent);
+    border-radius:50%; animation:overlay-spin .8s linear infinite;
+  }
+  @keyframes overlay-spin{ to{ transform:rotate(360deg); } }
+  .overlay-text{font-size:14px; font-weight:600; color:var(--ink-soft);}
+
+  .tooltip-popover{
+    position:fixed; background:#fff; color:var(--ink); padding:0; border-radius:10px;
+    font-size:12px; width:400px; z-index:150; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--line);
+    max-height:70vh; overflow:auto;
+  }
+  .tooltip-popover .t-header{
+    padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;
+  }
+  .tooltip-popover .t-header .icon{font-size:18px;}
+  .tooltip-popover .t-title{font-weight:600; font-size:13px; flex:1;}
+  .tooltip-popover .t-title.conflict{color:var(--red);}
+  .tooltip-popover .t-title.info{color:var(--accent);}
+  .tooltip-popover .t-body{padding:14px 16px;}
+  .tooltip-popover .t-current{
+    padding:10px 12px; border-radius:6px; margin-bottom:12px;
+    font-size:12px;
+  }
+  .tooltip-popover .t-current-label{color:var(--ink-soft); font-size:11px; margin-bottom:4px;}
+  .tooltip-popover .t-current-value{font-weight:600; font-size:13px;}
+  .tooltip-popover .t-source-group{
+    background:#f5f5f5; padding:10px 12px; border-radius:6px; margin-bottom:8px; border:1px solid #d0d0d0;
+  }
+  .tooltip-popover .t-source-group.conflict{border-left:3px solid #999; background:#f5f5f5;}
+  .tooltip-popover .t-source-value{font-weight:600; font-size:12px; margin-bottom:6px;}
+  .tooltip-popover .t-source-item{font-size:11px; color:var(--ink-soft); margin-bottom:3px; padding-left:8px;}
+  .tooltip-popover .t-actions{padding:12px 16px; border-top:1px solid var(--line); display:flex; gap:8px; justify-content:flex-end;}
+  .tooltip-popover .t-actions button{font-size:12px; padding:7px 14px; border-radius:6px; border:1px solid var(--line); cursor:pointer; font-weight:600;}
+  .tooltip-popover .t-actions .btn-primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tooltip-popover .t-actions .btn-danger{background:var(--red); color:#fff; border-color:var(--red);}
+  .tooltip-popover .t-actions .btn-secondary{background:#fff; color:var(--ink);}
+  .tooltip-popover .t-actions button:hover{opacity:0.85;}
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100; display:flex;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    background:#fff; border-radius:12px; max-width:700px; width:100%; max-height:80vh;
+    overflow:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3);
+  }
+  .modal-header{
+    padding:20px 24px; border-bottom:1px solid var(--line); display:flex;
+    align-items:center; justify-content:space-between;
+  }
+  .modal-header h2{margin:0; font-size:16px; font-weight:600;}
+  .modal-header .close{
+    cursor:pointer; font-size:24px; color:var(--ink-soft); line-height:1;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    border-radius:6px; transition:.15s;
+  }
+  .modal-header .close:hover{background:var(--line); color:var(--accent);}
+  .modal-body{padding:20px 24px;}
+  .modal-field-item{
+    padding:12px 14px; background:var(--accent-soft); border:1px solid var(--accent);
+    border-radius:8px; margin-bottom:10px;
+  }
+  .modal-field-item .mf-name{font-weight:600; font-size:13px; margin-bottom:4px;}
+  .modal-field-item .mf-range{font-size:12px; color:var(--ink-soft); font-family:var(--mono);}
+
+  /* Modal de confirmación/prompt personalizado */
+  .custom-dialog-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .custom-dialog-box{
+    background:#fff; border-radius:10px; max-width:450px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.3);
+  }
+  .custom-dialog-header{
+    padding:18px 20px; border-bottom:1px solid var(--line);
+  }
+  .custom-dialog-title{margin:0; font-size:15px; font-weight:600;}
+  .custom-dialog-body{padding:20px;}
+  .custom-dialog-message{font-size:13px; color:var(--ink); margin-bottom:16px; line-height:1.5;}
+  .custom-dialog-input{
+    width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:6px;
+    font-size:13px; font-family:inherit;
+  }
+  textarea.custom-dialog-input{
+    font-family:inherit; line-height:1.4;
+  }
+  .custom-dialog-actions{
+    padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; justify-content:flex-end;
+  }
+  .custom-dialog-actions button{
+    font-size:13px; padding:8px 18px; border-radius:6px; border:none; cursor:pointer; font-weight:600;
+  }
+  .custom-dialog-btn-primary{background:var(--accent); color:#fff;}
+  .custom-dialog-btn-primary:hover{background:#244a3f;}
+  .custom-dialog-btn-secondary{background:#e8e8e6; color:var(--ink);}
+  .custom-dialog-btn-secondary:hover{background:#d8d8d6;}
+
+  .empty-state{text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:13px;}
+  .legend{display:flex; gap:18px; font-size:11.5px; color:var(--ink-soft); margin-bottom:14px;}
+  .legend .sw{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+
+  /* Modal de ordenamiento */
+  .sort-modal-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:10px;background:#fafaf8;border-radius:6px;}
+  .sort-modal-row select{flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;}
+  .sort-modal-row .remove-sort{cursor:pointer;color:var(--ink-faint);font-size:18px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;}
+  .sort-modal-row .remove-sort:hover{background:var(--red);color:#fff;}
+
+  /* Filtro desplegable en columnas */
+  .column-filter-dropdown{
+    position:absolute;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    padding:8px;min-width:200px;max-width:300px;z-index:100;display:flex;flex-direction:column;
+  }
+  .column-filter-dropdown .filter-search{
+    width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;margin-bottom:8px;
+  }
+  .column-filter-dropdown .filter-actions{
+    display:flex;gap:6px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line);
+  }
+  .column-filter-dropdown .filter-actions button{
+    flex:1;font-size:11px;padding:5px 10px;border-radius:4px;border:1px solid var(--line);cursor:pointer;font-weight:600;
+  }
+  .column-filter-dropdown .filter-options-container{
+    max-height:300px;overflow-y:auto;
+  }
+  .column-filter-dropdown .filter-option{
+    display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;cursor:pointer;border-radius:4px;
+  }
+  .column-filter-dropdown .filter-option:hover{background:var(--accent-soft);}
+</style>
+</head>
+<body>
+
+<!-- ============ SCREEN 1: PROYECTOS ============ -->
+<div class="screen active" id="screen-proyectos">
+  <div class="topbar">
+    <h1>DocRev</h1>
+  </div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:18px;font-weight:600;">Mis proyectos</div>
+        <div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">Cada proyecto tiene su propia base de datos de instrumentos y documentos.</div>
+      </div>
+    </div>
+    <div class="proj-grid" id="proj-grid"></div>
+  </div>
+</div>
+
+<!-- ============ SCREEN 2: DENTRO DEL PROYECTO ============ -->
+<div class="screen" id="screen-proyecto">
+  <div class="topbar">
+    <div class="back" onclick="goToProyectos()">‹ Proyectos</div>
+    <h1 id="proj-title">—</h1>
+    <span class="crumb" id="proj-crumb"></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <span id="save-status" style="font-size:12px;color:var(--ink-faint);display:flex;align-items:center;gap:5px;"></span>
+      <button class="btn small ghost" id="btn-edit-project" style="display:flex;align-items:center;gap:4px;">
+        ✏️ Editar nombre
+      </button>
+      <button class="btn small ghost danger" id="btn-delete-project" style="display:flex;align-items:center;gap:4px;">
+        🗑️ Eliminar proyecto
+      </button>
+    </div>
+  </div>
+  <div class="wrap-full">
+    <div class="tabs2">
+      <div class="tab2 active" data-tab2="documentos">Documentos</div>
+      <div class="tab2" data-tab2="instrumentos">Base de datos</div>
+      <div class="tab2" data-tab2="exportar">Exportar documentos</div>
+    </div>
+
+    <div id="tab2-documentos">
+      <div class="panel">
+        <h2>Documentos cargados</h2>
+        <p class="desc">Subí un Excel y configurá qué celdas contienen cada dato. Lo que coincida con la base existente queda igual; lo nuevo se agrega como columna; lo que difiera se marca para revisión.</p>
+        <div class="doclist" id="doc-list"></div>
+        <div style="margin-top:28px;">
+          <label class="upload-drop" id="upload-drop">
+            <input type="file" id="file-input" accept=".xlsx,.xls">
+            <div class="updrop-sub">Arrastrá tu archivo Excel aquí, o</div>
+            <div class="updrop-select-btn">Seleccionar archivo Excel</div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab2-instrumentos" style="display:none;">
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <h2 style="margin:0;">Base de datos</h2>
+          <button class="btn" id="btn-export-db" style="display:flex;align-items:center;gap:6px;">
+            📊 Exportar base de datos
+          </button>
+        </div>
+        <p class="desc">Cuando un instrumento tiene línea asociada, hereda automáticamente los datos de esa línea (temperatura, presión, fluido) y los compara contra los propios.</p>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--red-bg);border:1px solid var(--red);"></span>Discrepancia entre documentos</span>
+          <span><span class="sw" style="background:var(--blue-bg);border:1px solid var(--blue);"></span>Actualización de datos</span>
+          <span><span class="sw" style="background:#ffc1c1;border:2px solid var(--red);"></span>TAG duplicado en documento</span>
+        </div>
+        <div class="master-toolbar">
+          <span class="stat" id="master-stats-instrumentos"></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+            <button class="btn small ghost" id="btn-show-columns-instrumentos" style="display:none;align-items:center;gap:6px;">
+              👁️ Mostrar columnas
+            </button>
+            <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;">
+              🔍 Zoom:
+              <input type="range" id="zoom-instrumentos" min="50" max="150" value="100" step="10" style="width:100px;">
+              <span id="zoom-value-instrumentos" style="font-weight:600;min-width:35px;">100%</span>
+            </label>
+            <button class="btn small" id="btn-sort-instrumentos" style="display:flex;align-items:center;gap:6px;">
+              ⇅ Ordenar
+            </button>
+          </div>
+        </div>
+        <div class="master-table-container" id="master-table-wrap-instrumentos"></div>
+      </div>
+    </div>
+
+    <div id="tab2-exportar" style="display:none;">
+      <div class="panel">
+        <h2>📝 Actualizar documentos originales</h2>
+        <p class="desc">Esta sección permite actualizar documentos Excel originales manteniendo su formato y estructura.</p>
+
+        <div style="margin-top:40px;text-align:center;padding:60px 20px;background:#fafaf8;border-radius:8px;border:1px dashed var(--line);">
+          <div style="font-size:48px;margin-bottom:16px;opacity:0.3;">🚧</div>
+          <div style="font-size:16px;font-weight:600;color:var(--ink-soft);margin-bottom:8px;">
+            Funcionalidad en desarrollo
+          </div>
+          <div style="font-size:13px;color:var(--ink-faint);max-width:500px;margin:0 auto;">
+            Estamos diseñando la mejor forma de actualizar los documentos originales manteniendo todo su formato, fórmulas y estructura.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenido anterior comentado para futuro desarrollo
+    <div id="old-export-content" style="display:none;">
+      <div style="margin-top:20px;">
+        <h3 style="font-size:14px;margin:0 0 12px;">Modo de exportación</h3>
+        <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+          <label class="mode-card" style="flex:1;min-width:280px;">
+            <input type="radio" name="export-mode" value="tabla" checked>
+            <div class="mc-title">📊 Base de datos</div>
+            <div class="mc-desc">Exporta la base de datos consolidada en un Excel nuevo</div>
+          </label>
+          <label class="mode-card" style="flex:1;min-width:280px;">
+            <input type="radio" name="export-mode" value="documento">
+            <div class="mc-title">📝 Actualizar documento original</div>
+            <div class="mc-desc">Modifica un documento existente manteniendo su estructura, formato y datos fijos</div>
+          </label>
+        </div>
+
+        <div id="export-tabla-options">
+            <div style="background:#f9f9f7;padding:12px 14px;border-radius:8px;border:1px solid var(--line);margin-bottom:20px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Base de datos: Instrumentos</div>
+              <div style="font-size:12px;color:var(--ink-soft);" id="export-inst-desc">—</div>
+            </div>
+
+            <h3 style="font-size:14px;margin:20px 0 12px;">Columnas a incluir</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="export-all-columns" checked>
+                <span>Incluir todas las columnas</span>
+              </label>
+              <div id="export-columns-selector" style="display:none;margin-left:24px;margin-top:8px;"></div>
+            </div>
+
+            <h3 style="font-size:14px;margin:20px 0 12px;">Filas a incluir</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" name="export-rows" value="all" checked>
+                <span>Todas las filas (<span id="export-total-rows">0</span>)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" name="export-rows" value="conflicts">
+                <span>Solo filas con discrepancias (<span id="export-conflict-rows">0</span>)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" name="export-rows" value="edited">
+                <span>Solo filas editadas manualmente (<span id="export-edited-rows">0</span>)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" name="export-rows" value="custom">
+                <span>Personalizado</span>
+              </label>
+              <div id="export-custom-rows" style="display:none;margin-left:24px;margin-top:8px;">
+                <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Seleccioná los instrumentos a exportar:</div>
+                <div id="export-rows-selector" style="max-height:250px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fafaf8;"></div>
+              </div>
+            </div>
+
+            <h3 style="font-size:14px;margin:20px 0 12px;">Opciones adicionales</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="export-with-comments">
+                <span>Incluir hoja adicional con comentarios de edición</span>
+              </label>
+            </div>
+
+            <div style="display:flex;gap:12px;">
+              <button class="btn" id="btn-export-excel" style="display:flex;align-items:center;gap:8px;">
+                📊 Exportar base de datos
+              </button>
+            </div>
+          </div>
+
+          <!-- Modo Documento Original -->
+          <div id="export-documento-options" style="display:none;">
+            <h3 style="font-size:14px;margin:0 0 12px;">Seleccioná el documento a actualizar</h3>
+            <div id="export-docs-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;"></div>
+
+            <div style="background:var(--accent-soft);padding:14px;border-radius:8px;border:1px solid var(--accent);margin-bottom:20px;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px;">ℹ️ Cómo funciona:</div>
+              <ul style="font-size:11.5px;margin:4px 0;padding-left:20px;line-height:1.6;">
+                <li>Se mantiene el formato original del Excel (colores, fórmulas, hojas adicionales)</li>
+                <li>Solo se actualizan las celdas en el rango de datos que configuraste</li>
+                <li>Si agregaste instrumentos/líneas en la base, se insertan filas nuevas</li>
+                <li>El contenido después del rango se desplaza automáticamente</li>
+              </ul>
+            </div>
+
+            <div style="display:flex;gap:12px;">
+              <button class="btn" id="btn-export-document" style="display:flex;align-items:center;gap:8px;" disabled>
+                📝 Exportar documento actualizado
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    -->
+
+  </div>
+</div>
+
+<!-- ============ SCREEN 3: CONFIGURAR DOCUMENTO (vista grilla) ============ -->
+<div class="screen" id="screen-mapeo">
+  <div class="topbar">
+    <div class="back" onclick="goToProyectoDocs()">‹ Documentos</div>
+    <h1>Configurar documento</h1>
+    <span class="crumb" id="mapeo-filename"></span>
+  </div>
+  <div class="wrap-full">
+    <div class="panel">
+      <h2>¿Cómo está organizada la información en este documento?</h2>
+      <p class="desc">Elegí el modo según cómo está armado el archivo.</p>
+      <div style="display:flex; gap:12px;">
+        <label class="mode-card" id="mode-card-tabla">
+          <input type="radio" name="docmode" value="tabla" checked>
+          <div class="mc-title">Tabla (una fila = un objeto)</div>
+          <div class="mc-desc">Ej. Listado de Líneas, Listado de Instrumentos, I/O List. Cada columna es un dato, cada fila es un objeto distinto.</div>
+        </label>
+        <label class="mode-card" id="mode-card-hojas">
+          <input type="radio" name="docmode" value="hojas">
+          <div class="mc-title">Una hoja = un objeto</div>
+          <div class="mc-desc">Ej. hojas de datos repetidas, una por cada equipo. La misma celda (ej. J7) tiene el mismo dato en cada hoja, pero referido a un objeto distinto.</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-hojas-selector" style="display:none;">
+      <h2>¿Qué hojas representan objetos?</h2>
+      <p class="desc">Desmarcá las que no correspondan (portada, índice, notas, etc.).</p>
+      <div id="hojas-checklist" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
+    <div class="panel" id="panel-rango-filas">
+      <h2>¿De qué hoja y qué filas son los datos? <span style="color:var(--red);">*</span></h2>
+      <p class="desc">Elegí la hoja del Excel y el rango de filas con datos (sin contar encabezados). <strong>Hacé click en "Desde" o "Hasta"</strong>, después clickeá una fila en la grilla (pinta toda la fila). También podés escribir el número a mano.</p>
+      <div id="rango-filas-controles" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:12.5px;">Hoja:</span>
+        <select id="rango-hoja-select" style="min-width:140px;"></select>
+        <span style="font-size:12.5px;">Desde la fila</span>
+        <input type="number" id="rango-fila-desde" min="1" placeholder="click aquí" style="width:90px; height:28px; padding:4px 8px;">
+        <span style="font-size:12.5px;">hasta la fila</span>
+        <input type="number" id="rango-fila-hasta" min="1" placeholder="click aquí" style="width:90px; height:28px; padding:4px 8px;">
+      </div>
+    </div>
+
+
+    <div class="panel" id="panel-agregar-columna">
+      <h2>Agregá una columna de datos</h2>
+      <p class="desc" id="agregar-columna-desc-top">Asignale un nombre a la columna de datos que quieras extraer.</p>
+
+      <div id="celda-manual-row" style="display:none; align-items:center; gap:10px; margin-bottom:10px;">
+        <span style="font-size:12.5px;">Celda fija (ej. J7):</span>
+        <input type="text" id="manual-range-edit" placeholder="J7 (Enter para aplicar)" style="width:160px;font-family:var(--mono);font-size:12px;text-transform:uppercase;">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:12.5px;">Nombre del campo:</span>
+        <select id="field-name-select" style="width:320px;"></select>
+        <input type="text" id="field-name-input" placeholder="" style="width:320px; display:none;">
+      </div>
+
+      <p class="desc" id="agregar-columna-desc" style="margin-top:10px;margin-bottom:0;"><strong>Hacé click en "Seleccionar columna"</strong>, después clickeá una letra de columna en la grilla (pinta toda la columna). También podés escribir la letra a mano.</p>
+
+      <div style="margin-top:14px;">
+        <div id="columnas-inputs-wrap" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+        <div style="margin-top:12px;">
+          <button class="btn small" id="btn-add-field">Confirmar campo</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel" id="panel-grilla">
+      <h2>Grilla del documento</h2>
+      <p class="desc" id="mapeo-instructions">Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre arriba. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.</p>
+
+      <div class="sheet-toolbar">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12px;font-weight:600;">Hoja:</span>
+          <select id="grid-sheet-selector" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;"></select>
+        </div>
+        <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;margin-left:auto;">
+          🔍 Zoom:
+          <input type="range" id="zoom-grid" min="50" max="150" value="100" step="10" style="width:100px;">
+          <span id="zoom-grid-value" style="font-weight:600;min-width:35px;">100%</span>
+        </label>
+        <span style="font-size:11.5px;color:var(--ink-soft);">Click en columna/fila · Ctrl+scroll para zoom</span>
+      </div>
+
+      <div class="grid-scroll-top" id="grid-scroll-top">
+        <div class="grid-scroll-top-inner" id="grid-scroll-top-inner"></div>
+      </div>
+      <div class="grid-container" id="grid-container"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Campos definidos en este documento</h2>
+      <p class="desc">Estos son los campos que se van a comparar o agregar a la base del proyecto.</p>
+      <div class="field-list" id="field-list"></div>
+      <div id="no-fields-msg" class="empty-state" style="display:none;padding:20px;">Todavía no definiste ningún campo.</div>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn ghost" onclick="goToProyectoDocs()">Cancelar</button>
+        <button class="btn" id="btn-process-doc">Procesar y comparar con la base →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay-carga" style="display:none;">
+  <div class="overlay-spinner"></div>
+  <div class="overlay-text">Cargando...</div>
+</div>
+
+<script>
+// ---------- modales personalizados (reemplazan alert/confirm/prompt de Chrome) ----------
+function customConfirm(message, title = 'Confirmar') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.innerHTML = `
+      <div class="custom-dialog-box">
+        <div class="custom-dialog-header">
+          <h3 class="custom-dialog-title">${escapeHtml(title)}</h3>
+        </div>
+        <div class="custom-dialog-body">
+          <div class="custom-dialog-message">${message}</div>
+        </div>
+        <div class="custom-dialog-actions">
+          <button class="custom-dialog-btn-secondary" data-action="cancel">Cancelar</button>
+          <button class="custom-dialog-btn-primary" data-action="confirm">Aceptar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+      overlay.remove();
+      resolve(false);
+    });
+    overlay.querySelector('[data-action="confirm"]').addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
+  });
+}
+
+function customPrompt(message, defaultValue = '', title = 'Ingresá el valor') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.innerHTML = `
+      <div class="custom-dialog-box">
+        <div class="custom-dialog-header">
+          <h3 class="custom-dialog-title">${escapeHtml(title)}</h3>
+        </div>
+        <div class="custom-dialog-body">
+          <div class="custom-dialog-message">${message}</div>
+          <input type="text" class="custom-dialog-input" value="${escapeHtml(defaultValue)}">
+        </div>
+        <div class="custom-dialog-actions">
+          <button class="custom-dialog-btn-secondary" data-action="cancel">Cancelar</button>
+          <button class="custom-dialog-btn-primary" data-action="confirm">Aceptar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector('.custom-dialog-input');
+    input.focus();
+    input.select();
+
+    const handleConfirm = () => {
+      const value = input.value;
+      overlay.remove();
+      resolve(value);
+    };
+
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+      overlay.remove();
+      resolve(null);
+    });
+    overlay.querySelector('[data-action="confirm"]').addEventListener('click', handleConfirm);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleConfirm();
+      if (e.key === 'Escape') {
+        overlay.remove();
+        resolve(null);
+      }
+    });
+  });
+}
+
+function customAlert(message, title = 'Aviso') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.innerHTML = `
+      <div class="custom-dialog-box">
+        <div class="custom-dialog-header">
+          <h3 class="custom-dialog-title">${escapeHtml(title)}</h3>
+        </div>
+        <div class="custom-dialog-body">
+          <div class="custom-dialog-message">${message}</div>
+        </div>
+        <div class="custom-dialog-actions">
+          <button class="custom-dialog-btn-primary" data-action="ok">Aceptar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('[data-action="ok"]').addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
+  });
+}
+
+function customEditWithComment(message, defaultValue = '', defaultComment = '') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.innerHTML = `
+      <div class="custom-dialog-box">
+        <div class="custom-dialog-header">
+          <h3 class="custom-dialog-title">Editar valor</h3>
+        </div>
+        <div class="custom-dialog-body">
+          <div class="custom-dialog-message">${message}</div>
+          <input type="text" class="custom-dialog-input" id="edit-value-input" value="${escapeHtml(defaultValue)}" style="margin-bottom:10px;">
+          <label style="display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;">Comentario (opcional):</label>
+          <textarea class="custom-dialog-input" id="edit-comment-input" placeholder="¿Por qué editaste este valor?" style="min-height:60px;resize:vertical;">${escapeHtml(defaultComment)}</textarea>
+        </div>
+        <div class="custom-dialog-actions">
+          <button class="custom-dialog-btn-secondary" data-action="cancel">Cancelar</button>
+          <button class="custom-dialog-btn-primary" data-action="confirm">Guardar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const valueInput = overlay.querySelector('#edit-value-input');
+    const commentInput = overlay.querySelector('#edit-comment-input');
+    valueInput.focus();
+    valueInput.select();
+
+    const handleConfirm = () => {
+      const value = valueInput.value;
+      const comment = commentInput.value.trim();
+      overlay.remove();
+      resolve({ value, comment });
+    };
+
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+      overlay.remove();
+      resolve(null);
+    });
+    overlay.querySelector('[data-action="confirm"]').addEventListener('click', handleConfirm);
+    valueInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) handleConfirm();
+      if (e.key === 'Escape') {
+        overlay.remove();
+        resolve(null);
+      }
+    });
+  });
+}
+
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://azirlerdgwashkgwtsmi.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yPmSwCVzNib2McRUUikvog_CbuSObKp';
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------- estado global (persistido en Supabase) ----------
+const appState = {
+  proyectos: [],
+  proyectoActualId: null,
+  docActualId: null,
+  originalWorkbooks: {}, // { docId: workbook original completo }
+  // mapeo en construccion
+  draft: {
+    sheets: null,        // { sheetName: [[...rows...]] }
+    sheetNames: [],
+    activeSheet: null,
+    selecting: false,
+    selStart: null,
+    selEnd: null,
+    fields: []           // [{ name, sheet, range:{r1,c1,r2,c2}, repeatAcrossSheets:false }]
+  },
+  tablas: {
+    instrumentos: { columns: [], rows: [] },
+    lineas: { columns: [], rows: [] }
+  }
+};
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+// ---------- sincronización con Supabase ----------
+let guardadoTimer = null;
+let guardadoEnCurso = false;
+let guardadoPendiente = false;
+
+function setSaveStatus(texto, esError){
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.textContent = texto;
+  el.style.color = esError ? 'var(--red)' : 'var(--ink-faint)';
+}
+
+// Debounce: agrupa cambios seguidos en un solo guardado, 1.2s después del último cambio
+function scheduleGuardado(){
+  if (!appState.proyectoActualId) return;
+  setSaveStatus('● Cambios sin guardar');
+  clearTimeout(guardadoTimer);
+  guardadoTimer = setTimeout(() => { guardarProyectoActual(); }, 1200);
+}
+
+async function cargarProyectos(){
+  const { data, error } = await supa.from('proyectos').select('*').order('creado', { ascending:false });
+  if (error){ console.error(error); await customAlert('No se pudieron cargar los proyectos: ' + error.message, 'Error de conexión'); return; }
+  const { data: docsCount } = await supa.from('documentos').select('proyecto_id');
+  const conteos = {};
+  (docsCount||[]).forEach(d => { conteos[d.proyecto_id] = (conteos[d.proyecto_id]||0) + 1; });
+  appState.proyectos = (data||[]).map(row => ({
+    id: row.id,
+    nombre: row.nombre,
+    creado: new Date(row.creado).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}),
+    docs: new Array(conteos[row.id]||0).fill(null) // placeholder solo para el conteo en la grilla; se reemplaza al abrir el proyecto
+  }));
+}
+
+// Carga todos los datos de un proyecto puntual (documentos, tablas, prefs) desde Supabase
+async function cargarProyectoCompleto(proyectoId){
+  const [docsRes, instrRes, lineasRes, metaRes, prefsRes] = await Promise.all([
+    supa.from('documentos').select('*').eq('proyecto_id', proyectoId).order('orden', { ascending:true }),
+    supa.from('instrumentos').select('*').eq('proyecto_id', proyectoId),
+    supa.from('lineas').select('*').eq('proyecto_id', proyectoId),
+    supa.from('tablas_meta').select('*').eq('proyecto_id', proyectoId),
+    supa.from('tabla_prefs').select('*').eq('proyecto_id', proyectoId),
+  ]);
+
+  const errores = [docsRes, instrRes, lineasRes, metaRes, prefsRes].map(r=>r.error).filter(Boolean);
+  if (errores.length){
+    console.error(errores);
+    await customAlert('No se pudo cargar el proyecto: ' + errores[0].message, 'Error de conexión');
+    throw errores[0];
+  }
+
+  const p = appState.proyectos.find(x=>x.id===proyectoId);
+
+  p.docs = (docsRes.data||[]).map(row => ({
+    id: row.id,
+    filename: row.filename,
+    fields: row.fields || [],
+    fecha: new Date(row.fecha).toLocaleDateString('es-AR',{day:'numeric',month:'short'}),
+    mode: row.mode,
+    hojasValidas: row.hojas_validas || null,
+    rangoFilas: row.rango_filas || null,
+    __originalPath: row.original_file_path || null
+  }));
+
+  appState.originalWorkbooks = {};
+
+  function filaARow(row){
+    const out = { __tag: row.tag, __sources: row.sources || {} };
+    Object.entries(row.data || {}).forEach(([k,v]) => out[k] = v);
+    if (row.conflict && Object.keys(row.conflict).length) out.__conflict = row.conflict;
+    if (row.linea_asociada !== null && row.linea_asociada !== undefined) out.__linea_asociada__ = row.linea_asociada;
+    if (row.duplicated) out.__duplicated = true;
+    if (row.duplicated_docs && row.duplicated_docs.length) out.__duplicatedDocs = row.duplicated_docs;
+    if (row.fila_excel) out.__filaExcel = row.fila_excel;
+    if (row.hoja_excel) out.__hojaExcel = row.hoja_excel;
+    if (row.edit_comments && Object.keys(row.edit_comments).length) out.__editComment = row.edit_comments;
+    if (row.pending_edit && Object.keys(row.pending_edit).length) out.__pendingEdit = row.pending_edit;
+    out.__dbId = row.id; // referencia interna, no se exporta
+    return out;
+  }
+
+  const metaInstr = (metaRes.data||[]).find(m => m.tipo === 'instrumentos');
+  const metaLineas = (metaRes.data||[]).find(m => m.tipo === 'lineas');
+  appState.tablas = {
+    instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrRes.data||[]).map(filaARow) },
+    lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasRes.data||[]).map(filaARow) }
+  };
+
+  appState.tableFilters = {}; appState.tableSorts = {}; appState.hiddenColumns = {};
+  (prefsRes.data||[]).forEach(row => {
+    appState.tableFilters[row.tipo] = row.filters || {};
+    appState.tableSorts[row.tipo] = row.sorts || [];
+    appState.hiddenColumns[row.tipo] = row.hidden_columns || [];
+  });
+
+  const pFull = appState.proyectos.find(x=>x.id===proyectoId);
+  document.getElementById('proj-crumb').textContent = `${pFull.docs.length} documento(s) cargado(s)`;
+}
+
+// Sube el archivo original (bytes) de un documento al bucket 'originales', si todavía no fue subido
+async function subirOriginalSiHaceFalta(proyectoId, doc){
+  if (doc.__originalPath) return doc.__originalPath;
+  const wbEntry = appState.originalWorkbooks[doc.id];
+  if (!wbEntry || !wbEntry.data) return null;
+  const path = `${proyectoId}/${doc.id}.xlsx`;
+  const { error } = await supa.storage.from('originales').upload(path, new Blob([wbEntry.data]), {
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    upsert: true
+  });
+  if (error){ console.error('Error subiendo original:', error); return null; }
+  doc.__originalPath = path;
+  return path;
+}
+
+// Descarga (si hace falta) el archivo original de un documento para poder exportarlo actualizado
+async function asegurarOriginalDescargado(doc){
+  if (appState.originalWorkbooks[doc.id]) return true;
+  if (!doc.__originalPath) return false;
+  const { data, error } = await supa.storage.from('originales').download(doc.__originalPath);
+  if (error){ console.error(error); return false; }
+  const buf = new Uint8Array(await data.arrayBuffer());
+  const wb = XLSX.read(buf, { type:'array', cellStyles:true });
+  appState.originalWorkbooks[doc.id] = { workbook: wb, data: buf };
+  return true;
+}
+
+// Guardado completo (snapshot) del proyecto abierto: reemplaza documentos/instrumentos/lineas/meta/prefs
+async function guardarProyectoActual(){
+  const proyectoId = appState.proyectoActualId;
+  if (!proyectoId) return;
+  if (guardadoEnCurso){ guardadoPendiente = true; return; }
+  guardadoEnCurso = true;
+  setSaveStatus('⏳ Guardando...');
+  try {
+    const p = appState.proyectos.find(x=>x.id===proyectoId);
+    if (!p) return;
+
+    // 1) subir archivos originales pendientes
+    for (const doc of p.docs) { await subirOriginalSiHaceFalta(proyectoId, doc); }
+
+    // 2) documentos: borrar e insertar de nuevo (snapshot completo)
+    await supa.from('documentos').delete().eq('proyecto_id', proyectoId);
+    if (p.docs.length){
+      const filasDocs = p.docs.map((d, i) => ({
+        id: d.id, proyecto_id: proyectoId, filename: d.filename, fields: d.fields,
+        mode: d.mode, hojas_validas: d.hojasValidas, rango_filas: d.rangoFilas,
+        original_file_path: d.__originalPath || null, orden: i
+      }));
+      const { error } = await supa.from('documentos').insert(filasDocs);
+      if (error) throw error;
+    }
+
+    // 3) instrumentos y líneas: borrar e insertar de nuevo
+    for (const tipo of ['instrumentos','lineas']){
+      await supa.from(tipo).delete().eq('proyecto_id', proyectoId);
+      const tabla = appState.tablas[tipo];
+      if (tabla.rows.length){
+        const filas = tabla.rows.map(r => {
+          const data = {};
+          tabla.columns.forEach(c => {
+            if (c === '__linea_asociada__') return;
+            if (r[c] !== undefined) data[c] = r[c];
+          });
+          return {
+            proyecto_id: proyectoId,
+            tag: r.__tag,
+            data,
+            sources: r.__sources || {},
+            conflict: r.__conflict || {},
+            linea_asociada: r.__linea_asociada__ ?? null,
+            duplicated: !!r.__duplicated,
+            duplicated_docs: r.__duplicatedDocs || [],
+            fila_excel: r.__filaExcel || null,
+            hoja_excel: r.__hojaExcel || null,
+            edit_comments: r.__editComment || {},
+            pending_edit: r.__pendingEdit || {}
+          };
+        });
+        const { error } = await supa.from(tipo).insert(filas);
+        if (error) throw error;
+      }
+    }
+
+    // 4) metadata de columnas
+    for (const tipo of ['instrumentos','lineas']){
+      const { error } = await supa.from('tablas_meta').upsert({
+        proyecto_id: proyectoId, tipo, columns: appState.tablas[tipo].columns
+      });
+      if (error) throw error;
+    }
+
+    // 5) preferencias de vista (filtros, orden, columnas ocultas)
+    for (const tipo of ['instrumentos','lineas']){
+      const { error } = await supa.from('tabla_prefs').upsert({
+        proyecto_id: proyectoId, tipo,
+        filters: (appState.tableFilters && appState.tableFilters[tipo]) || {},
+        sorts: (appState.tableSorts && appState.tableSorts[tipo]) || [],
+        hidden_columns: (appState.hiddenColumns && appState.hiddenColumns[tipo]) || []
+      });
+      if (error) throw error;
+    }
+
+    setSaveStatus('✓ Guardado');
+  } catch (err){
+    console.error(err);
+    setSaveStatus('⚠️ Error al guardar', true);
+  } finally {
+    guardadoEnCurso = false;
+    if (guardadoPendiente){ guardadoPendiente = false; guardarProyectoActual(); }
+  }
+}
+
+// ---------- navegación ----------
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+async function goToProyectos(){
+  appState.proyectoActualId = null;
+  showScreen('screen-proyectos');
+  mostrarOverlayCarga();
+  await cargarProyectos();
+  ocultarOverlayCarga();
+  renderProyectos();
+}
+function goToProyectoDocs(){
+  showScreen('screen-proyecto');
+  setTab2('documentos');
+  renderDocList();
+}
+async function abrirProyecto(id){
+  appState.proyectoActualId = id;
+  const p = appState.proyectos.find(x=>x.id===id);
+  document.getElementById('proj-title').textContent = p.nombre;
+  setSaveStatus('');
+  mostrarOverlayCarga();
+  try {
+    await cargarProyectoCompleto(id);
+  } catch (e) {
+    ocultarOverlayCarga();
+    appState.proyectoActualId = null;
+    return;
+  }
+  ocultarOverlayCarga();
+  goToProyectoDocs();
+}
+
+async function editarNombreProyecto(){
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  if (!p) return;
+
+  const nuevoNombre = await customPrompt('¿Cómo querés llamar al proyecto?', p.nombre, 'Editar nombre del proyecto');
+  if (!nuevoNombre || !nuevoNombre.trim()) return;
+  if (nuevoNombre.trim() === p.nombre) return;
+
+  p.nombre = nuevoNombre.trim();
+  document.getElementById('proj-title').textContent = p.nombre;
+  const { error } = await supa.from('proyectos').update({ nombre: p.nombre }).eq('id', p.id);
+  if (error){ await customAlert('No se pudo renombrar el proyecto: ' + error.message, 'Error'); return; }
+  await customAlert(`Proyecto renombrado a "${escapeHtml(p.nombre)}".`, 'Renombrado');
+}
+
+async function eliminarProyecto(){
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  if (!p) return;
+
+  // Contar recursos
+  const docsCount = p.docs.length;
+  const instCount = appState.tablas.instrumentos.rows.length;
+
+  // Confirmación
+  const confirmar = await customConfirm(
+    `¿Estás seguro de que querés eliminar el proyecto <strong>"${escapeHtml(p.nombre)}"</strong>?<br><br>
+    <div style="background:var(--red-bg);padding:14px;border-radius:6px;margin-top:10px;">
+      <div style="font-weight:600;margin-bottom:8px;">⚠️ Se eliminarán permanentemente:</div>
+      <ul style="margin:0;padding-left:20px;line-height:1.8;">
+        <li>${docsCount} documento(s) cargado(s)</li>
+        <li>${instCount} instrumento(s) en la base de datos</li>
+        <li>Todos los filtros, ordenamientos y configuraciones</li>
+      </ul>
+      <div style="margin-top:12px;font-weight:600;color:var(--red);">
+        Esta acción no se puede deshacer.
+      </div>
+    </div>`,
+    'Eliminar proyecto'
+  );
+
+  if (!confirmar) return;
+
+  // Doble confirmación para mayor seguridad
+  const confirmar2 = await customConfirm(
+    `<div style="text-align:center;padding:20px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px;">¿Estás completamente seguro?</div>
+      <div style="font-size:13px;color:var(--ink-soft);">
+        Vas a eliminar el proyecto "${escapeHtml(p.nombre)}" con todos sus datos.<br>
+        No hay forma de recuperarlo.
+      </div>
+    </div>`,
+    'Confirmación final'
+  );
+
+  if (!confirmar2) return;
+
+  mostrarOverlayCarga();
+
+  const proyectoIdAEliminar = appState.proyectoActualId;
+
+  // Borrar archivos originales del bucket (best-effort)
+  try {
+    const { data: archivos } = await supa.storage.from('originales').list(proyectoIdAEliminar);
+    if (archivos && archivos.length){
+      await supa.storage.from('originales').remove(archivos.map(a => `${proyectoIdAEliminar}/${a.name}`));
+    }
+  } catch(e){ console.warn('No se pudieron borrar los archivos originales del storage', e); }
+
+  // Borrar el proyecto en Supabase (cascade borra documentos/instrumentos/lineas/meta/prefs)
+  const { error } = await supa.from('proyectos').delete().eq('id', proyectoIdAEliminar);
+  if (error){
+    ocultarOverlayCarga();
+    await customAlert('No se pudo eliminar el proyecto: ' + error.message, 'Error');
+    return;
+  }
+
+  // Eliminar el proyecto del estado local
+  appState.proyectos = appState.proyectos.filter(x => x.id !== proyectoIdAEliminar);
+
+  // Limpiar datos asociados
+  delete appState.originalWorkbooks[proyectoIdAEliminar];
+
+  // Limpiar tablas
+  appState.tablas.instrumentos = { columns: [], rows: [] };
+  appState.tablas.lineas = { columns: [], rows: [] };
+
+  ocultarOverlayCarga();
+
+  // Volver a la lista de proyectos
+  appState.proyectoActualId = null;
+  await goToProyectos();
+
+  await customAlert(`Proyecto "${escapeHtml(p.nombre)}" eliminado correctamente.`, 'Eliminado');
+}
+
+// Event listeners para botones del proyecto
+document.getElementById('btn-edit-project').addEventListener('click', editarNombreProyecto);
+document.getElementById('btn-delete-project').addEventListener('click', eliminarProyecto);
+
+function setTab2(name){
+  document.querySelectorAll('.tab2[data-tab2]').forEach(t=>t.classList.toggle('active', t.dataset.tab2===name));
+  document.getElementById('tab2-documentos').style.display = name==='documentos' ? 'block':'none';
+  document.getElementById('tab2-instrumentos').style.display = name==='instrumentos' ? 'block':'none';
+  document.getElementById('tab2-exportar').style.display = name==='exportar' ? 'block':'none';
+  if (name==='instrumentos') renderMasterTable('instrumentos');
+  if (name==='exportar') actualizarVistaExportar();
+}
+document.querySelectorAll('.tab2[data-tab2]').forEach(t=>t.addEventListener('click', ()=>setTab2(t.dataset.tab2)));
+
+// ---------- pantalla 1: proyectos ----------
+function renderProyectos(){
+  const grid = document.getElementById('proj-grid');
+  grid.innerHTML = '';
+  appState.proyectos.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'proj-card';
+    card.innerHTML = `<div class="name">${escapeHtml(p.nombre)}</div><div class="meta">${p.docs.length} documento(s)</div><div class="meta" style="margin-top:2px;">Creado ${escapeHtml(p.creado)}</div>`;
+    card.addEventListener('click', ()=>abrirProyecto(p.id));
+    grid.appendChild(card);
+  });
+  const newCard = document.createElement('div');
+  newCard.className = 'proj-card new';
+  newCard.innerHTML = `<div class="plus">+</div><div>Nuevo proyecto</div>`;
+  newCard.addEventListener('click', crearProyecto);
+  grid.appendChild(newCard);
+}
+async function crearProyecto(){
+  const nombre = await customPrompt('¿Cómo se llama el proyecto?', '', 'Crear nuevo proyecto');
+  if (!nombre || !nombre.trim()) return;
+  mostrarOverlayCarga();
+  const { data, error } = await supa.from('proyectos').insert({ nombre: nombre.trim() }).select().single();
+  ocultarOverlayCarga();
+  if (error){ await customAlert('No se pudo crear el proyecto: ' + error.message, 'Error'); return; }
+  const p = { id: data.id, nombre: data.nombre, creado: new Date(data.creado).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}), docs:[] };
+  appState.proyectos.push(p);
+  renderProyectos();
+}
+
+// ---------- arranque ----------
+(async function iniciar(){
+  mostrarOverlayCarga();
+  await cargarProyectos();
+  ocultarOverlayCarga();
+  renderProyectos();
+})();
+
+// ---------- pantalla 2: documentos del proyecto ----------
+function renderDocList(){
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  const list = document.getElementById('doc-list');
+  if (!p.docs.length){
+    list.innerHTML = `<div class="empty-state">Todavía no subiste documentos en este proyecto.</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  p.docs.forEach(d => {
+    const item = document.createElement('div');
+    item.className = 'doc-item';
+    item.innerHTML = `
+      <div class="ico">📄</div>
+      <div class="info"><div class="name">${escapeHtml(d.filename)}</div><div class="sub">${d.fields.length} campo(s) configurado(s) · subido ${escapeHtml(d.fecha)}</div></div>
+      <span class="status mapped">Procesado</span>
+    `;
+    item.style.cursor = 'pointer';
+    item.addEventListener('click', () => mostrarDetalleDocumento(d));
+    list.appendChild(item);
+  });
+}
+
+function mostrarDetalleDocumento(doc){
+  // Crear modal overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📄 ${escapeHtml(doc.filename)}</h2>
+        <div class="close">×</div>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">
+          Subido el ${escapeHtml(doc.fecha)} · ${doc.fields.length} campo(s) configurado(s)
+        </p>
+        <div id="modal-fields-list"></div>
+      </div>
+      <div class="modal-body" style="border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn ghost" id="btn-close-doc">Cerrar</button>
+        <button class="btn" id="btn-delete-doc" style="background:var(--red);border-color:var(--red);">🗑️ Eliminar documento</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Cerrar al clickear fuera o en la X
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay || e.target.classList.contains('close')) {
+      overlay.remove();
+    }
+  });
+
+  // Botón cerrar
+  overlay.querySelector('#btn-close-doc').addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  // Botón eliminar
+  overlay.querySelector('#btn-delete-doc').addEventListener('click', async () => {
+    await eliminarDocumento(doc.id);
+    overlay.remove();
+  });
+
+  // Renderizar la lista de campos
+  const fieldsList = overlay.querySelector('#modal-fields-list');
+  doc.fields.forEach(f => {
+    let labels;
+    if (f.mode === 'hojas') {
+      const celdaBase = f.ranges.length > 0 ? rangeLabel(f.ranges[0].r1, f.ranges[0].c1, f.ranges[0].r2, f.ranges[0].c2) : '';
+      // Usar las hojas aplicadas guardadas, o extraer de los ranges
+      let hojasInfo;
+      if (f.hojasAplicadas && f.hojasAplicadas.length > 0) {
+        hojasInfo = f.hojasAplicadas.join(', ');
+      } else {
+        hojasInfo = f.ranges.map(r => r.sheet).filter((v,i,a) => a.indexOf(v) === i).join(', ');
+      }
+      labels = `${celdaBase} (hojas: ${hojasInfo || 'todas las válidas'})`;
+    } else {
+      labels = f.ranges.map(r => `${escapeHtml(r.sheet)} ${rangeLabel(r.r1,r.c1,r.r2,r.c2)}`).join(' + ');
+    }
+
+    let separadorInfo = '';
+    if (f.ranges.length > 1 && f.separador !== undefined) {
+      let sepLabel = '';
+      switch(f.separador) {
+        case '': sepLabel = 'sin separador'; break;
+        case '-': sepLabel = 'guion (-)'; break;
+        case ' ': sepLabel = 'espacio'; break;
+        case '_': sepLabel = 'guion bajo (_)'; break;
+        default: sepLabel = `"${escapeHtml(f.separador)}"`; break;
+      }
+      separadorInfo = ` · Unir con: ${sepLabel}`;
+    }
+
+    let badge = '';
+    if (f.isTag && f.tagTipo === 'instrumentos') {
+      badge = ` <span style="background:var(--accent);color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:5px;">TAG INSTRUMENTO</span>`;
+    } else if (f.name === '__linea_asociada__') {
+      badge = ` <span style="background:#2c4f7c;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:5px;">LÍNEA ASOCIADA</span>`;
+    }
+
+    const nombreVisible = f.name === '__linea_asociada__' ? 'Línea asociada' : escapeHtml(f.name);
+
+    const fieldItem = document.createElement('div');
+    fieldItem.className = 'modal-field-item';
+    fieldItem.innerHTML = `
+      <div class="mf-name">${nombreVisible}${badge}</div>
+      <div class="mf-range">${labels}${separadorInfo}</div>
+    `;
+    fieldsList.appendChild(fieldItem);
+  });
+}
+
+async function eliminarDocumento(docId){
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  const doc = p.docs.find(d => d.id === docId);
+
+  if (!doc) return;
+
+  // Confirmación
+  const confirmar = await customConfirm(
+    `¿Estás seguro de que querés eliminar el documento <strong>"${escapeHtml(doc.filename)}"</strong>?<br><br>
+    <div style="background:var(--red-bg);padding:10px;border-radius:6px;margin-top:10px;">
+      ⚠️ Se eliminarán todos los datos que vinieron de este documento en la base de datos.
+    </div>`,
+    'Eliminar documento'
+  );
+
+  if (!confirmar) return;
+
+  mostrarOverlayCarga();
+
+  // Eliminar el documento del proyecto
+  p.docs = p.docs.filter(d => d.id !== docId);
+
+  // Eliminar todos los datos que vinieron de este documento en las tablas
+  ['instrumentos', 'lineas'].forEach(tipo => {
+    const tabla = appState.tablas[tipo];
+
+    tabla.rows.forEach(row => {
+      if (!row.__sources) return;
+
+      // Revisar cada columna
+      Object.keys(row.__sources).forEach(col => {
+        // Filtrar las fuentes que NO sean de este documento
+        const sourcesFiltradas = row.__sources[col].filter(s => s.doc !== doc.filename);
+
+        if (sourcesFiltradas.length === 0) {
+          // Si no quedan fuentes, vaciar la celda
+          row[col] = null;
+          delete row.__sources[col];
+          if (row.__conflict) delete row.__conflict[col];
+          if (row.__pendingEdit) delete row.__pendingEdit[col];
+        } else if (sourcesFiltradas.length < row.__sources[col].length) {
+          // Si se eliminaron algunas fuentes pero quedan otras
+          row.__sources[col] = sourcesFiltradas;
+
+          // Verificar si hay conflicto entre las fuentes restantes
+          const valoresUnicos = new Set(sourcesFiltradas.map(s => {
+            const v = (s.value === null || s.value === undefined) ? '' : String(s.value).trim();
+            return v;
+          }));
+
+          if (valoresUnicos.size > 1) {
+            // Aún hay conflicto
+            row.__conflict = row.__conflict || {};
+            row.__conflict[col] = true;
+          } else {
+            // Ya no hay conflicto
+            if (row.__conflict) delete row.__conflict[col];
+            // Actualizar el valor con el de la fuente restante
+            const valorRestante = sourcesFiltradas[0].value;
+            row[col] = valorRestante;
+          }
+        }
+      });
+    });
+
+    // Eliminar filas que solo tenían datos de este documento (todas sus columnas están vacías ahora)
+    tabla.rows = tabla.rows.filter(row => {
+      const tieneDatos = tabla.columns.some(col => {
+        const val = row[col];
+        return val !== null && val !== undefined && String(val).trim() !== '';
+      });
+      return tieneDatos;
+    });
+  });
+
+  // Re-fusionar instrumentos con líneas (por si cambió algo)
+  fusionarInstrumentosConLineas();
+
+  ocultarOverlayCarga();
+
+  // Actualizar la vista
+  renderDocList();
+  renderMasterTable('instrumentos');
+  scheduleGuardado();
+
+  await customAlert(`Documento "${escapeHtml(doc.filename)}" eliminado correctamente.`, 'Eliminado');
+}
+
+function procesarArchivoExcel(file){
+  if (!file) return;
+  const validExt = /\.(xlsx|xls)$/i.test(file.name);
+  if (!validExt){ alert('Solo se aceptan archivos Excel (.xlsx, .xls).'); return; }
+  mostrarOverlayCarga();
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    // pequeño delay para que el navegador pinte el overlay antes de bloquear el hilo con el parseo
+    setTimeout(() => {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array', cellStyles: true});
+      const sheets = {};
+      wb.SheetNames.forEach(name => {
+        sheets[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:false, defval:''});
+      });
+      appState.draft = {
+        filename: file.name,
+        sheets, sheetNames: wb.SheetNames, activeSheet: wb.SheetNames[0],
+        selectedCells: new Set(), columnasInputs: [{id:uid(), letra:''}], fields:[],
+        mode: 'tabla', hojasValidas: new Set(wb.SheetNames),
+        rangoFilas: null,
+        originalWorkbook: wb, // Guardar el workbook original completo
+        originalData: data    // Guardar los datos binarios originales también
+      };
+      showScreen('screen-mapeo');
+      document.getElementById('mapeo-filename').textContent = file.name;
+
+      // Resetear COMPLETAMENTE la UI al modo tabla
+      document.querySelector('#mode-card-tabla input').checked = true;
+      document.querySelector('#mode-card-hojas input').checked = false;
+      document.getElementById('panel-hojas-selector').style.display = 'none';
+      document.getElementById('panel-rango-filas').style.display = 'block';
+      document.getElementById('celda-manual-row').style.display = 'none';
+      document.getElementById('columnas-inputs-wrap').style.display = 'flex';
+      document.getElementById('mapeo-instructions').innerHTML = 'Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.';
+      document.getElementById('agregar-columna-desc').textContent = 'Hacé click en el campo "Seleccionar columna" y después clickeá cualquier celda en la grilla — o escribí la letra a mano.';
+
+      renderRangoHojaSelect();
+      resetRangoFilasUI();
+      renderHojasChecklist();
+      renderGrid();
+      renderFieldList();
+      renderFieldNameSelect();
+      renderColumnasInputs();
+      ocultarOverlayCarga();
+    }, 30);
+  };
+  reader.onerror = () => { ocultarOverlayCarga(); alert('No se pudo leer el archivo.'); };
+  reader.readAsArrayBuffer(file);
+}
+
+function mostrarOverlayCarga(){
+  document.getElementById('overlay-carga').style.display = 'flex';
+}
+function ocultarOverlayCarga(){
+  document.getElementById('overlay-carga').style.display = 'none';
+}
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  procesarArchivoExcel(e.target.files[0]);
+  e.target.value = '';
+});
+
+const dropZone = document.getElementById('upload-drop');
+['dragenter','dragover'].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.add('dragover');
+  });
+});
+['dragleave','dragend'].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.remove('dragover');
+  });
+});
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  procesarArchivoExcel(file);
+});
+
+// ---------- pantalla 3: mapeo / grilla ----------
+function colLetter(idx){
+  let s=''; idx++;
+  while(idx>0){ const rem=(idx-1)%26; s=String.fromCharCode(65+rem)+s; idx=Math.floor((idx-1)/26); }
+  return s;
+}
+function colIndexFromLetter(letter){
+  letter = letter.toUpperCase();
+  let n=0;
+  for (let i=0;i<letter.length;i++) n = n*26 + (letter.charCodeAt(i)-64);
+  return n-1;
+}
+function parseManualRange(text){
+  text = text.trim().toUpperCase();
+  const m = text.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+  if (!m) return null;
+  const c1 = colIndexFromLetter(m[1]); const r1 = parseInt(m[2])-1;
+  const c2 = m[3] ? colIndexFromLetter(m[3]) : c1;
+  const r2 = m[4] ? parseInt(m[4])-1 : r1;
+  return { r1:Math.min(r1,r2), r2:Math.max(r1,r2), c1:Math.min(c1,c2), c2:Math.max(c1,c2) };
+}
+
+// ---------- selección de celdas: ahora es un Set de celdas individuales, no solo un rectángulo ----------
+appState.draft.selectedCells = new Set(); // claves "r-c"
+appState.draft.columnasInputs = [{id:uid(), letra:''}]; // inputs de columna del campo en construcción (multi-columna)
+appState.draft.mode = 'tabla'; // 'tabla' | 'hojas'
+appState.draft.hojasValidas = new Set(); // para modo 'hojas': qué hojas representan instrumentos
+let inputColumnaEnfocado = null; // id del input de columna que tiene foco, para asignarle la letra al clickear la grilla
+
+function cellKey(r,c){ return r+'-'+c; }
+
+function renderRangoHojaSelect(){
+  const sel = document.getElementById('rango-hoja-select');
+  sel.innerHTML = '';
+  appState.draft.sheetNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  sel.value = appState.draft.activeSheet;
+}
+document.getElementById('rango-hoja-select').addEventListener('change', (e) => {
+  appState.draft.activeSheet = e.target.value;
+  renderGrid();
+});
+
+
+// Zoom en grilla con Ctrl + Rueda y con el slider
+let gridZoom = 1;
+
+// Event listener para el slider de zoom de la grilla
+document.addEventListener('DOMContentLoaded', () => {
+  const zoomGridSlider = document.getElementById('zoom-grid');
+  if (zoomGridSlider) {
+    zoomGridSlider.addEventListener('input', (e) => {
+      const zoom = e.target.value;
+      gridZoom = zoom / 100;
+      document.getElementById('zoom-grid-value').textContent = zoom + '%';
+      const inner = document.getElementById('grid-container-inner');
+      if (inner) inner.style.transform = `scale(${gridZoom})`;
+    });
+  }
+});
+
+document.getElementById('grid-container').addEventListener('wheel', (e) => {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -10 : 10;
+    const zoomSlider = document.getElementById('zoom-grid');
+    if (zoomSlider) {
+      const newZoom = Math.max(50, Math.min(150, parseInt(zoomSlider.value) + delta));
+      zoomSlider.value = newZoom;
+      gridZoom = newZoom / 100;
+      document.getElementById('zoom-grid-value').textContent = newZoom + '%';
+      const inner = document.getElementById('grid-container-inner');
+      if (inner) inner.style.transform = `scale(${gridZoom})`;
+    }
+  }
+}, { passive: false });
+
+function resetRangoFilasUI(){
+  document.getElementById('rango-fila-desde').value = '';
+  document.getElementById('rango-fila-hasta').value = '';
+  inputFilaEnfocado = null;
+  limpiarHighlightFila();
+}
+
+// recordamos cuál de los dos inputs de fila fue el último enfocado
+let inputFilaEnfocado = null;
+
+document.getElementById('rango-fila-desde').addEventListener('focus', () => {
+  inputFilaEnfocado = 'rango-fila-desde';
+  limpiarHighlightFila();
+});
+document.getElementById('rango-fila-hasta').addEventListener('focus', () => {
+  inputFilaEnfocado = 'rango-fila-hasta';
+  limpiarHighlightFila();
+});
+
+// Actualizar rangoFilas automáticamente cuando cambian los valores
+document.getElementById('rango-fila-desde').addEventListener('input', actualizarRangoFilasAutomatico);
+document.getElementById('rango-fila-hasta').addEventListener('input', actualizarRangoFilasAutomatico);
+
+function actualizarRangoFilasAutomatico(){
+  const desde = parseInt(document.getElementById('rango-fila-desde').value);
+  const hasta = parseInt(document.getElementById('rango-fila-hasta').value);
+
+  if (desde && hasta && desde <= hasta) {
+    appState.draft.rangoFilas = { r1: desde - 1, r2: hasta - 1 };
+    pintarColumnasAsignadas(); // Actualizar visualización de columnas seleccionadas
+  } else {
+    appState.draft.rangoFilas = null;
+  }
+}
+
+function limpiarHighlightFila(){
+  document.querySelectorAll('table.sheet-grid tr.fila-destacada').forEach(tr => tr.classList.remove('fila-destacada'));
+}
+
+function asignarFilaAInputEnfocado(r){
+  if (!inputFilaEnfocado) return; // Solo si un input está enfocado
+
+  const input = document.getElementById(inputFilaEnfocado);
+  input.value = r + 1;
+
+  limpiarHighlightFila();
+  const rowEl = document.querySelector(`table.sheet-grid td[data-rowheader="${r}"]`);
+  if (rowEl) rowEl.closest('tr').classList.add('fila-destacada');
+
+  // Actualizar rangoFilas automáticamente
+  actualizarRangoFilasAutomatico();
+
+  // Pasar automáticamente el foco al otro input para encadenar Desde → Hasta
+  if (inputFilaEnfocado === 'rango-fila-desde' && document.getElementById('rango-fila-hasta').value === ''){
+    document.getElementById('rango-fila-hasta').focus();
+  } else {
+    // Si ya llenó ambos, quitar el foco para que pueda seguir con las columnas
+    inputFilaEnfocado = null;
+    input.blur();
+  }
+}
+
+function renderHojasChecklist(){
+  const box = document.getElementById('hojas-checklist');
+  box.innerHTML = '';
+  appState.draft.sheetNames.forEach(name => {
+    const id = 'hojachk-' + name.replace(/\W/g,'');
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;';
+    const checked = appState.draft.hojasValidas.has(name);
+    label.innerHTML = `<input type="checkbox" ${checked?'checked':''} data-sheetname="${escapeHtml(name)}"> ${escapeHtml(name)}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) appState.draft.hojasValidas.add(name);
+      else appState.draft.hojasValidas.delete(name);
+    });
+    box.appendChild(label);
+  });
+}
+
+document.querySelectorAll('input[name="docmode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    appState.draft.mode = e.target.value;
+    const esHojas = e.target.value === 'hojas';
+    document.getElementById('panel-hojas-selector').style.display = esHojas ? 'block' : 'none';
+    document.getElementById('panel-rango-filas').style.display = esHojas ? 'none' : 'block';
+    document.getElementById('celda-manual-row').style.display = esHojas ? 'flex' : 'none';
+    document.getElementById('columnas-inputs-wrap').style.display = esHojas ? 'none' : 'flex';
+    document.getElementById('mapeo-instructions').innerHTML = esHojas
+      ? 'Elegí una celda (ej. J7) que tenga siempre el mismo dato en la misma posición, en cada hoja que representa un objeto. Vas a definir un campo por cada celda fija que quieras extraer (TAG, presión, etc.).'
+      : 'Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.';
+    document.getElementById('agregar-columna-desc').textContent = esHojas
+      ? 'Hacé click en una celda de la grilla (o escribí la celda arriba) y asignale un nombre acá.'
+      : 'Hacé click en el campo "Seleccionar columna" y después clickeá cualquier celda en la grilla — o escribí la letra a mano.';
+    appState.draft.selectedCells.clear();
+    appState.draft.columnasInputs = [{id:uid(), letra:''}];
+    inputColumnaEnfocado = null;
+    paintSelection();
+    pintarColumnasAsignadas();
+    hideSelectionBar();
+    renderColumnasInputs();
+  });
+});
+function renderGrid(){
+  // Actualizar el selector de hojas
+  const gridSheetSelector = document.getElementById('grid-sheet-selector');
+  if (gridSheetSelector) {
+    gridSheetSelector.innerHTML = '';
+    appState.draft.sheetNames.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === appState.draft.activeSheet) opt.selected = true;
+      gridSheetSelector.appendChild(opt);
+    });
+    // Agregar event listener cada vez que se renderiza
+    gridSheetSelector.onchange = (e) => {
+      appState.draft.activeSheet = e.target.value;
+      renderGrid();
+    };
+  }
+
+  const sheetData = appState.draft.sheets[appState.draft.activeSheet] || [];
+  const totalRows = sheetData.length;
+
+  let maxCols = 0;
+  for (let r=0;r<totalRows;r++) maxCols = Math.max(maxCols, (sheetData[r]||[]).length);
+  maxCols = Math.min(Math.max(maxCols, 10), 40);
+
+  let html = '<table class="sheet-grid"><thead><tr><th class="rownum" data-selectall="1" title="Seleccionar todo"></th>';
+  for (let c=0;c<maxCols;c++) html += `<th data-colheader="${c}" style="cursor:pointer;" title="Click: seleccionar columna entera">${colLetter(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  for (let r=0;r<totalRows;r++){
+    html += `<tr><td class="rownum" data-rowheader="${r}" style="cursor:pointer;" title="Click: seleccionar fila entera">${r+1}</td>`;
+    const row = sheetData[r] || [];
+    for (let c=0;c<maxCols;c++){
+      const val = row[c];
+      const display = (val===null||val===undefined) ? '' : String(val).slice(0,30);
+      html += `<td data-r="${r}" data-c="${c}">${escapeHtml(display)}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  const gridContainer = document.getElementById('grid-container');
+  gridContainer.innerHTML = `<div class="grid-container-inner" id="grid-container-inner">${html}</div>`;
+
+  // Sincronizar scroll horizontal arriba y abajo
+  const scrollTop = document.getElementById('grid-scroll-top');
+  const scrollTopInner = document.getElementById('grid-scroll-top-inner');
+  const table = gridContainer.querySelector('table');
+  if (table) {
+    scrollTopInner.style.width = table.offsetWidth + 'px';
+  }
+
+  // Evento: cuando scrollea arriba, mover abajo
+  scrollTop.addEventListener('scroll', function() {
+    gridContainer.scrollLeft = this.scrollLeft;
+  });
+
+  // Evento: cuando scrollea abajo, mover arriba
+  gridContainer.addEventListener('scroll', function() {
+    scrollTop.scrollLeft = this.scrollLeft;
+  });
+
+  attachGridSelection(totalRows, maxCols);
+  paintSelection();
+  pintarColumnasAsignadas();
+}
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function attachGridSelection(maxRows, maxCols){
+  const cells = document.querySelectorAll('table.sheet-grid td[data-r]');
+  let mouseDown = false;
+  let dragAdditive = false;
+  let dragStartCell = null;
+  let dragToggleMode = null;
+
+  function setRangeRect(r1,c1,r2,c2, additive){
+    if (!additive) appState.draft.selectedCells.clear();
+    for (let r=Math.min(r1,r2); r<=Math.max(r1,r2); r++){
+      for (let c=Math.min(c1,c2); c<=Math.max(c1,c2); c++){
+        appState.draft.selectedCells.add(cellKey(r,c));
+      }
+    }
+  }
+
+  cells.forEach(cell => {
+    cell.addEventListener('mousedown', (e) => {
+      if (appState.draft.mode === 'tabla'){
+        // Si hay un input de fila enfocado, llenar ese input
+        if (inputFilaEnfocado) {
+          const r = parseInt(cell.dataset.r);
+          asignarFilaAInputEnfocado(r);
+          return;
+        }
+        // Si hay un input de columna enfocado, asignar la columna de esta celda
+        if (inputColumnaEnfocado !== null) {
+          const c = parseInt(cell.dataset.c);
+          asignarColumnaAInputEnfocado(c);
+          return;
+        }
+        return; // en modo tabla no se seleccionan celdas individuales
+      }
+      mouseDown = true;
+      dragAdditive = e.ctrlKey || e.metaKey;
+      const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+      dragStartCell = {r,c};
+      dragToggleMode = null; // se define al primer toggle del drag: 'add' o 'remove'
+      if (dragAdditive){
+        const key = cellKey(r,c);
+        if (appState.draft.selectedCells.has(key)){
+          appState.draft.selectedCells.delete(key);
+          dragToggleMode = 'remove';
+        } else {
+          appState.draft.selectedCells.add(key);
+          dragToggleMode = 'add';
+        }
+      } else {
+        setRangeRect(r,c,r,c, false);
+      }
+      renderSelectionPaint();
+      e.preventDefault();
+    });
+    cell.addEventListener('mouseenter', () => {
+      if (mouseDown && dragStartCell){
+        const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+        if (dragAdditive){
+          const r1=Math.min(dragStartCell.r,r), r2=Math.max(dragStartCell.r,r);
+          const c1=Math.min(dragStartCell.c,c), c2=Math.max(dragStartCell.c,c);
+          for (let rr=r1; rr<=r2; rr++){
+            for (let cc=c1; cc<=c2; cc++){
+              const key = cellKey(rr,cc);
+              if (dragToggleMode === 'remove') appState.draft.selectedCells.delete(key);
+              else appState.draft.selectedCells.add(key);
+            }
+          }
+        } else {
+          setRangeRect(dragStartCell.r, dragStartCell.c, r, c, false);
+        }
+        renderSelectionPaint();
+      }
+    });
+  });
+
+  document.querySelectorAll('th[data-colheader]').forEach(th => {
+    th.addEventListener('click', (e) => {
+      const c = parseInt(th.dataset.colheader);
+
+      // Si hay un input de columna enfocado, asignar esta columna
+      if (inputColumnaEnfocado !== null){
+        asignarColumnaAInputEnfocado(c);
+        return;
+      }
+
+      // Si no hay input enfocado, seleccionar la columna completa (modo hojas o visualización)
+      const additive = e.ctrlKey || e.metaKey;
+      let rFrom = 0, rTo = maxRows - 1;
+      if (appState.draft.mode === 'tabla' && appState.draft.rangoFilas){
+        rFrom = appState.draft.rangoFilas.r1;
+        rTo = Math.min(appState.draft.rangoFilas.r2, maxRows - 1);
+      }
+      if (additive){
+        // si ya está toda seleccionada, la sacamos; si no, la sumamos
+        let allSelected = true;
+        for (let r=rFrom;r<=rTo;r++){ if (!appState.draft.selectedCells.has(cellKey(r,c))){ allSelected=false; break; } }
+        for (let r=rFrom;r<=rTo;r++){
+          if (allSelected) appState.draft.selectedCells.delete(cellKey(r,c));
+          else appState.draft.selectedCells.add(cellKey(r,c));
+        }
+      } else {
+        appState.draft.selectedCells.clear();
+        for (let r=rFrom;r<=rTo;r++) appState.draft.selectedCells.add(cellKey(r,c));
+      }
+      renderSelectionPaint();
+    });
+  });
+
+  document.querySelectorAll('td[data-rowheader]').forEach(td => {
+    td.addEventListener('click', (e) => {
+      const r = parseInt(td.dataset.rowheader);
+
+      // En modo tabla, si hay un input de fila enfocado, llenar ese input y pintar la fila
+      if (appState.draft.mode === 'tabla' && inputFilaEnfocado){
+        asignarFilaAInputEnfocado(r);
+        return;
+      }
+
+      // Modo hojas o sin input enfocado: seleccionar la fila completa
+      const additive = e.ctrlKey || e.metaKey;
+      if (additive){
+        let allSelected = true;
+        for (let c=0;c<maxCols;c++){ if (!appState.draft.selectedCells.has(cellKey(r,c))){ allSelected=false; break; } }
+        for (let c=0;c<maxCols;c++){
+          if (allSelected) appState.draft.selectedCells.delete(cellKey(r,c));
+          else appState.draft.selectedCells.add(cellKey(r,c));
+        }
+      } else {
+        appState.draft.selectedCells.clear();
+        for (let c=0;c<maxCols;c++) appState.draft.selectedCells.add(cellKey(r,c));
+      }
+      renderSelectionPaint();
+    });
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (mouseDown){
+      mouseDown = false;
+      dragStartCell = null;
+      showSelectionBar();
+    }
+  });
+}
+
+function renderSelectionPaint(){
+  paintSelection();
+  if (appState.draft.selectedCells.size > 0) showSelectionBar();
+  else hideSelectionBar();
+}
+
+function paintSelection(){
+  document.querySelectorAll('table.sheet-grid td.selected').forEach(c=>c.classList.remove('selected'));
+  appState.draft.selectedCells.forEach(key => {
+    const [r,c] = key.split('-');
+    const cell = document.querySelector(`table.sheet-grid td[data-r="${r}"][data-c="${c}"]`);
+    if (cell) cell.classList.add('selected');
+  });
+}
+
+function selectionBounds(){
+  let r1=Infinity,r2=-Infinity,c1=Infinity,c2=-Infinity;
+  appState.draft.selectedCells.forEach(key => {
+    const [r,c] = key.split('-').map(Number);
+    r1=Math.min(r1,r); r2=Math.max(r2,r); c1=Math.min(c1,c); c2=Math.max(c2,c);
+  });
+  return {r1,r2,c1,c2};
+}
+
+function rangeLabel(r1,c1,r2,c2){
+  return (r1===r2 && c1===c2) ? `${colLetter(c1)}${r1+1}` : `${colLetter(c1)}${r1+1}:${colLetter(c2)}${r2+1}`;
+}
+
+function showSelectionBar(){
+  if (appState.draft.selectedCells.size === 0) return;
+
+  // En modo hojas, auto-completar el input de celda fija con el rango seleccionado
+  if (appState.draft.mode === 'hojas') {
+    const {r1,r2,c1,c2} = selectionBounds();
+    const rangeText = rangeLabel(r1,c1,r2,c2);
+    const manualInput = document.getElementById('manual-range-edit');
+    if (manualInput) {
+      manualInput.value = rangeText;
+    }
+  }
+
+  // NO llamar a renderFieldNameSelect aquí - eso borra lo que el usuario escribió
+  renderColumnasInputs();
+}
+function hideSelectionBar(){
+  renderColumnasInputs();
+}
+
+const manualRangeInput = document.getElementById('manual-range-edit');
+manualRangeInput.addEventListener('input', (e) => {
+  // Auto-convertir a mayúsculas mientras escribe
+  const start = e.target.selectionStart;
+  const end = e.target.selectionEnd;
+  e.target.value = e.target.value.toUpperCase();
+  e.target.setSelectionRange(start, end);
+});
+manualRangeInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const text = e.target.value.trim().toUpperCase();
+  const range = parseManualRange(text);
+  if (!range){ alert('Formato no reconocido. Probá algo como J7.'); return; }
+  appState.draft.selectedCells.clear();
+  for (let r=range.r1;r<=range.r2;r++) for (let c=range.c1;c<=range.c2;c++) appState.draft.selectedCells.add(cellKey(r,c));
+  paintSelection();
+  showSelectionBar();
+});
+
+function asignarColumnaAInputEnfocado(c){
+  const input = appState.draft.columnasInputs.find(ci => ci.id === inputColumnaEnfocado);
+  if (!input) return;
+  const letra = colLetter(c);
+  if (appState.draft.columnasInputs.some(other => other.id !== input.id && other.letra === letra)){
+    alert(`La columna ${letra} ya está seleccionada en otro campo de esta misma fila.`);
+    return;
+  }
+  input.letra = letra;
+  pintarColumnasAsignadas();
+  renderColumnasInputs();
+  // foco automático al siguiente input vacío, si existe, para encadenar
+  const siguienteVacio = appState.draft.columnasInputs.find(ci => ci.id !== input.id && ci.letra === '');
+  if (siguienteVacio){
+    const el = document.querySelector(`input[data-colinput-id="${siguienteVacio.id}"]`);
+    if (el) el.focus();
+  }
+}
+
+function pintarColumnasAsignadas(){
+  // Optimización: quitar todas las clases selected de una vez
+  document.querySelectorAll('table.sheet-grid td.selected').forEach(c=>c.classList.remove('selected'));
+  if (appState.draft.mode !== 'tabla' || !appState.draft.rangoFilas) return;
+
+  const {r1,r2} = appState.draft.rangoFilas;
+
+  // Optimización: obtener todas las celdas de una vez en lugar de hacer querySelector por cada fila
+  const allCells = document.querySelectorAll('table.sheet-grid td[data-r][data-c]');
+  const cellMap = new Map();
+  allCells.forEach(cell => {
+    const r = parseInt(cell.dataset.r);
+    const c = parseInt(cell.dataset.c);
+    const key = r + '-' + c;
+    cellMap.set(key, cell);
+  });
+
+  // Ahora marcar las columnas asignadas usando el mapa (O(1) lookup)
+  appState.draft.columnasInputs.forEach(ci => {
+    if (ci.letra === '') return;
+    const c = colIndexFromLetter(ci.letra);
+    for (let r=r1; r<=r2; r++){
+      const key = r + '-' + c;
+      const cell = cellMap.get(key);
+      if (cell) cell.classList.add('selected');
+    }
+  });
+}
+
+function agregarColumnaInput(){
+  appState.draft.columnasInputs.push({ id: uid(), letra:'' });
+  renderColumnasInputs();
+  const ids = appState.draft.columnasInputs.map(ci=>ci.id);
+  const ultimoId = ids[ids.length-1];
+  const el = document.querySelector(`input[data-colinput-id="${ultimoId}"]`);
+  if (el) el.focus();
+}
+function quitarColumnaInput(id){
+  if (appState.draft.columnasInputs.length === 1){
+    appState.draft.columnasInputs[0].letra = '';
+  } else {
+    appState.draft.columnasInputs = appState.draft.columnasInputs.filter(ci => ci.id !== id);
+  }
+  if (inputColumnaEnfocado === id) inputColumnaEnfocado = null;
+  pintarColumnasAsignadas();
+  renderColumnasInputs();
+}
+
+function renderColumnasInputs(){
+  const wrap = document.getElementById('columnas-inputs-wrap');
+  const inputs = appState.draft.columnasInputs;
+  const conLetra = inputs.filter(ci => ci.letra !== '').length;
+  const mostrarSeparador = conLetra > 1;
+
+  wrap.innerHTML = inputs.map((ci, i) => {
+    const esUltimo = i === inputs.length-1;
+    const separadorInline = (i===0 && mostrarSeparador) ? `
+      <span style="font-size:12px;color:var(--ink-soft);margin-left:14px;">Unir los valores con:</span>
+      <select id="separador-select" style="font-size:12.5px;">
+        <option value="" selected>sin separador</option>
+        <option value="-">guion ( - )</option>
+        <option value=" ">espacio ( )</option>
+        <option value="_">guion bajo ( _ )</option>
+        <option value="custom">otro...</option>
+      </select>
+      <input type="text" id="separador-custom" placeholder="separador" style="width:60px; display:none;">
+    ` : '';
+    return `
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:12.5px; min-width:120px;">${i===0 ? 'Seleccionar columna' : 'Columna ' + (i+1)}</span>
+      <input type="text" data-colinput-id="${ci.id}" value="${escapeHtml(ci.letra)}" maxlength="3"
+        style="width:60px; height:28px; padding:4px 8px;" placeholder="">
+      ${inputs.length > 1 ? `<span class="col-chip-x" data-removeinput="${ci.id}" title="Quitar" style="cursor:pointer;">✕</span>` : ''}
+      ${esUltimo ? `<button type="button" class="btn-unificar-col" id="btn-unificar-columna">+ Unificar con otra columna</button>` : ''}
+      ${separadorInline}
+    </div>
+  `;
+  }).join('');
+
+  wrap.querySelectorAll('input[data-colinput-id]').forEach(el => {
+    const id = el.dataset.colinputId;
+    el.addEventListener('focus', () => {
+      inputColumnaEnfocado = id;
+      pintarColumnasAsignadas(); // Actualizar visualización
+      // Resaltar visualmente el input enfocado
+      wrap.querySelectorAll('input[data-colinput-id]').forEach(inp => {
+        inp.style.boxShadow = inp.dataset.colinputId === id ? '0 0 0 2px var(--accent)' : '';
+        inp.style.borderColor = inp.dataset.colinputId === id ? 'var(--accent)' : 'var(--line)';
+      });
+    });
+    el.addEventListener('blur', () => {
+      // No limpiar inputColumnaEnfocado inmediatamente - dar tiempo al click
+      setTimeout(() => {
+        el.style.boxShadow = '';
+        el.style.borderColor = 'var(--line)';
+      }, 100);
+    });
+    el.addEventListener('input', (e) => {
+      const ci = appState.draft.columnasInputs.find(x=>x.id===id);
+      const nuevaLetra = e.target.value.toUpperCase().replace(/[^A-Z]/g,'');
+      if (nuevaLetra !== '' && appState.draft.columnasInputs.some(other => other.id !== id && other.letra === nuevaLetra)){
+        alert(`La columna ${nuevaLetra} ya está seleccionada en otro campo de esta misma fila.`);
+        e.target.value = ci ? ci.letra : '';
+        return;
+      }
+      if (ci) ci.letra = nuevaLetra;
+      e.target.value = ci ? ci.letra : '';
+      pintarColumnasAsignadas();
+    });
+  });
+  wrap.querySelectorAll('[data-removeinput]').forEach(el => {
+    el.addEventListener('click', () => quitarColumnaInput(el.dataset.removeinput));
+  });
+  const btnUnificar = document.getElementById('btn-unificar-columna');
+  if (btnUnificar) btnUnificar.addEventListener('click', agregarColumnaInput);
+
+  const sepSelect = document.getElementById('separador-select');
+  if (sepSelect){
+    sepSelect.addEventListener('change', (e) => {
+      const custom = document.getElementById('separador-custom');
+      if (custom) custom.style.display = e.target.value === 'custom' ? 'inline-block' : 'none';
+    });
+  }
+}
+
+function getSeparadorActual(){
+  const sel = document.getElementById('separador-select');
+  if (!sel) return '';
+  const val = sel.value;
+  if (val === 'custom') return document.getElementById('separador-custom').value || '';
+  return val;
+}
+
+function tieneTagInstrumento(){ return appState.draft.fields.some(f => f.isTag && f.tagTipo === 'instrumentos'); }
+function tieneTagLinea(){ return appState.draft.fields.some(f => f.isTag && f.tagTipo === 'lineas'); }
+
+function renderFieldNameSelect(){
+  const sel = document.getElementById('field-name-select');
+  const input = document.getElementById('field-name-input');
+  const valorPrevio = sel.value;
+  const textoPrevio = input.value; // Preservar el texto escrito en el input
+  sel.innerHTML = '';
+
+  const optNew = document.createElement('option');
+  optNew.value = '__NEW__';
+  optNew.textContent = '+ Crear columna nueva...';
+  sel.appendChild(optNew);
+
+  if (!tieneTagInstrumento()){
+    const opt = document.createElement('option');
+    opt.value = '__TAG_INSTRUMENTOS__';
+    opt.textContent = '★ TAG de instrumento';
+    sel.appendChild(opt);
+  }
+  if (!tieneTagLinea()){
+    const opt = document.createElement('option');
+    opt.value = '__TAG_LINEAS__';
+    opt.textContent = 'TAG de línea';
+    sel.appendChild(opt);
+  }
+
+  // Mostrar columnas existentes de la base de datos
+  const nombresVistos = new Set();
+  // Siempre mostrar columnas de instrumentos si existe la tabla
+  ['instrumentos', 'lineas'].forEach(tipo => {
+    if (appState.tablas[tipo].columns.length > 0) {
+      appState.tablas[tipo].columns.slice().sort((a,b)=>a.localeCompare(b)).forEach(col => {
+        // No mostrar columnas internas
+        if (col.startsWith('__')) return;
+        const key = normColName(col);
+        if (nombresVistos.has(key)) return;
+        nombresVistos.add(key);
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.textContent = col;
+        sel.appendChild(opt);
+      });
+    }
+  });
+
+  // preservamos lo que el usuario ya había elegido, si esa opción todavía existe en la lista reconstruida
+  const opcionesDisponibles = Array.from(sel.options).map(o => o.value);
+  if (valorPrevio && opcionesDisponibles.includes(valorPrevio)){
+    sel.value = valorPrevio;
+  } else {
+    const haySomeTag = tieneTagInstrumento() || tieneTagLinea();
+    sel.value = haySomeTag ? '__NEW__' : (!tieneTagInstrumento() ? '__TAG_INSTRUMENTOS__' : '__TAG_LINEAS__');
+  }
+
+  // Preservar el texto que el usuario había escrito
+  input.style.display = (sel.value === '__NEW__') ? 'block' : 'none';
+  if (sel.value === '__NEW__') {
+    input.value = textoPrevio; // Restaurar el texto previo
+  } else {
+    input.value = sel.value;
+  }
+}
+document.getElementById('field-name-select').addEventListener('change', (e) => {
+  const input = document.getElementById('field-name-input');
+  const especial = ['__NEW__','__TAG_INSTRUMENTOS__','__TAG_LINEAS__'];
+  if (e.target.value === '__NEW__'){
+    input.style.display = 'block';
+    input.value=''; input.focus();
+  } else {
+    input.style.display = 'none';
+    input.value = e.target.value;
+  }
+});
+
+document.getElementById('btn-add-field').addEventListener('click', () => {
+  let ranges = [];
+
+  if (appState.draft.mode === 'hojas'){
+    if (appState.draft.selectedCells.size === 0){ return; } // sin nada seleccionado, no hace nada
+    const {r1,r2,c1,c2} = selectionBounds();
+    ranges = [{ sheet: appState.draft.activeSheet, r1, r2, c1, c2 }];
+  } else {
+    if (!appState.draft.rangoFilas){
+      alert('Primero confirmá el rango de filas con datos, arriba.');
+      return;
+    }
+    const letrasIngresadas = appState.draft.columnasInputs.map(ci => ci.letra).filter(l => l !== '');
+    if (!letrasIngresadas.length){
+      return; // sin ninguna columna asignada, no hace nada (no rompe, simplemente no confirma)
+    }
+    const letrasUnicas = new Set(letrasIngresadas);
+    if (letrasUnicas.size !== letrasIngresadas.length){
+      alert('Elegiste la misma columna más de una vez. Revisá los campos antes de confirmar.');
+      return;
+    }
+    ranges = letrasIngresadas.map(letra => {
+      const c = colIndexFromLetter(letra);
+      return { sheet: appState.draft.activeSheet, r1: appState.draft.rangoFilas.r1, r2: appState.draft.rangoFilas.r2, c1:c, c2:c };
+    });
+  }
+
+  const selectVal = document.getElementById('field-name-select').value;
+  const separador = ranges.length > 1 ? getSeparadorActual() : '';
+
+  if (selectVal === '__TAG_INSTRUMENTOS__' || selectVal === '__TAG_LINEAS__'){
+    const tagTipo = selectVal === '__TAG_INSTRUMENTOS__' ? 'instrumentos' : 'lineas';
+    if (appState.draft.fields.some(f=>f.isTag && f.tagTipo===tagTipo)){ alert('Este documento ya tiene ese TAG definido.'); return; }
+    appState.draft.fields.unshift({ id: uid(), name: tagTipo==='instrumentos' ? 'TAG_INSTRUMENTO' : 'TAG_LINEA', ranges, isTag:true, tagTipo, mode: appState.draft.mode, separador });
+  } else {
+    // Para campos normales (no-TAG), necesitamos al menos un TAG definido (instrumento o línea)
+    if (!tieneTagInstrumento() && !tieneTagLinea()){
+      alert('Definí primero al menos un TAG (instrumento o línea) de este documento.');
+      return;
+    }
+    const name = document.getElementById('field-name-input').value.trim();
+    if (!name){ alert('Asignale un nombre al campo.'); return; }
+    appState.draft.fields.push({ id: uid(), name, ranges, isTag:false, mode: appState.draft.mode, separador });
+  }
+
+  appState.draft.selectedCells.clear();
+  appState.draft.columnasInputs = [{id:uid(), letra:''}];
+  inputColumnaEnfocado = null;
+  document.getElementById('field-name-select').value = '';
+  document.getElementById('field-name-input').value = '';
+  document.getElementById('field-name-input').style.display = 'block';
+  paintSelection();
+  pintarColumnasAsignadas();
+  renderFieldList();
+  renderFieldNameSelect();
+  renderColumnasInputs();
+});
+
+function renderFieldList(){
+  const list = document.getElementById('field-list');
+  const fields = appState.draft.fields;
+  document.getElementById('no-fields-msg').style.display = fields.length ? 'none' : 'block';
+  list.innerHTML = '';
+  fields.forEach(f => {
+    let labels;
+    if (f.mode === 'hojas') {
+      // En modo hojas: mostrar solo la celda, sin el nombre de las hojas (porque aplica a todas)
+      const hojasCount = appState.draft.hojasValidas.size;
+      const celdaBase = f.ranges.length > 0 ? rangeLabel(f.ranges[0].r1, f.ranges[0].c1, f.ranges[0].r2, f.ranges[0].c2) : '';
+      labels = `${celdaBase} (en ${hojasCount} hoja${hojasCount !== 1 ? 's' : ''})`;
+    } else {
+      // En modo tabla: mostrar hoja + rango
+      labels = f.ranges.map(r => `${escapeHtml(r.sheet)} ${rangeLabel(r.r1,r.c1,r.r2,r.c2)}`).join(' + ');
+    }
+
+    // Mostrar separador si hay múltiples rangos
+    let separadorInfo = '';
+    if (f.ranges.length > 1 && f.separador !== undefined) {
+      let sepLabel = '';
+      switch(f.separador) {
+        case '': sepLabel = 'sin separador'; break;
+        case '-': sepLabel = 'guion (-)'; break;
+        case ' ': sepLabel = 'espacio'; break;
+        case '_': sepLabel = 'guion bajo (_)'; break;
+        default: sepLabel = `"${escapeHtml(f.separador)}"`; break;
+      }
+      separadorInfo = ` <span style="color:var(--ink-faint);font-size:11px;margin-left:8px;">· Unir con: ${sepLabel}</span>`;
+    }
+
+    let badge = '';
+    if (f.isTag && f.tagTipo === 'instrumentos') {
+      badge = ` <span style="background:var(--accent);color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:5px;">TAG INSTRUMENTO</span>`;
+    } else if (f.name === '__linea_asociada__') {
+      badge = ` <span style="background:#2c4f7c;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:5px;">LÍNEA ASOCIADA</span>`;
+    }
+    // Badge de TAG LÍNEA eliminado a pedido del usuario
+    const nombreVisible = f.name === '__linea_asociada__' ? 'Línea asociada' : escapeHtml(f.name);
+    const chip = document.createElement('div');
+    chip.className = 'field-chip';
+    chip.innerHTML = `
+      <span class="fname">${nombreVisible}${badge}</span>
+      <span class="frange">${labels}${separadorInfo}</span>
+      <span class="remove" data-id="${f.id}">✕</span>
+    `;
+    chip.querySelector('.remove').addEventListener('click', () => {
+      appState.draft.fields = appState.draft.fields.filter(x=>x.id!==f.id);
+      renderFieldList();
+      renderFieldNameSelect();
+    });
+    list.appendChild(chip);
+  });
+}
+
+// ---------- procesar documento: extraer filas y volcar a la tabla maestra ----------
+function valueAt(sheetName, r, c){
+  const sheetData = appState.draft.sheets[sheetName];
+  return (sheetData[r] || [])[c];
+}
+
+function extractRowsFromFields(){
+  const fields = appState.draft.fields;
+  if (!fields.length) return [];
+
+  if (appState.draft.mode === 'hojas'){
+    return extractRowsModoHojas(fields);
+  }
+  return extractRowsModoTabla(fields);
+}
+
+function extractRowsModoHojas(fields){
+  // cada hoja válida = un registro. Cada campo es una celda fija (misma posición en todas las hojas).
+  const hojas = appState.draft.sheetNames.filter(n => appState.draft.hojasValidas.has(n));
+  const tagInstField = fields.find(f => f.isTag && f.tagTipo==='instrumentos');
+  const tagLineaField = fields.find(f => f.isTag && f.tagTipo==='lineas');
+
+  const rows = [];
+  hojas.forEach(hoja => {
+    const rowObj = { __tagInstrumento:null, __tagLinea:null, __hojaExcel: hoja, __metadata: {} };
+    fields.forEach(f => {
+      const parts = f.ranges.map(r => {
+        if (r.c1 === r.c2 && r.r1 === r.r2) return valueAt(hoja, r.r1, r.c1) ?? '';
+        const sub = [];
+        for (let rr=r.r1; rr<=r.r2; rr++){
+          for (let cc=r.c1; cc<=r.c2; cc++) sub.push(valueAt(hoja, rr, cc) ?? '');
+        }
+        return sub.join(' ');
+      });
+      const sep = f.separador !== undefined ? f.separador : '';
+      rowObj[f.name] = parts.join(sep);
+      // Guardar metadata: de qué hoja/celda viene cada campo
+      rowObj.__metadata[f.name] = f.ranges.map(r => ({
+        sheet: hoja,
+        row: r.r1 + 1,
+        col: colLetter(r.c1) + (r.c1 !== r.c2 || r.r1 !== r.r2 ? ':' + colLetter(r.c2) + (r.r2 + 1) : '')
+      }));
+    });
+    if (tagInstField) rowObj.__tagInstrumento = rowObj[tagInstField.name];
+    if (tagLineaField) rowObj.__tagLinea = rowObj[tagLineaField.name];
+    const hayTagInst = rowObj.__tagInstrumento !== null && rowObj.__tagInstrumento !== undefined && String(rowObj.__tagInstrumento).trim() !== '';
+    const hayTagLinea = rowObj.__tagLinea !== null && rowObj.__tagLinea !== undefined && String(rowObj.__tagLinea).trim() !== '';
+    if (hayTagInst || hayTagLinea){
+      rows.push(rowObj);
+    }
+  });
+  return rows;
+}
+
+function extractRowsModoTabla(fields){
+  const tagInstField = fields.find(f => f.isTag && f.tagTipo==='instrumentos');
+  const tagLineaField = fields.find(f => f.isTag && f.tagTipo==='lineas');
+  const rangoFilas = appState.draft.rangoFilas;
+  const nRows = rangoFilas.r2 - rangoFilas.r1 + 1;
+
+  function valueForField(f, i){
+    const rr = rangoFilas.r1 + i;
+    if (f.ranges.length === 1){
+      const r = f.ranges[0];
+      if (r.c1 === r.c2) return valueAt(r.sheet, rr, r.c1);
+      const parts = [];
+      for (let c=r.c1;c<=r.c2;c++) parts.push(valueAt(r.sheet, rr, c) ?? '');
+      return parts.join(' ');
+    }
+    // multi-rango: concatenar el valor de cada columna para esta fila i, usando el separador elegido por el usuario
+    const parts = f.ranges.map(r => {
+      if (r.c1 === r.c2) {
+        const val = valueAt(r.sheet, rr, r.c1);
+        return (val === null || val === undefined || String(val).trim() === '') ? '' : String(val).trim();
+      }
+      const sub = [];
+      for (let c=r.c1;c<=r.c2;c++) {
+        const val = valueAt(r.sheet, rr, c);
+        if (val !== null && val !== undefined && String(val).trim() !== '') {
+          sub.push(String(val).trim());
+        }
+      }
+      return sub.join(' ');
+    }).filter(p => p !== ''); // FILTRAR partes vacías antes de unir
+    const sep = f.separador !== undefined ? f.separador : '-';
+    return parts.join(sep);
+  }
+
+  const rows = [];
+  for (let i=0;i<nRows;i++){
+    const filaExcel = rangoFilas.r1 + i + 1;
+    const rowObj = { __tagInstrumento:null, __tagLinea:null, __filaExcel: filaExcel, __metadata: {} };
+    fields.forEach(f => {
+      const val = valueForField(f, i);
+      rowObj[f.name] = val;
+      // Guardar metadata: de qué hoja/columna viene cada campo
+      rowObj.__metadata[f.name] = f.ranges.map(r => ({
+        sheet: r.sheet,
+        row: filaExcel,
+        col: colLetter(r.c1) + (r.c1 !== r.c2 ? ':' + colLetter(r.c2) : '')
+      }));
+    });
+    if (tagInstField) rowObj.__tagInstrumento = rowObj[tagInstField.name];
+    if (tagLineaField) rowObj.__tagLinea = rowObj[tagLineaField.name];
+    const hayTagInst = rowObj.__tagInstrumento !== null && rowObj.__tagInstrumento !== undefined && String(rowObj.__tagInstrumento).trim() !== '';
+    const hayTagLinea = rowObj.__tagLinea !== null && rowObj.__tagLinea !== undefined && String(rowObj.__tagLinea).trim() !== '';
+    if (hayTagInst || hayTagLinea){
+      rows.push(rowObj);
+    }
+  }
+  return rows;
+}
+
+function normTag(v){
+  if (v===null||v===undefined) return '';
+  // Limpiar: trim, uppercase, reemplazar múltiples guiones/espacios por uno solo, quitar guiones del inicio/fin
+  return String(v).trim().toUpperCase()
+    .replace(/\s+/g, ' ')           // múltiples espacios → uno
+    .replace(/-+/g, '-')             // múltiples guiones → uno
+    .replace(/^-+|-+$/g, '')         // quitar guiones del inicio/fin
+    .trim();
+}
+function normColName(v){ return v===null||v===undefined ? '' : String(v).trim().toUpperCase().replace(/\s+/g,' '); }
+
+document.getElementById('btn-process-doc').addEventListener('click', async () => {
+  if (appState.draft.mode === 'tabla' && !appState.draft.rangoFilas){
+    await customAlert('Completá el rango de filas con datos (desde y hasta).', 'Falta información');
+    return;
+  }
+  if (!tieneTagInstrumento() && !tieneTagLinea()){
+    await customAlert('Definí al menos un TAG (instrumento o línea) de este documento.', 'Falta TAG');
+    return;
+  }
+  if (!appState.draft.fields.length){
+    await customAlert('Definí al menos un campo antes de procesar.', 'Sin campos');
+    return;
+  }
+
+  // Determinar el modo de líneas automáticamente:
+  // Si tiene TAG instrumento + línea → crear nuevas líneas
+  // Si SOLO tiene TAG línea → solo actualizar existentes
+  const lineaMode = (tieneTagInstrumento() && tieneTagLinea()) ? 'crear-asociar' : 'solo-actualizar';
+
+  const extracted = extractRowsFromFields();
+  const docName = appState.draft.filename;
+
+  // Si es modo hojas, guardar las hojas válidas en cada field para poder mostrarlas después
+  if (appState.draft.mode === 'hojas') {
+    appState.draft.fields.forEach(f => {
+      if (!f.hojasAplicadas) {
+        f.hojasAplicadas = Array.from(appState.draft.hojasValidas);
+      }
+    });
+  }
+
+  // Validar TAGs duplicados dentro del mismo documento
+  const tagsDuplicados = {};
+  const tagsVistos = {};
+  extracted.forEach((row, idx) => {
+    const tag = row.__tagInstrumento;
+    if (tag && String(tag).trim() !== '') {
+      const tagKey = normTag(tag);
+      if (tagsVistos[tagKey]) {
+        if (!tagsDuplicados[tagKey]) tagsDuplicados[tagKey] = [tagsVistos[tagKey]];
+        tagsDuplicados[tagKey].push(idx);
+      } else {
+        tagsVistos[tagKey] = idx;
+      }
+    }
+  });
+
+  if (Object.keys(tagsDuplicados).length > 0) {
+    let mensaje = '<div style="margin-bottom:12px;"><strong>⚠️ TAGs duplicados en el documento:</strong></div>';
+    for (const tag in tagsDuplicados) {
+      const indices = tagsDuplicados[tag];
+      const filas = indices.map(i => i + 1).join(', ');
+      const valoresOriginales = indices.map(i => {
+        const orig = extracted[i].__tagInstrumento;
+        return `"${escapeHtml(orig)}"`;
+      }).join(', ');
+      mensaje += `<div style="margin-bottom:8px;padding:8px;background:#fbe9e7;border-left:3px solid var(--red);border-radius:4px;">
+        <div style="font-weight:600;">TAG normalizado: "${escapeHtml(tag)}"</div>
+        <div style="font-size:11px;margin-top:4px;">Valores originales: ${valoresOriginales}</div>
+        <div style="font-size:11px;margin-top:2px;">Aparece en filas: ${filas}</div>
+      </div>`;
+    }
+    mensaje += '<div style="margin-top:12px;">¿Querés continuar y cargar los datos de todas formas? Podrás ver los duplicados en la base de datos.</div>';
+    const continuar = await customConfirm(mensaje, 'TAGs duplicados');
+    if (!continuar) {
+      return;
+    }
+  }
+  const camposNoTag = appState.draft.fields.filter(f => !f.isTag);
+  const fieldNames = camposNoTag.map(f=>f.name);
+  const hayAmbosTags = tieneTagInstrumento() && tieneTagLinea();
+
+  function procesarEnTabla(tipo, tagKeyName){
+    const tabla = appState.tablas[tipo];
+    const canonicalNameOf = {};
+    fieldNames.forEach(fn => {
+      const existing = tabla.columns.find(c => normColName(c) === normColName(fn));
+      if (existing) canonicalNameOf[fn] = existing;
+      else { tabla.columns.push(fn); canonicalNameOf[fn] = fn; }
+    });
+    if (tipo === 'instrumentos' && hayAmbosTags && !tabla.columns.includes('__linea_asociada__')){
+      tabla.columns.push('__linea_asociada__');
+    }
+
+    // Detectar TAGs duplicados en este documento
+    const tagsEnEsteDoc = {};
+    extracted.forEach(newRow => {
+      const tagVal = newRow[tagKeyName];
+      if (tagVal === null || tagVal === undefined || String(tagVal).trim() === '') return;
+      const tagKey = normTag(tagVal);
+      tagsEnEsteDoc[tagKey] = (tagsEnEsteDoc[tagKey] || 0) + 1;
+    });
+
+    extracted.forEach(newRow => {
+      const tagVal = newRow[tagKeyName];
+      if (tagVal === null || tagVal === undefined || String(tagVal).trim() === '') return; // esta fila no tiene TAG para esta tabla
+      const tagKey = normTag(tagVal);
+
+      // Si el TAG está duplicado EN ESTE DOCUMENTO, crear una fila nueva para cada aparición
+      const esDuplicadoEnEsteDoc = tagsEnEsteDoc[tagKey] > 1;
+
+      let existing;
+      if (esDuplicadoEnEsteDoc) {
+        // Para duplicados del mismo documento: SIEMPRE crear fila nueva
+        existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [docName], __duplicated: true };
+        // Agregar info de ubicación
+        if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
+        if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
+        tabla.columns.forEach(c => { if (!(c in existing)) existing[c] = null; });
+        tabla.rows.push(existing);
+      } else {
+        // Para no-duplicados: buscar si ya existe (puede venir de otro documento)
+        existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
+        if (!existing){
+          existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [] };
+          if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
+          if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
+          tabla.columns.forEach(c => { if (!(c in existing)) existing[c] = null; });
+          tabla.rows.push(existing);
+        }
+      }
+
+      if (tipo === 'instrumentos' && hayAmbosTags){
+        existing.__linea_asociada__ = newRow.__tagLinea;
+      }
+      fieldNames.forEach(fn => {
+        const colName = canonicalNameOf[fn];
+        const newVal = newRow[fn];
+        const metadata = newRow.__metadata && newRow.__metadata[fn] ? newRow.__metadata[fn] : [];
+
+        if (!existing.__sources[colName]) existing.__sources[colName] = [];
+        existing.__sources[colName].push({ doc: docName, value: newVal, metadata });
+
+        // Para duplicados del mismo documento: simplemente asignar el valor, SIN comparar
+        if (esDuplicadoEnEsteDoc) {
+          existing[colName] = newVal;
+          return; // NO hacer chequeos de conflicto entre duplicados del mismo doc
+        }
+
+        // Lógica normal para no-duplicados
+        const existingVal = existing[colName];
+        const existingTrimmed = (existingVal === null || existingVal === undefined) ? '' : String(existingVal).trim();
+        const newTrimmed = (newVal === null || newVal === undefined) ? '' : String(newVal).trim();
+
+        if (existingTrimmed === ''){
+          // Si el valor existente está vacío, simplemente lo llenamos con el nuevo
+          existing[colName] = newVal;
+        } else if (newTrimmed !== '' && existingTrimmed !== newTrimmed){
+          // Solo hay conflicto si vienen de documentos DIFERENTES
+          const valoresDeEsteDoc = existing.__sources[colName].filter(s => s.doc === docName);
+          const todosIgualesEnEsteDoc = valoresDeEsteDoc.every(s => {
+            const sTrimmed = (s.value === null || s.value === undefined) ? '' : String(s.value).trim();
+            return sTrimmed === newTrimmed || sTrimmed === '';
+          });
+
+          if (valoresDeEsteDoc.length === 0 || !todosIgualesEnEsteDoc) {
+            // Hay conflicto solo si:
+            // - No había valores de este documento (viene de otro doc diferente)
+            // - O había valores de este doc pero son diferentes entre sí (error en el mismo doc)
+            existing.__conflict = existing.__conflict || {};
+            existing.__conflict[colName] = true;
+          }
+        }
+        // Si newVal está vacío, no hacemos nada (mantenemos el valor existente)
+      });
+    });
+  }
+
+  // Procesar instrumentos
+  if (tieneTagInstrumento()) procesarEnTabla('instrumentos', '__tagInstrumento');
+
+  // Procesar líneas según el modo
+  if (tieneTagLinea()) {
+    if (lineaMode === 'solo-actualizar') {
+      // Modo: Solo actualizar líneas existentes
+      // No crear líneas nuevas, solo agregar datos a las que ya existen
+      const tabla = appState.tablas.lineas;
+      extracted.forEach(newRow => {
+        const tagVal = newRow.__tagLinea;
+        if (tagVal === null || tagVal === undefined || String(tagVal).trim() === '') return;
+        const tagKey = normTag(tagVal);
+        let existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
+
+        // SOLO actualizar si la línea YA EXISTE
+        if (existing) {
+          fieldNames.forEach(fn => {
+            const colName = tabla.columns.find(c => normColName(c) === normColName(fn)) || fn;
+            const newVal = newRow[fn];
+            const newTrimmed = (newVal === null || newVal === undefined) ? '' : String(newVal).trim();
+
+            if (newTrimmed === '') return; // no aporta nada
+
+            // Agregar columna si no existe
+            if (!tabla.columns.includes(colName)) tabla.columns.push(colName);
+
+            const metadata = newRow.__metadata && newRow.__metadata[fn] ? newRow.__metadata[fn] : [];
+            if (!existing.__sources[colName]) existing.__sources[colName] = [];
+            existing.__sources[colName].push({ doc: docName, value: newVal, metadata });
+
+            const existingVal = existing[colName];
+            const existingTrimmed = (existingVal === null || existingVal === undefined) ? '' : String(existingVal).trim();
+
+            if (existingTrimmed === '') {
+              existing[colName] = newVal;
+            } else if (existingTrimmed !== newTrimmed) {
+              existing.__conflict = existing.__conflict || {};
+              existing.__conflict[colName] = true;
+            }
+          });
+        }
+        // Si no existe, NO hace nada (no la crea)
+      });
+    } else if (!hayAmbosTags) {
+      // Modo crear-asociar Y no hay ambos tags: procesar normal como tabla de líneas
+      procesarEnTabla('lineas', '__tagLinea');
+    } else {
+      // Modo crear-asociar Y hay ambos tags: crear líneas solo con TAG (para vincular)
+      const tabla = appState.tablas.lineas;
+      extracted.forEach(newRow => {
+        const tagVal = newRow.__tagLinea;
+        if (tagVal === null || tagVal === undefined || String(tagVal).trim() === '') return;
+        const tagKey = normTag(tagVal);
+        let existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
+        if (!existing){
+          existing = { __tag: tagVal, __sources:{} };
+          tabla.rows.push(existing);
+        }
+      });
+    }
+  }
+
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  const newDocId = crypto.randomUUID();
+  p.docs.push({
+    id: newDocId,
+    filename: docName,
+    fields: appState.draft.fields,
+    fecha: new Date().toLocaleDateString('es-AR',{day:'numeric',month:'short'}),
+    mode: appState.draft.mode,
+    hojasValidas: appState.draft.mode === 'hojas' ? Array.from(appState.draft.hojasValidas) : null,
+    rangoFilas: appState.draft.rangoFilas
+  });
+
+  // Guardar el workbook original para poder exportar después
+  if (appState.draft.originalWorkbook) {
+    appState.originalWorkbooks[newDocId] = {
+      workbook: appState.draft.originalWorkbook,
+      data: appState.draft.originalData
+    };
+  }
+
+  fusionarInstrumentosConLineas();
+
+  showScreen('screen-proyecto');
+  setTab2('instrumentos');
+  renderDocList();
+  scheduleGuardado();
+});
+
+// ---------- fusión automática: instrumentos heredan/comparan datos de su línea asociada ----------
+function fusionarInstrumentosConLineas(){
+  const instr = appState.tablas.instrumentos;
+  const lineas = appState.tablas.lineas;
+  if (!instr.rows.length || !lineas.rows.length) return;
+
+  // Campos que existen TANTO en instrumentos como en líneas (para comparar/heredar)
+  const camposComunes = instr.columns.filter(ic =>
+    ic !== '__linea_asociada__' &&
+    lineas.columns.some(lc => normColName(lc) === normColName(ic))
+  );
+
+  // Campos que existen SOLO en líneas (para agregar como columnas heredables)
+  const camposNuevosDeLinea = lineas.columns.filter(lc =>
+    !instr.columns.some(ic => normColName(ic) === normColName(lc))
+  );
+  camposNuevosDeLinea.forEach(c => instr.columns.push(c));
+
+  instr.rows.forEach(inst => {
+    if (!inst.__linea_asociada__ || String(inst.__linea_asociada__).trim() === '') return;
+    const lineaKey = normTag(inst.__linea_asociada__);
+    const linea = lineas.rows.find(l => normTag(l.__tag) === lineaKey);
+    if (!linea) return;
+
+    // SOLO procesar campos que REALMENTE existen en la línea con valores
+    lineas.columns.forEach(colLinea => {
+      const valLinea = linea[colLinea];
+      const valLineaTrimmed = (valLinea === null || valLinea === undefined) ? '' : String(valLinea).trim();
+
+      // Si el valor de la línea está vacío, no hay nada que heredar/comparar
+      if (valLineaTrimmed === '') return;
+
+      const colInst = instr.columns.find(c => normColName(c) === normColName(colLinea)) || colLinea;
+      const valInst = inst[colInst];
+      const valInstTrimmed = (valInst === null || valInst === undefined) ? '' : String(valInst).trim();
+
+      if (!inst.__sources) inst.__sources = {};
+      if (!inst.__sources[colInst]) inst.__sources[colInst] = [];
+      const yaRegistrado = inst.__sources[colInst].some(s => s.doc === `Línea ${linea.__tag}`);
+      if (!yaRegistrado) inst.__sources[colInst].push({ doc:`Línea ${linea.__tag}`, value: valLinea });
+
+      if (valInstTrimmed === ''){
+        // Si el instrumento no tiene valor, hereda de la línea
+        inst[colInst] = valLinea;
+      } else if (valInstTrimmed !== valLineaTrimmed){
+        // Solo hay conflicto si AMBOS valores tienen contenido Y son diferentes
+        inst.__conflict = inst.__conflict || {};
+        inst.__conflict[colInst] = true;
+      }
+    });
+  });
+}
+
+// ---------- tabla maestra ----------
+// Estado de filtros, ordenamiento y columnas ocultas por tabla
+if (!appState.tableFilters) appState.tableFilters = {};
+if (!appState.tableSorts) appState.tableSorts = {};
+if (!appState.hiddenColumns) appState.hiddenColumns = {};
+
+function renderMasterTable(tipo){
+  const mt = appState.tablas[tipo];
+  const wrap = document.getElementById(`master-table-wrap-${tipo}`);
+  const statsEl = document.getElementById(`master-stats-${tipo}`);
+
+  if (!mt.rows.length){
+    wrap.innerHTML = `<div class="empty-state">Todavía no hay datos en esta base. Subí un documento para empezar.</div>`;
+    statsEl.textContent = '';
+    return;
+  }
+
+  // Inicializar filtros, sorts y columnas ocultas para este tipo si no existen
+  if (!appState.tableFilters[tipo]) appState.tableFilters[tipo] = {};
+  if (!appState.tableSorts[tipo]) appState.tableSorts[tipo] = [];
+  if (!appState.hiddenColumns[tipo]) appState.hiddenColumns[tipo] = [];
+
+  const filters = appState.tableFilters[tipo];
+  const sorts = appState.tableSorts[tipo];
+  const hiddenCols = appState.hiddenColumns[tipo];
+
+  // Filtrar filas
+  let rows = mt.rows.slice();
+
+  // Aplicar filtros por columna
+  Object.keys(filters).forEach(col => {
+    const filterValues = filters[col];
+    if (filterValues && filterValues.length > 0) {
+      rows = rows.filter(row => {
+        const val = col === '__tag' ? row.__tag : row[col];
+        const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+        return filterValues.includes(valStr);
+      });
+    }
+  });
+
+  // Aplicar ordenamiento múltiple
+  if (sorts.length > 0) {
+    rows.sort((a, b) => {
+      for (let i = 0; i < sorts.length; i++) {
+        const {col, desc, type} = sorts[i];
+        let valA = col === '__tag' ? a.__tag : a[col];
+        let valB = col === '__tag' ? b.__tag : b[col];
+
+        if (type === 'numeric') {
+          // Orden numérico
+          valA = valA === null || valA === undefined || valA === '' ? NaN : parseFloat(String(valA).replace(/[^\d.-]/g, ''));
+          valB = valB === null || valB === undefined || valB === '' ? NaN : parseFloat(String(valB).replace(/[^\d.-]/g, ''));
+
+          if (isNaN(valA) && isNaN(valB)) continue;
+          if (isNaN(valA)) return 1;
+          if (isNaN(valB)) return -1;
+
+          if (valA < valB) return desc ? 1 : -1;
+          if (valA > valB) return desc ? -1 : 1;
+        } else {
+          // Orden alfabético
+          if (valA === null || valA === undefined) valA = '';
+          if (valB === null || valB === undefined) valB = '';
+          valA = String(valA).toLowerCase();
+          valB = String(valB).toLowerCase();
+          if (valA < valB) return desc ? 1 : -1;
+          if (valA > valB) return desc ? -1 : 1;
+        }
+      }
+      return 0;
+    });
+  }
+
+  const conflictCount = rows.filter(r=>r.__conflict && Object.keys(r.__conflict).length).length;
+  const visibleCols = mt.columns.filter(c => !hiddenCols.includes(c));
+  const hiddenCount = hiddenCols.length;
+  statsEl.textContent = `${rows.length} fila(s) · ${visibleCols.length} columna(s) visible(s)${hiddenCount > 0 ? ` · ${hiddenCount} oculta(s)` : ''} · ${conflictCount} con discrepancia de datos`;
+
+  // Mostrar/ocultar botón de columnas ocultas
+  const btnShowCols = document.getElementById(`btn-show-columns-${tipo}`);
+  if (btnShowCols) {
+    btnShowCols.style.display = hiddenCount > 0 ? 'flex' : 'none';
+  }
+
+  // Agregar iconos de filtro en los encabezados
+  const hasFilter = (col) => filters[col] && filters[col].length > 0;
+
+  let html = '<table class="master-table"><thead><tr><th style="width:50px;">#</th><th data-col="__tag" class="' + (hasFilter('__tag') ? 'filtered' : '') + '">TAG <span class="filter-icon">▼</span></th>';
+  visibleCols.forEach(c => {
+    const label = c === '__linea_asociada__' ? 'Línea asociada' : c;
+    const filteredClass = hasFilter(c) ? 'filtered' : '';
+    html += `<th data-col="${escapeHtml(c)}" class="${filteredClass}">${escapeHtml(label)} <span class="filter-icon">▼</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  rows.forEach((row, ri) => {
+    const originalIndex = mt.rows.indexOf(row);
+    const isDuplicated = row.__duplicated;
+    const rowClass = isDuplicated ? ' class="error-row"' : '';
+    const duplicatedDocs = row.__duplicatedDocs || [];
+    const titleAttr = isDuplicated ? ` title="TAG duplicado en: ${duplicatedDocs.join(', ')}"` : '';
+    html += `<tr${rowClass}><td style="text-align:center;color:var(--ink-soft);font-size:11px;">${ri+1}</td><td style="font-family:var(--mono);font-weight:600;"${titleAttr}>${escapeHtml(row.__tag)}</td>`;
+    visibleCols.forEach(c => {
+      const isConflict = row.__conflict && row.__conflict[c];
+      const isPendingEdit = row.__pendingEdit && row.__pendingEdit[c];
+      const cls = isConflict ? 'conflict' : (isPendingEdit ? 'pending-edit' : '');
+      const val = row[c] === null || row[c] === undefined ? '' : row[c];
+      // TODAS las celdas son clickeables ahora
+      html += `<td class="${cls}" data-ri="${originalIndex}" data-col="${escapeHtml(c)}" data-tipo="${tipo}" style="cursor:pointer;">${escapeHtml(String(val))}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = `<div class="master-table-container-inner" id="master-table-inner-${tipo}">${html}</div>`;
+
+  // Zoom con Ctrl + rueda para la tabla maestra
+  wrap.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const zoomSlider = document.getElementById(`zoom-${tipo}`);
+      if (zoomSlider) {
+        const delta = e.deltaY > 0 ? -10 : 10;
+        const newZoom = Math.max(50, Math.min(150, parseInt(zoomSlider.value) + delta));
+        zoomSlider.value = newZoom;
+        document.getElementById(`zoom-value-${tipo}`).textContent = newZoom + '%';
+        const inner = document.getElementById(`master-table-inner-${tipo}`);
+        if (inner) inner.style.transform = `scale(${newZoom / 100})`;
+      }
+    }
+  }, { passive: false });
+
+  // TODAS las celdas son clickeables ahora (no solo las que tienen sources)
+  const celdas = wrap.querySelectorAll('td[data-ri][data-col][data-tipo]');
+
+  celdas.forEach(td => {
+    td.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showCellInfoPopover(e, td);
+    });
+  });
+
+  // Click en encabezados para filtrar
+  const headers = wrap.querySelectorAll('th[data-col]');
+  headers.forEach(th => {
+    th.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showColumnFilterDropdown(th, tipo);
+    });
+
+    // Click derecho para menú contextual
+    th.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showColumnContextMenu(th, tipo, e);
+    });
+  });
+}
+
+// Variable global para el popover, dropdown de filtro y menú contextual
+let activePopover = null;
+let activeFilterDropdown = null;
+let activeContextMenu = null;
+
+// Función para mostrar menú contextual en columna
+function showColumnContextMenu(th, tipo, e) {
+  // Cerrar menú anterior si existe
+  if (activeContextMenu) activeContextMenu.remove();
+  if (activeFilterDropdown) activeFilterDropdown.remove();
+
+  const col = th.dataset.col;
+  const mt = appState.tablas[tipo];
+
+  // No permitir eliminar la columna TAG
+  if (col === '__tag') {
+    customAlert('La columna TAG no se puede eliminar.', 'Columna protegida');
+    return;
+  }
+
+  // Crear menú contextual
+  const menu = document.createElement('div');
+  menu.className = 'column-context-menu';
+  menu.style.left = e.pageX + 'px';
+  menu.style.top = e.pageY + 'px';
+
+  const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+
+  menu.innerHTML = `
+    <div class="column-context-menu-item" data-action="filter">
+      <span>🔍</span>
+      <span>Filtrar esta columna</span>
+    </div>
+    <div class="column-context-menu-item" data-action="hide">
+      <span>👁️</span>
+      <span>Ocultar columna "${escapeHtml(colLabel)}"</span>
+    </div>
+    <div class="column-context-menu-item danger" data-action="delete">
+      <span>🗑️</span>
+      <span>Eliminar columna "${escapeHtml(colLabel)}"</span>
+    </div>
+  `;
+
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+
+  // Acción filtrar
+  menu.querySelector('[data-action="filter"]').addEventListener('click', () => {
+    menu.remove();
+    activeContextMenu = null;
+    showColumnFilterDropdown(th, tipo);
+  });
+
+  // Acción ocultar
+  menu.querySelector('[data-action="hide"]').addEventListener('click', () => {
+    menu.remove();
+    activeContextMenu = null;
+    ocultarColumna(tipo, col);
+  });
+
+  // Acción eliminar
+  menu.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+    menu.remove();
+    activeContextMenu = null;
+    await eliminarColumna(tipo, col);
+  });
+
+  // Cerrar al clickear fuera
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenu(e) {
+      if (activeContextMenu && !activeContextMenu.contains(e.target)) {
+        activeContextMenu.remove();
+        activeContextMenu = null;
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }, 100);
+}
+
+// Función para ocultar una columna
+function ocultarColumna(tipo, col) {
+  if (!appState.hiddenColumns[tipo]) appState.hiddenColumns[tipo] = [];
+  if (!appState.hiddenColumns[tipo].includes(col)) {
+    appState.hiddenColumns[tipo].push(col);
+  }
+  renderMasterTable(tipo);
+  scheduleGuardado();
+}
+
+// Función para mostrar una columna oculta
+function mostrarColumna(tipo, col) {
+  if (!appState.hiddenColumns[tipo]) appState.hiddenColumns[tipo] = [];
+  appState.hiddenColumns[tipo] = appState.hiddenColumns[tipo].filter(c => c !== col);
+  renderMasterTable(tipo);
+  scheduleGuardado();
+}
+
+// Función para eliminar una columna completa
+async function eliminarColumna(tipo, col) {
+  const mt = appState.tablas[tipo];
+  const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+
+  // Contar cuántas celdas tienen datos
+  let celdasConDatos = 0;
+  mt.rows.forEach(row => {
+    const val = row[col];
+    if (val !== null && val !== undefined && String(val).trim() !== '') {
+      celdasConDatos++;
+    }
+  });
+
+  // Confirmación
+  const confirmar = await customConfirm(
+    `¿Estás seguro de que querés eliminar la columna <strong>"${escapeHtml(colLabel)}"</strong>?<br><br>
+    <div style="background:var(--red-bg);padding:10px;border-radius:6px;margin-top:10px;">
+      ⚠️ Se eliminarán ${celdasConDatos} celda(s) con datos de esta columna en la tabla de ${tipo}.<br><br>
+      Esta acción no se puede deshacer.
+    </div>`,
+    'Eliminar columna'
+  );
+
+  if (!confirmar) return;
+
+  mostrarOverlayCarga();
+
+  // Eliminar la columna de todas las filas
+  mt.rows.forEach(row => {
+    delete row[col];
+    if (row.__sources) delete row.__sources[col];
+    if (row.__conflict) delete row.__conflict[col];
+    if (row.__pendingEdit) delete row.__pendingEdit[col];
+    if (row.__editComment) delete row.__editComment[col];
+  });
+
+  // Eliminar la columna del array de columnas
+  mt.columns = mt.columns.filter(c => c !== col);
+
+  // Limpiar filtros y sorts de esta columna
+  if (appState.tableFilters[tipo]) {
+    delete appState.tableFilters[tipo][col];
+  }
+  if (appState.tableSorts[tipo]) {
+    appState.tableSorts[tipo] = appState.tableSorts[tipo].filter(s => s.col !== col);
+  }
+
+  ocultarOverlayCarga();
+
+  // Actualizar la vista
+  renderMasterTable(tipo);
+  scheduleGuardado();
+
+  await customAlert(`Columna "${escapeHtml(colLabel)}" eliminada correctamente.`, 'Eliminado');
+}
+
+// Función para mostrar dropdown de filtro en columna
+function showColumnFilterDropdown(th, tipo) {
+  // Cerrar dropdown anterior si existe
+  if (activeFilterDropdown) activeFilterDropdown.remove();
+  if (activeContextMenu) activeContextMenu.remove();
+
+  const col = th.dataset.col;
+  const mt = appState.tablas[tipo];
+  const rect = th.getBoundingClientRect();
+
+  // Obtener todos los valores únicos de esta columna
+  const uniqueValues = new Set();
+  mt.rows.forEach(row => {
+    const val = col === '__tag' ? row.__tag : row[col];
+    const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+    uniqueValues.add(valStr);
+  });
+
+  const valuesArray = Array.from(uniqueValues).sort();
+
+  // Crear dropdown
+  const dropdown = document.createElement('div');
+  dropdown.className = 'column-filter-dropdown';
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.top = (rect.bottom + 5) + 'px';
+
+  const currentFilter = appState.tableFilters[tipo][col] || valuesArray.slice();
+
+  let html = `<input type="text" class="filter-search" placeholder="Buscar...">`;
+  html += `
+    <div class="filter-actions">
+      <button class="btn-select-all">Todos</button>
+      <button class="btn-clear">Ninguno</button>
+      <button class="btn-apply">Aplicar</button>
+    </div>
+  `;
+  html += `<div class="filter-options-container">`;
+  valuesArray.forEach(val => {
+    const checked = currentFilter.includes(val);
+    const displayVal = val === '' ? '(vacío)' : escapeHtml(val);
+    html += `
+      <label class="filter-option">
+        <input type="checkbox" value="${escapeHtml(val)}" ${checked ? 'checked' : ''}>
+        <span>${displayVal}</span>
+      </label>
+    `;
+  });
+  html += `</div>`;
+
+  dropdown.innerHTML = html;
+  document.body.appendChild(dropdown);
+  activeFilterDropdown = dropdown;
+
+  // Búsqueda en tiempo real
+  const searchInput = dropdown.querySelector('.filter-search');
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    dropdown.querySelectorAll('.filter-option').forEach(opt => {
+      const text = opt.textContent.toLowerCase();
+      opt.style.display = text.includes(query) ? 'flex' : 'none';
+    });
+  });
+
+  // Botón "Todos"
+  dropdown.querySelector('.btn-select-all').addEventListener('click', () => {
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+  });
+
+  // Botón "Ninguno"
+  dropdown.querySelector('.btn-clear').addEventListener('click', () => {
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  });
+
+  // Botón "Aplicar"
+  dropdown.querySelector('.btn-apply').addEventListener('click', () => {
+    const selected = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+    if (selected.length === valuesArray.length) {
+      // Si están todos seleccionados, quitar el filtro
+      delete appState.tableFilters[tipo][col];
+    } else {
+      appState.tableFilters[tipo][col] = selected;
+    }
+
+    renderMasterTable(tipo);
+    scheduleGuardado();
+    dropdown.remove();
+    activeFilterDropdown = null;
+  });
+
+  // Cerrar al clickear fuera
+  setTimeout(() => {
+    document.addEventListener('click', function closeDropdown(e) {
+      if (activeFilterDropdown && !activeFilterDropdown.contains(e.target) && !th.contains(e.target)) {
+        activeFilterDropdown.remove();
+        activeFilterDropdown = null;
+        document.removeEventListener('click', closeDropdown);
+      }
+    });
+  }, 100);
+}
+
+// Función para mostrar modal de columnas ocultas
+function showHiddenColumnsModal(tipo) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const mt = appState.tablas[tipo];
+  const hiddenCols = appState.hiddenColumns[tipo] || [];
+
+  if (hiddenCols.length === 0) {
+    customAlert('No hay columnas ocultas.', 'Sin columnas ocultas');
+    return;
+  }
+
+  let bodyHtml = '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Hacé click en una columna para mostrarla de nuevo:</div>';
+
+  hiddenCols.forEach(col => {
+    const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+    bodyHtml += `
+      <div class="sort-modal-row" style="cursor:pointer;" data-col="${escapeHtml(col)}">
+        <span style="font-size:13px;font-weight:600;flex:1;">${escapeHtml(colLabel)}</span>
+        <button class="btn small ghost" style="font-size:11px;padding:4px 10px;">Mostrar</button>
+      </div>
+    `;
+  });
+
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>👁️ Columnas ocultas</h2>
+        <div class="close">×</div>
+      </div>
+      <div class="modal-body">
+        ${bodyHtml}
+      </div>
+      <div class="modal-body" style="border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn ghost" id="btn-show-all-cols">Mostrar todas</button>
+        <button class="btn" id="btn-close-cols-modal">Cerrar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Click en una fila para mostrar esa columna
+  overlay.querySelectorAll('.sort-modal-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const col = row.dataset.col;
+      mostrarColumna(tipo, col);
+      overlay.remove();
+    });
+  });
+
+  // Botón mostrar todas
+  overlay.querySelector('#btn-show-all-cols').addEventListener('click', () => {
+    appState.hiddenColumns[tipo] = [];
+    renderMasterTable(tipo);
+    overlay.remove();
+  });
+
+  // Botón cerrar
+  overlay.querySelector('#btn-close-cols-modal').addEventListener('click', () => overlay.remove());
+
+  // Cerrar modal
+  overlay.querySelector('.close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+// Función para mostrar modal de ordenamiento personalizado
+function showSortModal(tipo) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const mt = appState.tablas[tipo];
+  const sorts = appState.tableSorts[tipo] || [];
+
+  let bodyHtml = '';
+
+  if (sorts.length === 0) {
+    sorts.push({ col: '__tag', desc: false, type: 'alpha' });
+  }
+
+  // Obtener columnas ya usadas
+  const usedCols = sorts.map(s => s.col);
+
+  sorts.forEach((sort, idx) => {
+    // Opciones disponibles para este select (excluir las ya usadas en otros niveles)
+    const availableOptions = ['__tag', ...mt.columns].filter(c => c === sort.col || !usedCols.includes(c));
+
+    bodyHtml += `
+      <div class="sort-modal-row" data-idx="${idx}">
+        <span style="font-size:12px;color:var(--ink-soft);min-width:70px;">${idx === 0 ? 'Ordenar por:' : 'Luego por:'}</span>
+        <select class="sort-col-select">
+          ${availableOptions.map(c => {
+            const label = c === '__tag' ? 'TAG' : (c === '__linea_asociada__' ? 'Línea asociada' : c);
+            return `<option value="${escapeHtml(c)}" ${sort.col === c ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+          }).join('')}
+        </select>
+        <select class="sort-type-select">
+          <option value="alpha" ${(sort.type || 'alpha') === 'alpha' ? 'selected' : ''}>Alfabético</option>
+          <option value="numeric" ${sort.type === 'numeric' ? 'selected' : ''}>Numérico</option>
+        </select>
+        <select class="sort-order-select">
+          <option value="asc" ${!sort.desc ? 'selected' : ''}>↑</option>
+          <option value="desc" ${sort.desc ? 'selected' : ''}>↓</option>
+        </select>
+        ${sorts.length > 1 ? '<span class="remove-sort">✕</span>' : ''}
+      </div>
+    `;
+  });
+
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>⇅ Ordenamiento personalizado</h2>
+        <div class="close">×</div>
+      </div>
+      <div class="modal-body">
+        ${bodyHtml}
+        <button class="btn small" id="btn-add-sort" style="margin-top:10px;">+ Agregar nivel</button>
+      </div>
+      <div class="modal-body" style="border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn ghost" id="btn-clear-sort">Limpiar todo</button>
+        <button class="btn" id="btn-apply-sort">Aplicar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Actualizar sorts al cambiar los selects
+  const updateSorts = () => {
+    const newSorts = [];
+    overlay.querySelectorAll('.sort-modal-row').forEach(row => {
+      const col = row.querySelector('.sort-col-select').value;
+      const type = row.querySelector('.sort-type-select').value;
+      const desc = row.querySelector('.sort-order-select').value === 'desc';
+      newSorts.push({ col, desc, type });
+    });
+    return newSorts;
+  };
+
+  // Botón agregar nivel
+  overlay.querySelector('#btn-add-sort').addEventListener('click', () => {
+    const newSorts = updateSorts();
+    const usedCols = newSorts.map(s => s.col);
+    const availableCols = ['__tag', ...mt.columns].filter(c => !usedCols.includes(c));
+
+    if (availableCols.length === 0) {
+      customAlert('Ya usaste todas las columnas disponibles.', 'Sin columnas');
+      return;
+    }
+
+    newSorts.push({ col: availableCols[0], desc: false, type: 'alpha' });
+    appState.tableSorts[tipo] = newSorts;
+    overlay.remove();
+    showSortModal(tipo);
+  });
+
+  // Botones eliminar nivel
+  overlay.querySelectorAll('.remove-sort').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const row = e.target.closest('.sort-modal-row');
+      const idx = parseInt(row.dataset.idx);
+      const newSorts = updateSorts();
+      newSorts.splice(idx, 1);
+      appState.tableSorts[tipo] = newSorts;
+      overlay.remove();
+      showSortModal(tipo);
+    });
+  });
+
+  // Botón limpiar todo
+  overlay.querySelector('#btn-clear-sort').addEventListener('click', () => {
+    appState.tableSorts[tipo] = [];
+    renderMasterTable(tipo);
+    scheduleGuardado();
+    overlay.remove();
+  });
+
+  // Botón aplicar
+  overlay.querySelector('#btn-apply-sort').addEventListener('click', () => {
+    appState.tableSorts[tipo] = updateSorts();
+    renderMasterTable(tipo);
+    scheduleGuardado();
+    overlay.remove();
+  });
+
+  // Cerrar modal
+  overlay.querySelector('.close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+function closePopover(){
+  if (activePopover){ activePopover.remove(); activePopover = null; }
+}
+
+// Event listeners para zoom y ordenamiento
+document.getElementById('zoom-instrumentos').addEventListener('input', (e) => {
+  const zoom = e.target.value;
+  document.getElementById('zoom-value-instrumentos').textContent = zoom + '%';
+  const inner = document.getElementById('master-table-inner-instrumentos');
+  if (inner) inner.style.transform = `scale(${zoom / 100})`;
+});
+
+document.getElementById('btn-sort-instrumentos').addEventListener('click', () => {
+  showSortModal('instrumentos');
+});
+
+document.getElementById('btn-show-columns-instrumentos').addEventListener('click', () => {
+  showHiddenColumnsModal('instrumentos');
+});
+
+async function showCellInfoPopover(e, td){
+  closePopover();
+  const ri = parseInt(td.dataset.ri);
+  const col = td.dataset.col;
+  const tipo = td.dataset.tipo;
+  const row = appState.tablas[tipo].rows[ri];
+
+  const pop = document.createElement('div');
+  pop.className = 'tooltip-popover';
+
+  // Posicionar el popover centrado en la pantalla
+  pop.style.left = '50%';
+  pop.style.top = '50%';
+  pop.style.transform = 'translate(-50%, -50%)';
+
+  const sources = row.__sources && row.__sources[col] ? row.__sources[col] : [];
+  const isConflict = row.__conflict && row.__conflict[col];
+  const currentValue = row[col];
+  const isEmpty = currentValue === null || currentValue === undefined || String(currentValue).trim() === '';
+
+  const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+
+  let bodyHtml = '';
+
+  // Mostrar valor actual
+  if (!isEmpty) {
+    bodyHtml += `
+      <div class="t-current">
+        <div class="t-current-label">Valor actual</div>
+        <div class="t-current-value">${escapeHtml(String(currentValue))}</div>
+      </div>
+    `;
+  }
+
+  // Mostrar comentario si existe
+  const hasComment = row.__editComment && row.__editComment[col];
+  if (hasComment) {
+    bodyHtml += `
+      <div style="background:#fffbea;padding:10px 12px;border-radius:6px;margin-bottom:12px;border-left:3px solid #f0c020;">
+        <div style="color:var(--ink-soft);font-size:11px;margin-bottom:4px;">💬 Comentario de edición</div>
+        <div style="font-size:12px;font-style:italic;">${escapeHtml(row.__editComment[col])}</div>
+      </div>
+    `;
+  }
+
+  if (sources.length === 0) {
+    // Celda sin fuentes (vacía o editada manualmente)
+    bodyHtml += `<div style="color:var(--ink-soft);font-size:12px;text-align:center;padding:12px;">
+      ${isEmpty ? '✕ Sin datos cargados' : '✎ Valor editado manualmente'}
+    </div>`;
+  } else {
+    // Agrupar sources por valor para detectar discrepancias
+    const valueGroups = {};
+    sources.forEach(s => {
+      const val = (s.value === null || s.value === undefined) ? '' : String(s.value).trim();
+      if (!valueGroups[val]) valueGroups[val] = [];
+      valueGroups[val].push(s);
+    });
+
+    const uniqueValues = Object.keys(valueGroups);
+    const hasConflict = uniqueValues.length > 1;
+
+    uniqueValues.forEach((val, idx) => {
+      const sourcesForValue = valueGroups[val];
+      const displayVal = val === '' ? '(vacío)' : val;
+      const groupClass = hasConflict && idx > 0 ? 't-source-group conflict' : 't-source-group';
+
+      bodyHtml += `<div class="${groupClass}">`;
+      bodyHtml += `<div class="t-source-value">${escapeHtml(displayVal)}</div>`;
+
+      sourcesForValue.forEach(s => {
+        const meta = s.metadata && s.metadata.length > 0 ? s.metadata : [];
+        if (meta.length > 0) {
+          // Si hay metadata, mostrar cada entrada con su info completa
+          meta.forEach(m => {
+            bodyHtml += `<div class="t-source-item">📄 ${escapeHtml(s.doc)}</div>`;
+            bodyHtml += `<div class="t-source-item" style="padding-left:20px;">
+              📋 Hoja: <strong>${escapeHtml(m.sheet)}</strong> · Fila: <strong>${m.row}</strong> · Col: <strong>${escapeHtml(m.col)}</strong>
+            </div>`;
+          });
+        } else {
+          // Si no hay metadata (ej. líneas asociadas), solo mostrar el documento
+          bodyHtml += `<div class="t-source-item">📄 ${escapeHtml(s.doc)}</div>`;
+        }
+      });
+
+      bodyHtml += `</div>`;
+    });
+  }
+
+  const icon = isConflict ? '⚠️' : '📊';
+  const titleClass = isConflict ? 't-title conflict' : 't-title info';
+  const titleText = isConflict ? `Discrepancia en "${escapeHtml(colLabel)}"` : `${escapeHtml(colLabel)}`;
+
+  pop.innerHTML = `
+    <div class="t-header">
+      <span class="icon">${icon}</span>
+      <span class="${titleClass}">${titleText}</span>
+    </div>
+    <div class="t-body">
+      ${bodyHtml}
+    </div>
+    <div class="t-actions">
+      <button class="btn-secondary" data-action="close">Cerrar</button>
+      ${!isEmpty ? '<button class="btn-danger" data-action="delete">Vaciar</button>' : ''}
+      <button class="btn-primary" data-action="edit">Editar</button>
+    </div>
+  `;
+  document.body.appendChild(pop);
+  activePopover = pop;
+
+  pop.querySelector('[data-action="close"]').addEventListener('click', closePopover);
+
+  const deleteBtn = pop.querySelector('[data-action="delete"]');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      const comment = await customPrompt(`¿Por qué vaciás el campo "${colLabel}" para ${row.__tag}?`, '', 'Comentario (opcional)');
+      if (comment !== null) {
+        row[col] = null;
+        if (row.__conflict) row.__conflict[col] = false;
+        row.__pendingEdit = row.__pendingEdit || {};
+        row.__pendingEdit[col] = true;
+        row.__editComment = row.__editComment || {};
+        row.__editComment[col] = comment.trim() || 'Valor vaciado manualmente';
+        renderMasterTable(tipo);
+        scheduleGuardado();
+        closePopover();
+      }
+    });
+  }
+
+  const editBtn = pop.querySelector('[data-action="edit"]');
+  if (editBtn) {
+    editBtn.addEventListener('click', async () => {
+      const result = await customEditWithComment(`Nuevo valor para "${colLabel}" en ${row.__tag}:`, row[col] ?? '', row.__editComment ? row.__editComment[col] : '');
+      if (result && result.value !== row[col]) {
+        row[col] = result.value;
+        if (row.__conflict) row.__conflict[col] = false;
+        row.__pendingEdit = row.__pendingEdit || {};
+        row.__pendingEdit[col] = true;
+        row.__editComment = row.__editComment || {};
+        row.__editComment[col] = result.comment || '';
+        renderMasterTable(tipo);
+        scheduleGuardado();
+        closePopover();
+      }
+    });
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (activePopover && !activePopover.contains(e.target) && !e.target.closest('td[data-ri]')){
+    closePopover();
+  }
+  if (activeContextMenu && !activeContextMenu.contains(e.target) && !e.target.closest('th[data-col]')){
+    activeContextMenu.remove();
+    activeContextMenu = null;
+  }
+});
+
+// ---------- exportar ----------
+function actualizarVistaExportar(){
+  const mt = appState.tablas.instrumentos;
+  const instCount = mt.rows.length;
+  const instCols = mt.columns.length;
+
+  // Contar filas con conflictos
+  const conflictCount = mt.rows.filter(r => r.__conflict && Object.keys(r.__conflict).length > 0).length;
+
+  // Contar filas editadas manualmente
+  const editedCount = mt.rows.filter(r => r.__pendingEdit && Object.keys(r.__pendingEdit).length > 0).length;
+
+  document.getElementById('export-inst-desc').textContent = `${instCount} instrumento(s), ${instCols} columna(s)`;
+  document.getElementById('export-total-rows').textContent = instCount;
+  document.getElementById('export-conflict-rows').textContent = conflictCount;
+  document.getElementById('export-edited-rows').textContent = editedCount;
+
+  // Cambiar entre modos de exportación
+  document.querySelectorAll('input[name="export-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const esTabla = e.target.value === 'tabla';
+      document.getElementById('export-tabla-options').style.display = esTabla ? 'block' : 'none';
+      document.getElementById('export-documento-options').style.display = esTabla ? 'none' : 'block';
+      if (!esTabla) renderDocumentosExportar();
+    });
+  });
+
+  // Toggle selector de columnas
+  document.getElementById('export-all-columns').addEventListener('change', (e) => {
+    document.getElementById('export-columns-selector').style.display = e.target.checked ? 'none' : 'block';
+    if (!e.target.checked) actualizarSelectorColumnas();
+  });
+
+  // Toggle selector de filas personalizado
+  document.querySelectorAll('input[name="export-rows"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const esCustom = e.target.value === 'custom';
+      document.getElementById('export-custom-rows').style.display = esCustom ? 'block' : 'none';
+      if (esCustom) renderSelectorFilas();
+    });
+  });
+
+  actualizarSelectorColumnas();
+}
+
+function renderDocumentosExportar(){
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  const list = document.getElementById('export-docs-list');
+
+  if (!p.docs.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px;">No hay documentos cargados en este proyecto.</div>';
+    document.getElementById('btn-export-document').disabled = true;
+    return;
+  }
+
+  list.innerHTML = '';
+  p.docs.forEach(doc => {
+    const card = document.createElement('label');
+    card.className = 'mode-card';
+    card.style.cssText = 'cursor:pointer;margin-bottom:8px;';
+
+    const hasOriginal = !!appState.originalWorkbooks[doc.id] || !!doc.__originalPath;
+    const modoLabel = doc.mode === 'hojas' ? 'Una hoja = un objeto' : 'Tabla';
+
+    card.innerHTML = `
+      <input type="radio" name="export-doc" value="${doc.id}" ${!hasOriginal ? 'disabled' : ''}>
+      <div class="mc-title">${escapeHtml(doc.filename)}</div>
+      <div class="mc-desc">
+        ${modoLabel} · ${doc.fields.length} campo(s) · Subido ${escapeHtml(doc.fecha)}
+        ${!hasOriginal ? '<br><span style="color:var(--red);">⚠️ Archivo original no disponible</span>' : ''}
+      </div>
+    `;
+
+    list.appendChild(card);
+  });
+
+  // Habilitar botón cuando se selecciona un documento
+  document.querySelectorAll('input[name="export-doc"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.getElementById('btn-export-document').disabled = false;
+    });
+  });
+}
+
+function actualizarSelectorColumnas(){
+  const mt = appState.tablas.instrumentos;
+  const selector = document.getElementById('export-columns-selector');
+
+  if (document.getElementById('export-all-columns').checked) {
+    selector.style.display = 'none';
+    return;
+  }
+
+  selector.style.display = 'block';
+  selector.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--ink-soft);">Seleccioná las columnas a incluir:</div>';
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;';
+
+  // Siempre incluir TAG (deshabilitado)
+  const tagLabel = document.createElement('label');
+  tagLabel.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 8px;background:#fafaf8;border-radius:4px;';
+  tagLabel.innerHTML = `<input type="checkbox" checked disabled> <span style="opacity:0.6;">TAG (siempre incluido)</span>`;
+  grid.appendChild(tagLabel);
+
+  mt.columns.forEach(col => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 8px;background:#fafaf8;border-radius:4px;';
+    const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+    label.innerHTML = `<input type="checkbox" value="${escapeHtml(col)}" class="export-col-check" checked> <span>${escapeHtml(colLabel)}</span>`;
+    grid.appendChild(label);
+  });
+
+  selector.appendChild(grid);
+}
+
+function renderSelectorFilas(){
+  const mt = appState.tablas.instrumentos;
+  const selector = document.getElementById('export-rows-selector');
+
+  selector.innerHTML = '';
+
+  mt.rows.forEach((row, idx) => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 8px;margin-bottom:2px;border-radius:4px;';
+    label.innerHTML = `<input type="checkbox" value="${idx}" class="export-row-check" checked> <span style="font-family:var(--mono);font-weight:600;">${escapeHtml(row.__tag)}</span>`;
+    label.addEventListener('mouseenter', () => label.style.background = 'var(--accent-soft)');
+    label.addEventListener('mouseleave', () => label.style.background = 'transparent');
+    selector.appendChild(label);
+  });
+}
+
+// Modal de exportación rápida de base de datos
+function showExportDatabaseModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const mt = appState.tablas.instrumentos;
+
+  // Determinar qué datos se van a exportar según los filtros actuales
+  const filters = appState.tableFilters.instrumentos || {};
+  const hiddenCols = appState.hiddenColumns.instrumentos || [];
+
+  // Aplicar filtros para obtener filas visibles
+  let visibleRows = mt.rows.slice();
+  Object.keys(filters).forEach(col => {
+    const filterValues = filters[col];
+    if (filterValues && filterValues.length > 0) {
+      visibleRows = visibleRows.filter(row => {
+        const val = col === '__tag' ? row.__tag : row[col];
+        const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+        return filterValues.includes(valStr);
+      });
+    }
+  });
+
+  const totalRows = mt.rows.length;
+  const filteredRows = visibleRows.length;
+  const totalCols = mt.columns.length + 1; // +1 por TAG
+  const visibleCols = mt.columns.filter(c => !hiddenCols.includes(c)).length + 1; // +1 por TAG
+  const hayFiltros = filteredRows !== totalRows || visibleCols !== totalCols;
+
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📊 Exportar base de datos</h2>
+        <div class="close">×</div>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ink-soft);margin:0 0 20px;">
+          ¿Qué querés exportar?
+        </p>
+
+        <label class="mode-card" style="margin-bottom:12px;cursor:pointer;display:block;">
+          <input type="radio" name="export-db-mode" value="current" ${hayFiltros ? 'checked' : ''} style="position:absolute;top:14px;right:14px;">
+          <div class="mc-title" style="padding-right:30px;">Vista actual (filtrada/oculta)</div>
+          <div class="mc-desc" style="padding-right:30px;">
+            Exporta solo lo que estás viendo ahora:<br>
+            • ${filteredRows} fila(s) ${filteredRows !== totalRows ? '(filtradas de ' + totalRows + ')' : ''}<br>
+            • ${visibleCols} columna(s) ${visibleCols !== totalCols ? '(visibles de ' + totalCols + ')' : ''}
+          </div>
+        </label>
+
+        <label class="mode-card" style="cursor:pointer;display:block;">
+          <input type="radio" name="export-db-mode" value="complete" ${!hayFiltros ? 'checked' : ''} style="position:absolute;top:14px;right:14px;">
+          <div class="mc-title" style="padding-right:30px;">Base de datos completa</div>
+          <div class="mc-desc" style="padding-right:30px;">
+            Exporta todo sin filtros:<br>
+            • ${totalRows} fila(s) (todas)<br>
+            • ${totalCols} columna(s) (todas)
+          </div>
+        </label>
+
+        <div style="margin-top:20px;padding:12px;background:#fafaf8;border-radius:6px;border:1px solid var(--line);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="export-db-with-comments">
+            <span>Incluir hoja adicional con comentarios de edición</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-body" style="border-top:1px solid var(--line);padding-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn ghost" id="btn-cancel-export-db">Cancelar</button>
+        <button class="btn" id="btn-confirm-export-db">Exportar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Cerrar modal
+  overlay.querySelector('.close').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#btn-cancel-export-db').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  // Confirmar exportación
+  overlay.querySelector('#btn-confirm-export-db').addEventListener('click', () => {
+    const mode = overlay.querySelector('input[name="export-db-mode"]:checked').value;
+    const withComments = overlay.querySelector('#export-db-with-comments').checked;
+    overlay.remove();
+    exportarBaseDatosDirecta(mode, withComments);
+  });
+}
+
+// Función para exportar base de datos directamente
+function exportarBaseDatosDirecta(mode, withComments) {
+  const mt = appState.tablas.instrumentos;
+
+  if (mt.rows.length === 0) {
+    customAlert('No hay datos para exportar.', 'Sin datos');
+    return;
+  }
+
+  mostrarOverlayCarga();
+
+  try {
+    let columnas, rows;
+
+    if (mode === 'current') {
+      // Exportar vista actual (con filtros y columnas ocultas)
+      const filters = appState.tableFilters.instrumentos || {};
+      const hiddenCols = appState.hiddenColumns.instrumentos || [];
+
+      // Columnas visibles
+      columnas = ['__tag'].concat(mt.columns.filter(c => !hiddenCols.includes(c)));
+
+      // Filas filtradas
+      rows = mt.rows.slice();
+      Object.keys(filters).forEach(col => {
+        const filterValues = filters[col];
+        if (filterValues && filterValues.length > 0) {
+          rows = rows.filter(row => {
+            const val = col === '__tag' ? row.__tag : row[col];
+            const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+            return filterValues.includes(valStr);
+          });
+        }
+      });
+    } else {
+      // Exportar todo
+      columnas = ['__tag'].concat(mt.columns);
+      rows = mt.rows.slice();
+    }
+
+    // Crear workbook
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+
+    // Encabezados
+    const headers = columnas.map(col => {
+      if (col === '__tag') return 'TAG';
+      if (col === '__linea_asociada__') return 'Línea asociada';
+      return col;
+    });
+    wsData.push(headers);
+
+    // Datos
+    rows.forEach(row => {
+      const rowData = columnas.map(col => {
+        const val = col === '__tag' ? row.__tag : row[col];
+        return val === null || val === undefined ? '' : val;
+      });
+      wsData.push(rowData);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Instrumentos');
+
+    // Hoja de comentarios (opcional)
+    if (withComments) {
+      const wsComments = [];
+      wsComments.push(['TAG', 'Columna', 'Comentario']);
+
+      rows.forEach(row => {
+        if (row.__editComment) {
+          Object.keys(row.__editComment).forEach(col => {
+            if (row.__editComment[col] && row.__editComment[col].trim() !== '') {
+              const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+              wsComments.push([row.__tag, colLabel, row.__editComment[col]]);
+            }
+          });
+        }
+      });
+
+      if (wsComments.length > 1) {
+        const wsC = XLSX.utils.aoa_to_sheet(wsComments);
+        XLSX.utils.book_append_sheet(wb, wsC, 'Comentarios');
+      }
+    }
+
+    // Descargar
+    const fecha = new Date().toISOString().slice(0,10);
+    const modeLabel = mode === 'current' ? 'filtrada' : 'completa';
+    const filename = `instrumentos_${modeLabel}_${fecha}.xlsx`;
+    XLSX.writeFile(wb, filename);
+
+    ocultarOverlayCarga();
+    customAlert(`Archivo "${filename}" descargado correctamente con ${rows.length} fila(s).`, 'Exportado');
+  } catch (error) {
+    ocultarOverlayCarga();
+    customAlert('Error al exportar: ' + error.message, 'Error');
+    console.error(error);
+  }
+}
+
+// Botón de exportar base de datos desde la pestaña Base de datos
+document.getElementById('btn-export-db').addEventListener('click', () => {
+  showExportDatabaseModal();
+});
+
+document.getElementById('btn-export-excel').addEventListener('click', exportarExcel);
+document.getElementById('btn-export-document').addEventListener('click', exportarDocumentoActualizado);
+
+function exportarExcel(){
+  const mt = appState.tablas.instrumentos;
+
+  if (mt.rows.length === 0) {
+    customAlert('No hay datos para exportar.', 'Sin datos');
+    return;
+  }
+
+  const allColumns = document.getElementById('export-all-columns').checked;
+  const rowsMode = document.querySelector('input[name="export-rows"]:checked').value;
+  const withComments = document.getElementById('export-with-comments').checked;
+
+  // Determinar columnas a exportar
+  let columnas = ['__tag'];
+  if (allColumns) {
+    columnas = columnas.concat(mt.columns);
+  } else {
+    const selected = Array.from(document.querySelectorAll('.export-col-check:checked')).map(cb => cb.value);
+    columnas = columnas.concat(selected);
+  }
+
+  // Filtrar filas según el modo
+  let rows = mt.rows.slice();
+
+  if (rowsMode === 'conflicts') {
+    rows = rows.filter(r => r.__conflict && Object.keys(r.__conflict).length > 0);
+  } else if (rowsMode === 'edited') {
+    rows = rows.filter(r => r.__pendingEdit && Object.keys(r.__pendingEdit).length > 0);
+  } else if (rowsMode === 'custom') {
+    const selectedIndices = Array.from(document.querySelectorAll('.export-row-check:checked')).map(cb => parseInt(cb.value));
+    rows = rows.filter((r, idx) => selectedIndices.includes(idx));
+  }
+
+  if (rows.length === 0) {
+    customAlert('No hay filas que coincidan con la selección.', 'Sin datos');
+    return;
+  }
+
+  mostrarOverlayCarga();
+
+  // Crear workbook
+  const wb = XLSX.utils.book_new();
+
+  // Hoja principal con datos
+  const wsData = [];
+
+  // Encabezados
+  const headers = columnas.map(col => {
+    if (col === '__tag') return 'TAG';
+    if (col === '__linea_asociada__') return 'Línea asociada';
+    return col;
+  });
+  wsData.push(headers);
+
+  // Datos
+  rows.forEach(row => {
+    const rowData = columnas.map(col => {
+      const val = col === '__tag' ? row.__tag : row[col];
+      return val === null || val === undefined ? '' : val;
+    });
+    wsData.push(rowData);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, 'Instrumentos');
+
+  // Hoja de comentarios (opcional)
+  if (withComments) {
+    const wsComments = [];
+    wsComments.push(['TAG', 'Columna', 'Comentario']);
+
+    rows.forEach(row => {
+      if (row.__editComment) {
+        Object.keys(row.__editComment).forEach(col => {
+          if (row.__editComment[col] && row.__editComment[col].trim() !== '') {
+            const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
+            wsComments.push([row.__tag, colLabel, row.__editComment[col]]);
+          }
+        });
+      }
+    });
+
+    if (wsComments.length > 1) {
+      const wsC = XLSX.utils.aoa_to_sheet(wsComments);
+      XLSX.utils.book_append_sheet(wb, wsC, 'Comentarios');
+    }
+  }
+
+  // Descargar
+  const fecha = new Date().toISOString().slice(0,10);
+  const filename = `instrumentos_${fecha}.xlsx`;
+  XLSX.writeFile(wb, filename);
+
+  ocultarOverlayCarga();
+
+  customAlert(`Archivo "${filename}" descargado correctamente con ${rows.length} fila(s).`, 'Exportado');
+}
+
+async function exportarDocumentoActualizado(){
+  const docIdSelected = document.querySelector('input[name="export-doc"]:checked');
+  if (!docIdSelected) {
+    customAlert('Seleccioná un documento para actualizar.', 'Sin selección');
+    return;
+  }
+
+  const docId = docIdSelected.value;
+  const p = appState.proyectos.find(x=>x.id===appState.proyectoActualId);
+  const doc = p.docs.find(d => d.id === docId);
+
+  if (!appState.originalWorkbooks[docId]) {
+    mostrarOverlayCarga();
+    const ok = await asegurarOriginalDescargado(doc);
+    if (!ok) {
+      ocultarOverlayCarga();
+      customAlert('No se encontró el archivo original de este documento.', 'Error');
+      return;
+    }
+  }
+  const originalWb = appState.originalWorkbooks[docId];
+
+  mostrarOverlayCarga();
+
+  try {
+    // Clonar el workbook original
+    const wb = XLSX.read(originalWb.data, {type:'array', cellStyles:true});
+
+    // Siempre usar la tabla de instrumentos
+    const mt = appState.tablas.instrumentos;
+
+    if (doc.mode === 'tabla') {
+      // Modo tabla: actualizar el rango de filas original
+      exportarModoTabla(wb, doc, mt);
+    } else {
+      // Modo hojas: actualizar las hojas válidas
+      exportarModoHojas(wb, doc, mt);
+    }
+
+    // Descargar el archivo actualizado
+    const fecha = new Date().toISOString().slice(0,10);
+    const filename = doc.filename.replace(/\.(xlsx|xls)$/i, `_actualizado_${fecha}.$1`);
+    XLSX.writeFile(wb, filename);
+
+    ocultarOverlayCarga();
+    customAlert(`Documento "${filename}" exportado correctamente.`, 'Exportado');
+  } catch (error) {
+    ocultarOverlayCarga();
+    customAlert('Error al exportar el documento: ' + error.message, 'Error');
+    console.error(error);
+  }
+}
+
+function exportarModoTabla(wb, doc, mt) {
+  const rangoFilas = doc.rangoFilas;
+  if (!rangoFilas) return;
+
+  // Obtener la hoja donde están los datos
+  const sheetName = doc.fields[0].ranges[0].sheet;
+  const ws = wb.Sheets[sheetName];
+
+  // Mapear campos a columnas
+  const fieldToCol = {};
+  doc.fields.forEach(f => {
+    if (f.ranges && f.ranges.length > 0) {
+      // Para multi-columna, usar la primera columna como referencia
+      fieldToCol[f.name] = f.ranges[0].c1;
+    }
+  });
+
+  // Obtener todas las filas de la base de datos
+  const dbRows = mt.rows;
+
+  // Calcular cuántas filas necesitamos (puede ser más que el original)
+  const filasOriginales = rangoFilas.r2 - rangoFilas.r1 + 1;
+  const filasNecesarias = dbRows.length;
+  const filasAInsertar = filasNecesarias - filasOriginales;
+
+  if (filasAInsertar > 0) {
+    // Necesitamos insertar filas: desplazar contenido hacia abajo
+    const rangeObj = XLSX.utils.decode_range(ws['!ref']);
+    const ultimaFila = rangeObj.e.r;
+
+    // Desplazar todas las filas después del rango hacia abajo
+    for (let r = ultimaFila; r > rangoFilas.r2; r--) {
+      for (let c = 0; c <= rangeObj.e.c; c++) {
+        const cellAddr = XLSX.utils.encode_cell({r, c});
+        const newAddr = XLSX.utils.encode_cell({r: r + filasAInsertar, c});
+        if (ws[cellAddr]) {
+          ws[newAddr] = ws[cellAddr];
+          delete ws[cellAddr];
+        }
+      }
+    }
+
+    // Actualizar el rango de la hoja
+    rangeObj.e.r += filasAInsertar;
+    ws['!ref'] = XLSX.utils.encode_range(rangeObj);
+  }
+
+  // Escribir los datos actualizados
+  dbRows.forEach((row, idx) => {
+    const filaExcel = rangoFilas.r1 + idx;
+
+    doc.fields.forEach(f => {
+      if (f.isTag) {
+        // Es el TAG
+        const col = fieldToCol[f.name];
+        if (col !== undefined) {
+          const cellAddr = XLSX.utils.encode_cell({r: filaExcel, c: col});
+          ws[cellAddr] = {v: row.__tag, t: 's'};
+        }
+      } else if (f.name in row) {
+        // Es un campo normal
+        const col = fieldToCol[f.name];
+        if (col !== undefined) {
+          const val = row[f.name];
+          const cellAddr = XLSX.utils.encode_cell({r: filaExcel, c: col});
+          if (val !== null && val !== undefined && String(val).trim() !== '') {
+            ws[cellAddr] = {v: val, t: 's'};
+          } else {
+            ws[cellAddr] = {v: '', t: 's'};
+          }
+        }
+      }
+    });
+  });
+}
+
+function exportarModoHojas(wb, doc, mt) {
+  const hojasValidas = doc.hojasValidas || [];
+
+  hojasValidas.forEach((sheetName, idx) => {
+    if (!wb.Sheets[sheetName]) return;
+
+    const ws = wb.Sheets[sheetName];
+    const row = mt.rows[idx];
+    if (!row) return;
+
+    doc.fields.forEach(f => {
+      if (f.ranges && f.ranges.length > 0) {
+        const range = f.ranges[0]; // En modo hojas, cada field tiene un rango fijo
+        const cellAddr = XLSX.utils.encode_cell({r: range.r1, c: range.c1});
+
+        if (f.isTag) {
+          ws[cellAddr] = {v: row.__tag, t: 's'};
+        } else if (f.name in row) {
+          const val = row[f.name];
+          if (val !== null && val !== undefined && String(val).trim() !== '') {
+            ws[cellAddr] = {v: val, t: 's'};
+          } else {
+            ws[cellAddr] = {v: '', t: 's'};
+          }
+        }
+      }
+    });
+  });
+}
+</script>
+
+</body>
+</html>
