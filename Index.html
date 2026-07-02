@@ -984,6 +984,11 @@ async function cargarProyectoCompleto(proyectoId){
     instrumentos: { columns: metaInstr ? metaInstr.columns : [], rows: (instrData||[]).map(filaARow) },
     lineas: { columns: metaLineas ? metaLineas.columns : [], rows: (lineasData||[]).map(filaARow) }
   };
+  // Guardamos qué ids existían en Supabase al momento de cargar, para poder borrar
+  // puntualmente solo las filas que realmente se eliminaron (nunca "borrar todo").
+  appState.tablas.instrumentos.__loadedIds = new Set((instrData||[]).map(r => r.id));
+  appState.tablas.lineas.__loadedIds = new Set((lineasData||[]).map(r => r.id));
+  p.__loadedDocIds = new Set((docsData||[]).map(r => r.id));
 
   appState.tableFilters = {}; appState.tableSorts = {}; appState.hiddenColumns = {};
   (prefsRes.data||[]).forEach(row => {
@@ -1037,30 +1042,44 @@ async function guardarProyectoActual(){
     // 1) subir archivos originales pendientes
     for (const doc of p.docs) { await subirOriginalSiHaceFalta(proyectoId, doc); }
 
-    // 2) documentos: borrar e insertar de nuevo (snapshot completo)
-    await supa.from('documentos').delete().eq('proyecto_id', proyectoId);
+    // 2) documentos: upsert (nunca borramos todo) + borramos puntualmente los que ya no están
+    const idsDocsActuales = new Set(p.docs.map(d => d.id));
+    const idsDocsABorrar = Array.from(p.__loadedDocIds || []).filter(id => !idsDocsActuales.has(id));
+    if (idsDocsABorrar.length){
+      await supa.from('documentos').delete().in('id', idsDocsABorrar);
+    }
     if (p.docs.length){
       const filasDocs = p.docs.map((d, i) => ({
         id: d.id, proyecto_id: proyectoId, filename: d.filename, fields: d.fields,
         mode: d.mode, hojas_validas: d.hojasValidas, rango_filas: d.rangoFilas,
         original_file_path: d.__originalPath || null, orden: i
       }));
-      const { error } = await supa.from('documentos').insert(filasDocs);
+      const { error } = await supa.from('documentos').upsert(filasDocs);
       if (error) throw error;
     }
+    p.__loadedDocIds = idsDocsActuales;
 
-    // 3) instrumentos y líneas: borrar e insertar de nuevo
+    // 3) instrumentos y líneas: upsert por id (nunca borramos todo) + borrado puntual de lo eliminado
     for (const tipo of ['instrumentos','lineas']){
-      await supa.from(tipo).delete().eq('proyecto_id', proyectoId);
       const tabla = appState.tablas[tipo];
+      const idsActuales = new Set(tabla.rows.map(r => r.__dbId).filter(Boolean));
+      const idsABorrar = Array.from(tabla.__loadedIds || []).filter(id => !idsActuales.has(id));
+      if (idsABorrar.length){
+        // Borrar en tandas de 500 para no pasarnos de tamaño de request
+        for (let i=0; i<idsABorrar.length; i+=500){
+          await supa.from(tipo).delete().in('id', idsABorrar.slice(i, i+500));
+        }
+      }
       if (tabla.rows.length){
         const filas = tabla.rows.map(r => {
+          if (!r.__dbId) r.__dbId = crypto.randomUUID(); // fila creada en esta misma sesión, todavía sin id
           const data = {};
           tabla.columns.forEach(c => {
             if (c === '__linea_asociada__') return;
             if (r[c] !== undefined) data[c] = r[c];
           });
           return {
+            id: r.__dbId,
             proyecto_id: proyectoId,
             tag: r.__tag,
             data,
@@ -1075,9 +1094,13 @@ async function guardarProyectoActual(){
             pending_edit: r.__pendingEdit || {}
           };
         });
-        const { error } = await supa.from(tipo).insert(filas);
-        if (error) throw error;
+        // Upsert en tandas de 500
+        for (let i=0; i<filas.length; i+=500){
+          const { error } = await supa.from(tipo).upsert(filas.slice(i, i+500));
+          if (error) throw error;
+        }
       }
+      tabla.__loadedIds = idsActuales;
     }
 
     // 4) metadata de columnas
@@ -2608,7 +2631,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
       let existing;
       if (esDuplicadoEnEsteDoc) {
         // Para duplicados del mismo documento: SIEMPRE crear fila nueva
-        existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [docName], __duplicated: true };
+        existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID(), __duplicatedDocs: [docName], __duplicated: true };
         // Agregar info de ubicación
         if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
         if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
@@ -2618,7 +2641,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
         // Para no-duplicados: buscar si ya existe (puede venir de otro documento)
         existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
         if (!existing){
-          existing = { __tag: tagVal, __sources:{}, __duplicatedDocs: [] };
+          existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID(), __duplicatedDocs: [] };
           if (newRow.__filaExcel) existing.__filaExcel = newRow.__filaExcel;
           if (newRow.__hojaExcel) existing.__hojaExcel = newRow.__hojaExcel;
           tabla.columns.forEach(c => { if (!(c in existing)) existing[c] = null; });
@@ -2728,7 +2751,7 @@ document.getElementById('btn-process-doc').addEventListener('click', async () =>
         const tagKey = normTag(tagVal);
         let existing = tabla.rows.find(r => normTag(r.__tag) === tagKey);
         if (!existing){
-          existing = { __tag: tagVal, __sources:{} };
+          existing = { __tag: tagVal, __sources:{}, __dbId: crypto.randomUUID() };
           tabla.rows.push(existing);
         }
       });
