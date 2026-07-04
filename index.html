@@ -19,16 +19,16 @@
   .screen.active{display:block;}
 
   .topbar{
-    background:#fff; border-bottom:1px solid var(--line); padding:14px 26px;
-    display:flex; align-items:center; gap:14px;
+    background:#fff; border-bottom:1px solid var(--line); padding:12px 20px;
+    display:flex; align-items:center; gap:12px;
   }
   .topbar .back{cursor:pointer; font-size:14px; color:var(--ink-soft); display:flex; align-items:center; gap:4px;}
   .topbar .back:hover{color:var(--accent);}
   .topbar h1{font-size:16px; font-weight:600; margin:0;}
   .topbar .crumb{font-size:12.5px; color:var(--ink-faint);}
 
-  .wrap{max-width:1220px; margin:0 auto; padding:26px;}
-  .wrap-full{padding:26px;}
+  .wrap{max-width:1220px; margin:0 auto; padding:20px;}
+  .wrap-full{padding:0;}
 
   .proj-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:20px;}
   .proj-card{
@@ -55,11 +55,12 @@
   .btn.small{font-size:12px; padding:6px 12px;}
   .btn:disabled{opacity:.4; cursor:not-allowed;}
 
-  .tabs2{display:flex; gap:2px; margin:18px 0; border-bottom:1px solid var(--line);}
-  .tab2{padding:10px 14px; font-size:13px; font-weight:500; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent;}
-  .tab2.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .tabs2{display:flex; gap:2px; align-items:center; background:#fff; border-bottom:1px solid var(--line); padding:0 20px;}
+  .tab2{padding:12px 16px; font-size:13px; font-weight:500; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; transition:.15s;}
+  .tab2.active{color:var(--accent); border-bottom-color:var(--accent); background:var(--accent-soft);}
+  .tabs2 .btn{margin-bottom:2px;}
 
-  .panel{background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin-bottom:18px;}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:0; padding:20px 22px; margin:0; border-left:none; border-right:none;}
   .panel h2{font-size:14px; margin:0 0 4px; font-weight:600;}
   .panel .desc{font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;}
 
@@ -112,6 +113,9 @@
   }
   .column-context-menu-item:hover{background:var(--accent-soft);}
   .column-context-menu-item.danger:hover{background:var(--red-bg);color:var(--red);}
+  .column-context-menu-separator{
+    height:1px;background:var(--line);margin:4px 0;
+  }
 
   .mode-card{
     flex:1; border:1.5px solid var(--line); border-radius:9px; padding:14px 16px; cursor:pointer; position:relative;
@@ -195,7 +199,7 @@
   .field-chip .remove:hover{color:var(--red);}
 
   /* master table */
-  .master-toolbar{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .master-toolbar{display:flex; align-items:center; gap:10px; margin-bottom:12px; padding:12px 20px; background:#fafaf8; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
   .master-toolbar .stat{font-size:12px; color:var(--ink-soft);}
   .master-table-container{overflow:auto; max-height:600px; border:1px solid var(--line); border-radius:8px; width:100%;}
   .master-table-container-inner{transform-origin:0 0; display:inline-block; min-width:100%;}
@@ -203,12 +207,16 @@
   table.master-table th{
     text-align:left; padding:8px 10px; background:#fafaf8; border-bottom:1.5px solid var(--line);
     font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--ink-soft); white-space:nowrap;
-    position:sticky; top:0; z-index:10; cursor:pointer; user-select:none;
+    position:sticky; top:0; z-index:10; cursor:pointer; user-select:none; position:relative;
   }
   table.master-table th:hover{background:#eee8e0;}
   table.master-table th[data-col]:hover .filter-icon{opacity:0.8;}
   table.master-table th .filter-icon{float:right; opacity:0.5; font-size:10px; margin-left:4px;}
-  table.master-table th.filtered .filter-icon{opacity:1; color:var(--accent);}
+  table.master-table th.filtered{background:#e6ede9; color:var(--accent); font-weight:700;}
+  table.master-table th.filtered::before{
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent);
+  }
+  table.master-table th.filtered .filter-icon{opacity:1; color:var(--accent); font-weight:700;}
   table.master-table td{padding:7px 10px; border-bottom:1px solid #ece9e3; position:relative;}
   table.master-table td.conflict{background:var(--red-bg); color:var(--red); font-weight:600; cursor:pointer;}
   table.master-table td.pending-edit{background:var(--blue-bg); color:var(--blue); font-weight:600; cursor:pointer;}
@@ -327,8 +335,8 @@
   .custom-dialog-btn-secondary:hover{background:#d8d8d6;}
 
   .empty-state{text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:13px;}
-  .legend{display:flex; gap:18px; font-size:11.5px; color:var(--ink-soft); margin-bottom:14px;}
-  .legend .sw{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+  .legend{display:flex; gap:16px; font-size:11px; color:var(--ink-soft); margin-bottom:12px; padding:8px 20px; background:#fafaf8; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .legend .sw{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px;}
 
   /* Modal de ordenamiento */
   .sort-modal-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:10px;background:#fafaf8;border-radius:6px;}
@@ -357,6 +365,50 @@
     display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;cursor:pointer;border-radius:4px;
   }
   .column-filter-dropdown .filter-option:hover{background:var(--accent-soft);}
+
+  /* Control de zoom mejorado */
+  .zoom-control{
+    display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line);
+    border-radius:6px; padding:4px 10px;
+  }
+  .zoom-control label{font-size:12px; color:var(--ink-soft); margin:0;}
+  .zoom-control input[type=range]{width:100px; height:4px; border-radius:2px; -webkit-appearance:none; appearance:none;}
+  .zoom-control input[type=range]::-webkit-slider-runnable-track{
+    width:100%; height:4px; background:var(--line); border-radius:2px;
+  }
+  .zoom-control input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:14px; height:14px; background:var(--accent);
+    border-radius:50%; cursor:pointer; margin-top:-5px;
+  }
+  .zoom-control input[type=range]::-moz-range-track{
+    width:100%; height:4px; background:var(--line); border-radius:2px;
+  }
+  .zoom-control input[type=range]::-moz-range-thumb{
+    width:14px; height:14px; background:var(--accent); border-radius:50%; cursor:pointer; border:none;
+  }
+  .zoom-control .zoom-input-wrapper{
+    display:flex; align-items:center; gap:2px; background:#fafaf8; border:1px solid var(--line);
+    border-radius:4px; padding:2px 4px;
+  }
+  .zoom-control input[type=number]{
+    width:45px; border:none; background:transparent; font-size:12px; font-weight:600;
+    text-align:center; padding:0; -moz-appearance:textfield;
+  }
+  .zoom-control input[type=number]::-webkit-outer-spin-button,
+  .zoom-control input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .zoom-control .zoom-btns{display:flex; flex-direction:column; gap:1px;}
+  .zoom-control .zoom-btn{
+    width:16px; height:10px; display:flex; align-items:center; justify-content:center;
+    background:var(--accent-soft); border:none; cursor:pointer; font-size:8px;
+    line-height:1; color:var(--accent); border-radius:2px;
+  }
+  .zoom-control .zoom-btn:hover{background:var(--accent); color:#fff;}
+
+  /* Details/Summary colapsable */
+  details.panel summary{cursor:pointer; user-select:none;}
+  details.panel summary::-webkit-details-marker{display:none;}
+  details.panel[open] .summary-arrow{transform:rotate(90deg);}
+  details.panel summary:hover{color:var(--accent);}
 </style>
 </head>
 <body>
@@ -398,14 +450,15 @@
       <div class="tab2 active" data-tab2="documentos">Documentos</div>
       <div class="tab2" data-tab2="instrumentos">Base de datos</div>
       <div class="tab2" data-tab2="exportar">Exportar documentos</div>
+      <button class="btn" id="btn-export-db-header" style="margin-left:auto;display:none;align-items:center;gap:6px;">
+        📊 Exportar base de datos
+      </button>
     </div>
 
     <div id="tab2-documentos">
       <div class="panel">
-        <h2>Documentos cargados</h2>
-        <p class="desc">Subí un Excel y configurá qué celdas contienen cada dato. Lo que coincida con la base existente queda igual; lo nuevo se agrega como columna; lo que difiera se marca para revisión.</p>
         <div class="doclist" id="doc-list"></div>
-        <div style="margin-top:28px;">
+        <div style="margin-top:20px;">
           <label class="upload-drop" id="upload-drop">
             <input type="file" id="file-input" accept=".xlsx,.xls">
             <div class="updrop-sub">Arrastrá tu archivo Excel aquí, o</div>
@@ -417,29 +470,31 @@
 
     <div id="tab2-instrumentos" style="display:none;">
       <div class="panel">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <h2 style="margin:0;">Base de datos</h2>
-          <button class="btn" id="btn-export-db" style="display:flex;align-items:center;gap:6px;">
-            📊 Exportar base de datos
-          </button>
-        </div>
-        <p class="desc">Cuando un instrumento tiene línea asociada, hereda automáticamente los datos de esa línea (temperatura, presión, fluido) y los compara contra los propios.</p>
         <div class="legend">
-          <span><span class="sw" style="background:var(--red-bg);border:1px solid var(--red);"></span>Discrepancia entre documentos</span>
-          <span><span class="sw" style="background:var(--blue-bg);border:1px solid var(--blue);"></span>Actualización de datos</span>
-          <span><span class="sw" style="background:#ffc1c1;border:2px solid var(--red);"></span>TAG duplicado en documento</span>
+          <span><span class="sw" style="background:var(--red-bg);border:1px solid var(--red);"></span>Discrepancia</span>
+          <span><span class="sw" style="background:var(--blue-bg);border:1px solid var(--blue);"></span>Modificada</span>
+          <span><span class="sw" style="background:#ffc1c1;border:2px solid var(--red);"></span>Duplicada</span>
         </div>
         <div class="master-toolbar">
           <span class="stat" id="master-stats-instrumentos"></span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
             <button class="btn small ghost" id="btn-show-columns-instrumentos" style="display:none;align-items:center;gap:6px;">
-              👁️ Mostrar columnas
+              👁️ Columnas ocultas
             </button>
-            <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;">
-              🔍 Zoom:
-              <input type="range" id="zoom-instrumentos" min="50" max="150" value="100" step="10" style="width:100px;">
-              <span id="zoom-value-instrumentos" style="font-weight:600;min-width:35px;">100%</span>
-            </label>
+            <button class="btn small ghost" id="btn-save-view-instrumentos" style="display:none;align-items:center;gap:6px;" title="Guardar vista actual (filtros, orden, columnas)">
+              💾 Guardar vista
+            </button>
+            <div class="zoom-control">
+              <label>🔍 Zoom:</label>
+              <input type="range" id="zoom-instrumentos" min="50" max="150" value="100" step="5">
+              <div class="zoom-input-wrapper">
+                <input type="number" id="zoom-input-instrumentos" min="50" max="150" value="100" step="5">
+                <div class="zoom-btns">
+                  <button class="zoom-btn" id="zoom-up-instrumentos">▴</button>
+                  <button class="zoom-btn" id="zoom-down-instrumentos">▾</button>
+                </div>
+              </div>
+            </div>
             <button class="btn small" id="btn-sort-instrumentos" style="display:flex;align-items:center;gap:6px;">
               ⇅ Ordenar
             </button>
@@ -452,9 +507,9 @@
     <div id="tab2-exportar" style="display:none;">
       <div class="panel">
         <h2>📝 Actualizar documentos originales</h2>
-        <p class="desc">Esta sección permite actualizar documentos Excel originales manteniendo su formato y estructura.</p>
+        <p class="desc" style="margin-bottom:24px;">Esta sección permite actualizar documentos Excel originales manteniendo su formato y estructura.</p>
 
-        <div style="margin-top:40px;text-align:center;padding:60px 20px;background:#fafaf8;border-radius:8px;border:1px dashed var(--line);">
+        <div style="text-align:center;padding:60px 20px;background:#fafaf8;border-radius:8px;border:1px dashed var(--line);">
           <div style="font-size:48px;margin-bottom:16px;opacity:0.3;">🚧</div>
           <div style="font-size:16px;font-weight:600;color:var(--ink-soft);margin-bottom:8px;">
             Funcionalidad en desarrollo
@@ -566,7 +621,65 @@
   </div>
 </div>
 
-<!-- ============ SCREEN 3: CONFIGURAR DOCUMENTO (vista grilla) ============ -->
+<!-- ============ SCREEN 3: VISTA PREVIA DEL DOCUMENTO ============ -->
+<div class="screen" id="screen-preview">
+  <div class="topbar">
+    <div class="back" onclick="cancelarCargaDocumento()">‹ Documentos</div>
+    <h1>Vista previa del documento</h1>
+    <span class="crumb" id="preview-filename"></span>
+  </div>
+  <div class="wrap-full">
+    <div class="panel">
+      <h2>¿Cómo está organizada la información en este documento?</h2>
+      <p class="desc" style="margin-bottom:18px;">Revisá las hojas del documento y elegí el modo según cómo está armado el archivo.</p>
+      <div style="display:flex; gap:12px; margin-bottom:24px;">
+        <label class="mode-card" id="preview-mode-card-tabla">
+          <input type="radio" name="previewmode" value="tabla" checked>
+          <div class="mc-title">Tabla (una fila = un objeto)</div>
+          <div class="mc-desc">Ej. Listado de Líneas, Listado de Instrumentos, I/O List. Cada columna es un dato, cada fila es un objeto distinto.</div>
+        </label>
+        <label class="mode-card" id="preview-mode-card-hojas">
+          <input type="radio" name="previewmode" value="hojas">
+          <div class="mc-title">Una hoja = un objeto</div>
+          <div class="mc-desc">Ej. hojas de datos repetidas, una por cada equipo. La misma celda (ej. J7) tiene el mismo dato en cada hoja, pero referido a un objeto distinto.</div>
+        </label>
+      </div>
+
+      <h2>Vista previa</h2>
+      <p class="desc" style="margin-bottom:12px;">Navegá entre las hojas para revisar el contenido del documento.</p>
+
+      <div class="sheet-toolbar">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12px;font-weight:600;">Hoja:</span>
+          <select id="preview-sheet-selector" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;"></select>
+        </div>
+        <div class="zoom-control" style="margin-left:auto;">
+          <label>🔍 Zoom:</label>
+          <input type="range" id="zoom-preview" min="50" max="150" value="100" step="5">
+          <div class="zoom-input-wrapper">
+            <input type="number" id="zoom-input-preview" min="50" max="150" value="100" step="5">
+            <div class="zoom-btns">
+              <button class="zoom-btn" id="zoom-up-preview">▴</button>
+              <button class="zoom-btn" id="zoom-down-preview">▾</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-scroll-top" id="preview-scroll-top">
+        <div class="grid-scroll-top-inner" id="preview-scroll-top-inner"></div>
+      </div>
+      <div class="grid-container" id="preview-container" style="max-height:500px;"></div>
+
+      <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn ghost" onclick="cancelarCargaDocumento()">Cancelar</button>
+        <button class="btn" id="btn-continuar-mapeo">Continuar con la configuración →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN 4: CONFIGURAR DOCUMENTO (mapeo campos) ============ -->
 <div class="screen" id="screen-mapeo">
   <div class="topbar">
     <div class="back" onclick="goToProyectoDocs()">‹ Documentos</div>
@@ -574,41 +687,21 @@
     <span class="crumb" id="mapeo-filename"></span>
   </div>
   <div class="wrap-full">
-    <div class="panel">
-      <h2>¿Cómo está organizada la información en este documento?</h2>
-      <p class="desc">Elegí el modo según cómo está armado el archivo.</p>
-      <div style="display:flex; gap:12px;">
-        <label class="mode-card" id="mode-card-tabla">
-          <input type="radio" name="docmode" value="tabla" checked>
-          <div class="mc-title">Tabla (una fila = un objeto)</div>
-          <div class="mc-desc">Ej. Listado de Líneas, Listado de Instrumentos, I/O List. Cada columna es un dato, cada fila es un objeto distinto.</div>
-        </label>
-        <label class="mode-card" id="mode-card-hojas">
-          <input type="radio" name="docmode" value="hojas">
-          <div class="mc-title">Una hoja = un objeto</div>
-          <div class="mc-desc">Ej. hojas de datos repetidas, una por cada equipo. La misma celda (ej. J7) tiene el mismo dato en cada hoja, pero referido a un objeto distinto.</div>
-        </label>
-      </div>
-    </div>
+    <details class="panel" id="panel-config-organizacion" style="border-radius:8px;margin:20px;">
+      <summary style="cursor:pointer;font-size:14px;font-weight:600;padding:12px 0;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span>⚙️ Configuración: Organización del documento</span>
+        <span style="font-size:20px;transition:.2s;display:inline-block;" class="summary-arrow">›</span>
+      </summary>
+      <div style="padding-top:12px;">
+        <p class="desc" style="margin-bottom:14px;">Modo seleccionado: <strong id="modo-seleccionado-texto">Tabla (una fila = un objeto)</strong></p>
 
-    <div class="panel" id="panel-hojas-selector" style="display:none;">
-      <h2>¿Qué hojas representan objetos?</h2>
-      <p class="desc">Desmarcá las que no correspondan (portada, índice, notas, etc.).</p>
-      <div id="hojas-checklist" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
-    </div>
-
-    <div class="panel" id="panel-rango-filas">
-      <h2>¿De qué hoja y qué filas son los datos? <span style="color:var(--red);">*</span></h2>
-      <p class="desc">Elegí la hoja del Excel y el rango de filas con datos (sin contar encabezados). <strong>Hacé click en "Desde" o "Hasta"</strong>, después clickeá una fila en la grilla (pinta toda la fila). También podés escribir el número a mano.</p>
-      <div id="rango-filas-controles" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-        <span style="font-size:12.5px;">Hoja:</span>
-        <select id="rango-hoja-select" style="min-width:140px;"></select>
-        <span style="font-size:12.5px;">Desde la fila</span>
-        <input type="number" id="rango-fila-desde" min="1" placeholder="click aquí" style="width:90px; height:28px; padding:4px 8px;">
-        <span style="font-size:12.5px;">hasta la fila</span>
-        <input type="number" id="rango-fila-hasta" min="1" placeholder="click aquí" style="width:90px; height:28px; padding:4px 8px;">
+        <div id="panel-hojas-selector-inline" style="display:none;">
+          <h3 style="font-size:13px;margin:12px 0 8px;font-weight:600;">¿Qué hojas representan objetos?</h3>
+          <p class="desc" style="margin-bottom:10px;">Desmarcá las que no correspondan (portada, índice, notas, etc.).</p>
+          <div id="hojas-checklist" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
       </div>
-    </div>
+    </details>
 
 
     <div class="panel" id="panel-agregar-columna">
@@ -640,19 +733,30 @@
 
     <div class="panel" id="panel-grilla">
       <h2>Grilla del documento</h2>
-      <p class="desc" id="mapeo-instructions">Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre arriba. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.</p>
+      <p class="desc" id="mapeo-instructions">Seleccioná las columnas y el rango de filas con datos. Después asignale un nombre a cada columna. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong>.</p>
 
       <div class="sheet-toolbar">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:12px;font-weight:600;">Hoja:</span>
           <select id="grid-sheet-selector" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;"></select>
         </div>
-        <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;margin-left:auto;">
-          🔍 Zoom:
-          <input type="range" id="zoom-grid" min="50" max="150" value="100" step="10" style="width:100px;">
-          <span id="zoom-grid-value" style="font-weight:600;min-width:35px;">100%</span>
-        </label>
-        <span style="font-size:11.5px;color:var(--ink-soft);">Click en columna/fila · Ctrl+scroll para zoom</span>
+        <div id="rango-filas-inline" style="display:flex;align-items:center;gap:8px;margin-left:20px;">
+          <span style="font-size:12px;color:var(--ink-soft);">Filas:</span>
+          <input type="number" id="rango-fila-desde" min="1" placeholder="desde" style="width:70px; height:28px; padding:4px 8px;font-size:12px;">
+          <span style="font-size:12px;color:var(--ink-soft);">a</span>
+          <input type="number" id="rango-fila-hasta" min="1" placeholder="hasta" style="width:70px; height:28px; padding:4px 8px;font-size:12px;">
+        </div>
+        <div class="zoom-control" style="margin-left:auto;">
+          <label>🔍 Zoom:</label>
+          <input type="range" id="zoom-grid" min="50" max="150" value="100" step="5">
+          <div class="zoom-input-wrapper">
+            <input type="number" id="zoom-input-grid" min="50" max="150" value="100" step="5">
+            <div class="zoom-btns">
+              <button class="zoom-btn" id="zoom-up-grid">▴</button>
+              <button class="zoom-btn" id="zoom-down-grid">▾</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="grid-scroll-top" id="grid-scroll-top">
@@ -1006,6 +1110,9 @@ async function cargarProyectoCompleto(proyectoId){
     appState.hiddenColumns[row.tipo] = row.hidden_columns || [];
   });
 
+  // Intentar cargar vistas desde sessionStorage (tiene prioridad sobre Supabase)
+  const vistasCargadas = cargarVistasDeSessionStorage();
+
   const pFull = appState.proyectos.find(x=>x.id===proyectoId);
   document.getElementById('proj-crumb').textContent = `${pFull.docs.length} documento(s) cargado(s)`;
 }
@@ -1330,6 +1437,13 @@ function setTab2(name){
   document.getElementById('tab2-documentos').style.display = name==='documentos' ? 'block':'none';
   document.getElementById('tab2-instrumentos').style.display = name==='instrumentos' ? 'block':'none';
   document.getElementById('tab2-exportar').style.display = name==='exportar' ? 'block':'none';
+
+  // Mostrar/ocultar botón de exportar en el header
+  const btnExportHeader = document.getElementById('btn-export-db-header');
+  if (btnExportHeader) {
+    btnExportHeader.style.display = name==='instrumentos' ? 'flex' : 'none';
+  }
+
   if (name==='instrumentos') renderMasterTable('instrumentos');
   // La pestaña "Exportar" está en desarrollo: el HTML de export-tabla/export-documento
   // quedó comentado, así que no inicializamos esos controles.
@@ -1584,7 +1698,6 @@ function procesarArchivoExcel(file){
   mostrarOverlayCarga();
   const reader = new FileReader();
   reader.onload = (ev) => {
-    // pequeño delay para que el navegador pinte el overlay antes de bloquear el hilo con el parseo
     setTimeout(() => {
       const data = new Uint8Array(ev.target.result);
       const wb = XLSX.read(data, {type:'array', cellStyles: true});
@@ -1598,34 +1711,123 @@ function procesarArchivoExcel(file){
         selectedCells: new Set(), columnasInputs: [{id:uid(), letra:''}], fields:[],
         mode: 'tabla', hojasValidas: new Set(wb.SheetNames),
         rangoFilas: null,
-        originalWorkbook: wb, // Guardar el workbook original completo
-        originalData: data    // Guardar los datos binarios originales también
+        originalWorkbook: wb,
+        originalData: data
       };
-      showScreen('screen-mapeo');
-      document.getElementById('mapeo-filename').textContent = file.name;
 
-      // Resetear COMPLETAMENTE la UI al modo tabla
-      document.querySelector('#mode-card-tabla input').checked = true;
-      document.querySelector('#mode-card-hojas input').checked = false;
-      document.getElementById('panel-hojas-selector').style.display = 'none';
-      document.getElementById('panel-rango-filas').style.display = 'block';
-      document.getElementById('celda-manual-row').style.display = 'none';
-      document.getElementById('columnas-inputs-wrap').style.display = 'flex';
-      document.getElementById('mapeo-instructions').innerHTML = 'Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.';
-      document.getElementById('agregar-columna-desc').textContent = 'Hacé click en el campo "Seleccionar columna" y después clickeá cualquier celda en la grilla — o escribí la letra a mano.';
+      // Mostrar vista previa primero
+      showScreen('screen-preview');
+      document.getElementById('preview-filename').textContent = file.name;
 
-      renderRangoHojaSelect();
-      resetRangoFilasUI();
-      renderHojasChecklist();
-      renderGrid();
-      renderFieldList();
-      renderFieldNameSelect();
-      renderColumnasInputs();
+      // Resetear modo a tabla por defecto
+      document.querySelector('#preview-mode-card-tabla input').checked = true;
+      document.querySelector('#preview-mode-card-hojas input').checked = false;
+
+      renderPreviewGrid();
+      setupPreviewZoom();
       ocultarOverlayCarga();
     }, 30);
   };
   reader.onerror = () => { ocultarOverlayCarga(); alert('No se pudo leer el archivo.'); };
   reader.readAsArrayBuffer(file);
+}
+
+function cancelarCargaDocumento(){
+  appState.draft = null;
+  goToProyectoDocs();
+}
+
+function renderPreviewGrid(){
+  const previewSheetSelector = document.getElementById('preview-sheet-selector');
+  previewSheetSelector.innerHTML = '';
+  appState.draft.sheetNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if (name === appState.draft.activeSheet) opt.selected = true;
+    previewSheetSelector.appendChild(opt);
+  });
+
+  previewSheetSelector.onchange = (e) => {
+    appState.draft.activeSheet = e.target.value;
+    renderPreviewGrid();
+  };
+
+  const sheetData = appState.draft.sheets[appState.draft.activeSheet] || [];
+  const totalRows = sheetData.length;
+
+  let maxCols = 0;
+  for (let r=0;r<totalRows;r++) maxCols = Math.max(maxCols, (sheetData[r]||[]).length);
+  maxCols = Math.min(Math.max(maxCols, 10), 40);
+
+  let html = '<table class="sheet-grid"><thead><tr><th class="rownum"></th>';
+  for (let c=0;c<maxCols;c++) html += `<th>${colLetter(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  for (let r=0;r<totalRows;r++){
+    html += `<tr><td class="rownum">${r+1}</td>`;
+    const row = sheetData[r] || [];
+    for (let c=0;c<maxCols;c++){
+      const val = row[c];
+      const display = (val===null||val===undefined) ? '' : String(val).slice(0,30);
+      html += `<td>${escapeHtml(display)}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+
+  const previewContainer = document.getElementById('preview-container');
+  previewContainer.innerHTML = `<div class="grid-container-inner" id="preview-container-inner">${html}</div>`;
+
+  // Sincronizar scroll
+  const scrollTop = document.getElementById('preview-scroll-top');
+  const scrollTopInner = document.getElementById('preview-scroll-top-inner');
+  const table = previewContainer.querySelector('table');
+  if (table) {
+    scrollTopInner.style.width = table.offsetWidth + 'px';
+  }
+
+  scrollTop.addEventListener('scroll', function() {
+    previewContainer.scrollLeft = this.scrollLeft;
+  });
+
+  previewContainer.addEventListener('scroll', function() {
+    scrollTop.scrollLeft = this.scrollLeft;
+  });
+}
+
+function setupPreviewZoom(){
+  let previewZoom = 1;
+  const slider = document.getElementById('zoom-preview');
+  const input = document.getElementById('zoom-input-preview');
+  const btnUp = document.getElementById('zoom-up-preview');
+  const btnDown = document.getElementById('zoom-down-preview');
+
+  if (!slider || !input) return;
+
+  const updateZoom = (value) => {
+    const zoom = Math.max(50, Math.min(150, parseInt(value)));
+    slider.value = zoom;
+    input.value = zoom;
+    previewZoom = zoom / 100;
+    const inner = document.getElementById('preview-container-inner');
+    if (inner) inner.style.transform = `scale(${previewZoom})`;
+  };
+
+  slider.addEventListener('input', (e) => updateZoom(e.target.value));
+  input.addEventListener('input', (e) => updateZoom(e.target.value));
+  input.addEventListener('change', (e) => updateZoom(e.target.value));
+
+  if (btnUp) btnUp.addEventListener('click', () => updateZoom(parseInt(input.value) + 5));
+  if (btnDown) btnDown.addEventListener('click', () => updateZoom(parseInt(input.value) - 5));
+
+  // Ctrl+scroll
+  document.getElementById('preview-container').addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -5 : 5;
+      updateZoom(parseInt(slider.value) + delta);
+    }
+  }, { passive: false });
 }
 
 function mostrarOverlayCarga(){
@@ -1691,21 +1893,7 @@ let inputColumnaEnfocado = null; // id del input de columna que tiene foco, para
 
 function cellKey(r,c){ return r+'-'+c; }
 
-function renderRangoHojaSelect(){
-  const sel = document.getElementById('rango-hoja-select');
-  sel.innerHTML = '';
-  appState.draft.sheetNames.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    sel.appendChild(opt);
-  });
-  sel.value = appState.draft.activeSheet;
-}
-document.getElementById('rango-hoja-select').addEventListener('change', (e) => {
-  appState.draft.activeSheet = e.target.value;
-  renderGrid();
-});
+// renderRangoHojaSelect ya no es necesario, se usa grid-sheet-selector
 
 
 // Zoom en grilla con Ctrl + Rueda y con el slider
@@ -1714,27 +1902,40 @@ let gridZoom = 1;
 // Event listener para el slider de zoom de la grilla
 document.addEventListener('DOMContentLoaded', () => {
   const zoomGridSlider = document.getElementById('zoom-grid');
-  if (zoomGridSlider) {
-    zoomGridSlider.addEventListener('input', (e) => {
-      const zoom = e.target.value;
+  const zoomGridInput = document.getElementById('zoom-input-grid');
+  const zoomUpGrid = document.getElementById('zoom-up-grid');
+  const zoomDownGrid = document.getElementById('zoom-down-grid');
+
+  if (zoomGridSlider && zoomGridInput) {
+    const updateGridZoom = (value) => {
+      const zoom = Math.max(50, Math.min(150, parseInt(value)));
+      zoomGridSlider.value = zoom;
+      zoomGridInput.value = zoom;
       gridZoom = zoom / 100;
-      document.getElementById('zoom-grid-value').textContent = zoom + '%';
       const inner = document.getElementById('grid-container-inner');
       if (inner) inner.style.transform = `scale(${gridZoom})`;
-    });
+    };
+
+    zoomGridSlider.addEventListener('input', (e) => updateGridZoom(e.target.value));
+    zoomGridInput.addEventListener('input', (e) => updateGridZoom(e.target.value));
+    zoomGridInput.addEventListener('change', (e) => updateGridZoom(e.target.value));
+
+    if (zoomUpGrid) zoomUpGrid.addEventListener('click', () => updateGridZoom(parseInt(zoomGridInput.value) + 5));
+    if (zoomDownGrid) zoomDownGrid.addEventListener('click', () => updateGridZoom(parseInt(zoomGridInput.value) - 5));
   }
 });
 
 document.getElementById('grid-container').addEventListener('wheel', (e) => {
   if (e.ctrlKey) {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -10 : 10;
+    const delta = e.deltaY > 0 ? -5 : 5;
     const zoomSlider = document.getElementById('zoom-grid');
-    if (zoomSlider) {
+    const zoomInput = document.getElementById('zoom-input-grid');
+    if (zoomSlider && zoomInput) {
       const newZoom = Math.max(50, Math.min(150, parseInt(zoomSlider.value) + delta));
       zoomSlider.value = newZoom;
+      zoomInput.value = newZoom;
       gridZoom = newZoom / 100;
-      document.getElementById('zoom-grid-value').textContent = newZoom + '%';
       const inner = document.getElementById('grid-container-inner');
       if (inner) inner.style.transform = `scale(${gridZoom})`;
     }
@@ -1820,29 +2021,47 @@ function renderHojasChecklist(){
   });
 }
 
-document.querySelectorAll('input[name="docmode"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    appState.draft.mode = e.target.value;
-    const esHojas = e.target.value === 'hojas';
-    document.getElementById('panel-hojas-selector').style.display = esHojas ? 'block' : 'none';
-    document.getElementById('panel-rango-filas').style.display = esHojas ? 'none' : 'block';
-    document.getElementById('celda-manual-row').style.display = esHojas ? 'flex' : 'none';
-    document.getElementById('columnas-inputs-wrap').style.display = esHojas ? 'none' : 'flex';
-    document.getElementById('mapeo-instructions').innerHTML = esHojas
-      ? 'Elegí una celda (ej. J7) que tenga siempre el mismo dato en la misma posición, en cada hoja que representa un objeto. Vas a definir un campo por cada celda fija que quieras extraer (TAG, presión, etc.).'
-      : 'Click en una letra de columna para seleccionarla (usa el rango de filas que confirmaste arriba). Después asignale un nombre. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong> — eso define a qué base se suma el documento entero.';
-    document.getElementById('agregar-columna-desc').textContent = esHojas
-      ? 'Hacé click en una celda de la grilla (o escribí la celda arriba) y asignale un nombre acá.'
-      : 'Hacé click en el campo "Seleccionar columna" y después clickeá cualquier celda en la grilla — o escribí la letra a mano.';
-    appState.draft.selectedCells.clear();
-    appState.draft.columnasInputs = [{id:uid(), letra:''}];
-    inputColumnaEnfocado = null;
-    paintSelection();
-    pintarColumnasAsignadas();
-    hideSelectionBar();
-    renderColumnasInputs();
-  });
+// Continuar desde vista previa a configuración de mapeo
+document.getElementById('btn-continuar-mapeo').addEventListener('click', () => {
+  const modeSelected = document.querySelector('input[name="previewmode"]:checked').value;
+  appState.draft.mode = modeSelected;
+
+  showScreen('screen-mapeo');
+  document.getElementById('mapeo-filename').textContent = appState.draft.filename;
+
+  // Actualizar texto del modo seleccionado
+  const modoTexto = modeSelected === 'tabla' ? 'Tabla (una fila = un objeto)' : 'Una hoja = un objeto';
+  document.getElementById('modo-seleccionado-texto').textContent = modoTexto;
+
+  // Mostrar/ocultar selector de hojas según el modo
+  const panelHojasInline = document.getElementById('panel-hojas-selector-inline');
+  panelHojasInline.style.display = modeSelected === 'hojas' ? 'block' : 'none';
+
+  // Mostrar/ocultar selector de rango de filas
+  const rangoFilasInline = document.getElementById('rango-filas-inline');
+  rangoFilasInline.style.display = modeSelected === 'tabla' ? 'flex' : 'none';
+
+  // Configurar UI según modo
+  document.getElementById('celda-manual-row').style.display = modeSelected === 'hojas' ? 'flex' : 'none';
+  document.getElementById('columnas-inputs-wrap').style.display = modeSelected === 'hojas' ? 'none' : 'flex';
+
+  if (modeSelected === 'hojas') {
+    document.getElementById('mapeo-instructions').innerHTML = 'Elegí una celda (ej. J7) que tenga siempre el mismo dato en la misma posición, en cada hoja que representa un objeto. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong>.';
+    document.getElementById('agregar-columna-desc').textContent = 'Hacé click en una celda de la grilla (o escribí la celda arriba) y asignale un nombre.';
+  } else {
+    document.getElementById('mapeo-instructions').innerHTML = 'Seleccioná las columnas y el rango de filas con datos. Después asignale un nombre a cada columna. Uno de los campos tiene que ser el <strong>TAG de instrumento</strong> o el <strong>TAG de línea</strong>.';
+    document.getElementById('agregar-columna-desc').textContent = 'Hacé click en el campo "Seleccionar columna" y después clickeá cualquier celda en la grilla — o escribí la letra a mano.';
+  }
+
+  renderHojasChecklist();
+  resetRangoFilasUI();
+  renderGrid();
+  renderFieldList();
+  renderFieldNameSelect();
+  renderColumnasInputs();
 });
+
+// Los event listeners de docmode ya no son necesarios, el modo se elige en la vista previa
 function renderGrid(){
   // Actualizar el selector de hojas
   const gridSheetSelector = document.getElementById('grid-sheet-selector');
@@ -2587,7 +2806,9 @@ function normColName(v){ return v===null||v===undefined ? '' : String(v).trim().
 
 document.getElementById('btn-process-doc').addEventListener('click', async () => {
   if (appState.draft.mode === 'tabla' && !appState.draft.rangoFilas){
-    await customAlert('Completá el rango de filas con datos (desde y hasta).', 'Falta información');
+    await customAlert('Definí el rango de filas con datos (desde y hasta) en la barra de la grilla.', 'Falta información');
+    // Hacer scroll y focus al input
+    document.getElementById('rango-fila-desde').focus();
     return;
   }
   if (!tieneTagInstrumento() && !tieneTagLinea()){
@@ -2928,12 +3149,39 @@ function renderMasterTable(tipo){
 
   // Aplicar filtros por columna
   Object.keys(filters).forEach(col => {
-    const filterValues = filters[col];
-    if (filterValues && filterValues.length > 0) {
+    const filter = filters[col];
+    if (!filter) return;
+
+    // Compatibilidad con filtros antiguos (array simple)
+    if (Array.isArray(filter)) {
       rows = rows.filter(row => {
         const val = col === '__tag' ? row.__tag : row[col];
         const valStr = (val === null || val === undefined) ? '' : String(val).trim();
-        return filterValues.includes(valStr);
+        return filter.includes(valStr);
+      });
+      return;
+    }
+
+    // Nuevos filtros con valores y estados
+    const { values, states } = filter;
+    if (values && values.length > 0 && states && states.length > 0) {
+      rows = rows.filter(row => {
+        // Filtro por valor
+        const val = col === '__tag' ? row.__tag : row[col];
+        const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+        if (!values.includes(valStr)) return false;
+
+        // Filtro por estado
+        const hasConflict = row.__conflict && row.__conflict[col];
+        const hasEdit = row.__pendingEdit && row.__pendingEdit[col];
+        const isDuplicated = row.__duplicated;
+
+        let state = 'normal';
+        if (hasConflict) state = 'conflict';
+        else if (hasEdit) state = 'edited';
+        else if (isDuplicated) state = 'duplicated';
+
+        return states.includes(state);
       });
     }
   });
@@ -2983,13 +3231,75 @@ function renderMasterTable(tipo){
   }
 
   // Agregar iconos de filtro en los encabezados
-  const hasFilter = (col) => filters[col] && filters[col].length > 0;
+  const hasFilter = (col) => {
+    const filter = filters[col];
+    if (!filter) return false;
+    if (Array.isArray(filter)) return filter.length > 0;
+    return (filter.values && filter.values.length > 0) || (filter.states && filter.states.length < 4);
+  };
 
-  let html = '<table class="master-table"><thead><tr><th style="width:50px;">#</th><th data-col="__tag" class="' + (hasFilter('__tag') ? 'filtered' : '') + '">TAG <span class="filter-icon">▼</span></th>';
+  const getFilterInfo = (col) => {
+    const filter = filters[col];
+    if (!filter) return { active: false, text: '' };
+
+    let parts = [];
+
+    if (Array.isArray(filter)) {
+      const uniqueVals = new Set();
+      mt.rows.forEach(row => {
+        const val = col === '__tag' ? row.__tag : row[col];
+        const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+        uniqueVals.add(valStr);
+      });
+      const totalVals = uniqueVals.size;
+      if (filter.length < totalVals) {
+        parts.push(`${filter.length} de ${totalVals} valores`);
+      }
+    } else if (filter.values || filter.states) {
+      const uniqueVals = new Set();
+      mt.rows.forEach(row => {
+        const val = col === '__tag' ? row.__tag : row[col];
+        const valStr = (val === null || val === undefined) ? '' : String(val).trim();
+        uniqueVals.add(valStr);
+      });
+      const totalVals = uniqueVals.size;
+      const filteredVals = filter.values ? filter.values.length : totalVals;
+      const filteredStates = filter.states ? filter.states.length : 4;
+
+      if (filteredVals < totalVals) {
+        parts.push(`${filteredVals}/${totalVals} valores`);
+      }
+      if (filteredStates < 4) {
+        const stateNames = {
+          conflict: 'Discrepancias',
+          edited: 'Modificadas',
+          duplicated: 'Duplicadas',
+          normal: 'Normales'
+        };
+        const activeStates = (filter.states || []).map(s => stateNames[s]).join(', ');
+        parts.push(activeStates);
+      }
+    }
+
+    return {
+      active: parts.length > 0,
+      text: parts.join(' · ')
+    };
+  };
+
+  let html = '<table class="master-table"><thead><tr><th style="width:50px;">#</th>';
+
+  const tagFiltered = hasFilter('__tag');
+  const tagFilterInfo = getFilterInfo('__tag');
+  const tagTitle = tagFilterInfo.active ? `Filtros activos: ${tagFilterInfo.text}` : 'Click para filtrar';
+  html += `<th data-col="__tag" class="${tagFiltered ? 'filtered' : ''}" title="${escapeHtml(tagTitle)}">TAG <span class="filter-icon">${tagFiltered ? '🔍' : '▼'}</span></th>`;
+
   visibleCols.forEach(c => {
     const label = c === '__linea_asociada__' ? 'Línea asociada' : c;
-    const filteredClass = hasFilter(c) ? 'filtered' : '';
-    html += `<th data-col="${escapeHtml(c)}" class="${filteredClass}">${escapeHtml(label)} <span class="filter-icon">▼</span></th>`;
+    const filtered = hasFilter(c);
+    const filterInfo = getFilterInfo(c);
+    const title = filterInfo.active ? `Filtros activos: ${filterInfo.text}` : 'Click para filtrar';
+    html += `<th data-col="${escapeHtml(c)}" class="${filtered ? 'filtered' : ''}" title="${escapeHtml(title)}">${escapeHtml(label)} <span class="filter-icon">${filtered ? '🔍' : '▼'}</span></th>`;
   });
   html += '</tr></thead><tbody>';
   rows.forEach((row, ri) => {
@@ -3069,11 +3379,8 @@ function showColumnContextMenu(th, tipo, e) {
   const col = th.dataset.col;
   const mt = appState.tablas[tipo];
 
-  // No permitir eliminar la columna TAG
-  if (col === '__tag') {
-    customAlert('La columna TAG no se puede eliminar.', 'Columna protegida');
-    return;
-  }
+  // No permitir ciertas acciones en la columna TAG
+  const isTagColumn = col === '__tag';
 
   // Crear menú contextual
   const menu = document.createElement('div');
@@ -3083,19 +3390,37 @@ function showColumnContextMenu(th, tipo, e) {
 
   const colLabel = col === '__linea_asociada__' ? 'Línea asociada' : col;
 
+  // Determinar posición de la columna para habilitar/deshabilitar mover
+  const visibleCols = ['__tag', ...mt.columns.filter(c => !appState.hiddenColumns[tipo].includes(c))];
+  const colIndex = visibleCols.indexOf(col);
+  const canMoveLeft = colIndex > 1; // No mover el TAG ni la primera columna
+  const canMoveRight = colIndex >= 0 && colIndex < visibleCols.length - 1;
+
   menu.innerHTML = `
     <div class="column-context-menu-item" data-action="filter">
       <span>🔍</span>
       <span>Filtrar esta columna</span>
     </div>
+    ${!isTagColumn ? `
     <div class="column-context-menu-item" data-action="hide">
       <span>👁️</span>
-      <span>Ocultar columna "${escapeHtml(colLabel)}"</span>
+      <span>Ocultar columna</span>
     </div>
+    <div class="column-context-menu-separator"></div>
+    <div class="column-context-menu-item ${!canMoveLeft ? 'disabled' : ''}" data-action="move-left" style="${!canMoveLeft ? 'opacity:0.4;cursor:not-allowed;' : ''}">
+      <span>←</span>
+      <span>Mover a la izquierda</span>
+    </div>
+    <div class="column-context-menu-item ${!canMoveRight ? 'disabled' : ''}" data-action="move-right" style="${!canMoveRight ? 'opacity:0.4;cursor:not-allowed;' : ''}">
+      <span>→</span>
+      <span>Mover a la derecha</span>
+    </div>
+    <div class="column-context-menu-separator"></div>
     <div class="column-context-menu-item danger" data-action="delete">
       <span>🗑️</span>
-      <span>Eliminar columna "${escapeHtml(colLabel)}"</span>
+      <span>Eliminar columna</span>
     </div>
+    ` : ''}
   `;
 
   document.body.appendChild(menu);
@@ -3109,18 +3434,44 @@ function showColumnContextMenu(th, tipo, e) {
   });
 
   // Acción ocultar
-  menu.querySelector('[data-action="hide"]').addEventListener('click', () => {
-    menu.remove();
-    activeContextMenu = null;
-    ocultarColumna(tipo, col);
-  });
+  const hideBtn = menu.querySelector('[data-action="hide"]');
+  if (hideBtn) {
+    hideBtn.addEventListener('click', () => {
+      menu.remove();
+      activeContextMenu = null;
+      ocultarColumna(tipo, col);
+    });
+  }
+
+  // Acción mover a la izquierda
+  const moveLeftBtn = menu.querySelector('[data-action="move-left"]');
+  if (moveLeftBtn && canMoveLeft) {
+    moveLeftBtn.addEventListener('click', () => {
+      menu.remove();
+      activeContextMenu = null;
+      moverColumna(tipo, col, 'left');
+    });
+  }
+
+  // Acción mover a la derecha
+  const moveRightBtn = menu.querySelector('[data-action="move-right"]');
+  if (moveRightBtn && canMoveRight) {
+    moveRightBtn.addEventListener('click', () => {
+      menu.remove();
+      activeContextMenu = null;
+      moverColumna(tipo, col, 'right');
+    });
+  }
 
   // Acción eliminar
-  menu.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-    menu.remove();
-    activeContextMenu = null;
-    await eliminarColumna(tipo, col);
-  });
+  const deleteBtn = menu.querySelector('[data-action="delete"]');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      menu.remove();
+      activeContextMenu = null;
+      await eliminarColumna(tipo, col);
+    });
+  }
 
   // Cerrar al clickear fuera
   setTimeout(() => {
@@ -3141,7 +3492,7 @@ function ocultarColumna(tipo, col) {
     appState.hiddenColumns[tipo].push(col);
   }
   renderMasterTable(tipo);
-  scheduleGuardado();
+  guardarVistasEnSessionStorage();
 }
 
 // Función para mostrar una columna oculta
@@ -3149,7 +3500,107 @@ function mostrarColumna(tipo, col) {
   if (!appState.hiddenColumns[tipo]) appState.hiddenColumns[tipo] = [];
   appState.hiddenColumns[tipo] = appState.hiddenColumns[tipo].filter(c => c !== col);
   renderMasterTable(tipo);
-  scheduleGuardado();
+  guardarVistasEnSessionStorage();
+}
+
+// Función para mover una columna a izquierda o derecha
+function moverColumna(tipo, col, direccion) {
+  const mt = appState.tablas[tipo];
+  const colIndex = mt.columns.indexOf(col);
+
+  if (colIndex === -1) return;
+
+  // No permitir mover más allá de los límites
+  if (direccion === 'left' && colIndex === 0) return;
+  if (direccion === 'right' && colIndex === mt.columns.length - 1) return;
+
+  // Intercambiar posiciones
+  const newIndex = direccion === 'left' ? colIndex - 1 : colIndex + 1;
+  const temp = mt.columns[colIndex];
+  mt.columns[colIndex] = mt.columns[newIndex];
+  mt.columns[newIndex] = temp;
+
+  renderMasterTable(tipo);
+  guardarVistasEnSessionStorage();
+}
+
+// Variable para trackear si hay cambios sin guardar en las vistas
+let vistasModificadas = false;
+
+// Guardar vistas (filtros, orden, columnas) en sessionStorage para no sobrecargar Supabase
+function guardarVistasEnSessionStorage() {
+  if (!appState.proyectoActualId) return;
+  const vistas = {
+    tableFilters: appState.tableFilters,
+    tableSorts: appState.tableSorts,
+    hiddenColumns: appState.hiddenColumns,
+    columnOrder: {
+      instrumentos: appState.tablas.instrumentos.columns,
+      lineas: appState.tablas.lineas.columns
+    }
+  };
+  sessionStorage.setItem(`vistas_${appState.proyectoActualId}`, JSON.stringify(vistas));
+  vistasModificadas = true;
+  actualizarBotonGuardarVista();
+}
+
+// Cargar vistas desde sessionStorage
+function cargarVistasDeSessionStorage() {
+  if (!appState.proyectoActualId) return false;
+  const saved = sessionStorage.getItem(`vistas_${appState.proyectoActualId}`);
+  if (!saved) return false;
+  try {
+    const vistas = JSON.parse(saved);
+    appState.tableFilters = vistas.tableFilters || {};
+    appState.tableSorts = vistas.tableSorts || {};
+    appState.hiddenColumns = vistas.hiddenColumns || {};
+    if (vistas.columnOrder) {
+      if (vistas.columnOrder.instrumentos) appState.tablas.instrumentos.columns = vistas.columnOrder.instrumentos;
+      if (vistas.columnOrder.lineas) appState.tablas.lineas.columns = vistas.columnOrder.lineas;
+    }
+    vistasModificadas = false;
+    actualizarBotonGuardarVista();
+    return true;
+  } catch(e) {
+    console.error('Error cargando vistas:', e);
+    return false;
+  }
+}
+
+// Actualizar visibilidad del botón "Guardar vista"
+function actualizarBotonGuardarVista() {
+  const btn = document.getElementById('btn-save-view-instrumentos');
+  if (btn) {
+    btn.style.display = vistasModificadas ? 'flex' : 'none';
+  }
+}
+
+// Guardar vistas en Supabase explícitamente
+async function guardarVistasEnSupabase() {
+  if (!appState.proyectoActualId) return;
+
+  mostrarOverlayCarga();
+
+  try {
+    for (const tipo of ['instrumentos','lineas']){
+      const { error } = await supa.from('tabla_prefs').upsert({
+        proyecto_id: appState.proyectoActualId, tipo,
+        filters: (appState.tableFilters && appState.tableFilters[tipo]) || {},
+        sorts: (appState.tableSorts && appState.tableSorts[tipo]) || [],
+        hidden_columns: (appState.hiddenColumns && appState.hiddenColumns[tipo]) || []
+      });
+      if (error) throw error;
+    }
+
+    vistasModificadas = false;
+    actualizarBotonGuardarVista();
+    ocultarOverlayCarga();
+    await customAlert('Vista guardada correctamente. Tus filtros, ordenamiento y columnas ocultas se mantendrán en futuras sesiones.', 'Vista guardada');
+  } catch(err) {
+    ocultarOverlayCarga();
+    console.error(err);
+    await customAlert('No se pudo guardar la vista: ' + err.message, 'Error');
+  }
 }
 
 // Función para eliminar una columna completa
@@ -3229,15 +3680,60 @@ function showColumnFilterDropdown(th, tipo) {
 
   const valuesArray = Array.from(uniqueValues).sort();
 
+  // Contar filas por estado
+  const stateCount = {
+    conflict: 0,
+    edited: 0,
+    duplicated: 0,
+    normal: 0
+  };
+
+  mt.rows.forEach(row => {
+    const hasConflict = row.__conflict && row.__conflict[col];
+    const hasEdit = row.__pendingEdit && row.__pendingEdit[col];
+    const isDuplicated = row.__duplicated;
+
+    if (hasConflict) stateCount.conflict++;
+    else if (hasEdit) stateCount.edited++;
+    else if (isDuplicated) stateCount.duplicated++;
+    else stateCount.normal++;
+  });
+
   // Crear dropdown
   const dropdown = document.createElement('div');
   dropdown.className = 'column-filter-dropdown';
   dropdown.style.left = rect.left + 'px';
   dropdown.style.top = (rect.bottom + 5) + 'px';
 
-  const currentFilter = appState.tableFilters[tipo][col] || valuesArray.slice();
+  const currentFilter = appState.tableFilters[tipo][col] || { values: valuesArray.slice(), states: ['conflict', 'edited', 'duplicated', 'normal'] };
+  if (!currentFilter.states) currentFilter.states = ['conflict', 'edited', 'duplicated', 'normal'];
+  if (!currentFilter.values) currentFilter.values = valuesArray.slice();
 
   let html = `<input type="text" class="filter-search" placeholder="Buscar...">`;
+
+  // Filtros por estado
+  html += `
+    <div style="padding:8px;border-bottom:1px solid var(--line);">
+      <div style="font-size:11px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;">Estado</div>
+      <label class="filter-option">
+        <input type="checkbox" class="state-filter" value="conflict" ${currentFilter.states.includes('conflict') ? 'checked' : ''}>
+        <span>⚠️ Discrepancias (${stateCount.conflict})</span>
+      </label>
+      <label class="filter-option">
+        <input type="checkbox" class="state-filter" value="edited" ${currentFilter.states.includes('edited') ? 'checked' : ''}>
+        <span>✎ Modificadas (${stateCount.edited})</span>
+      </label>
+      <label class="filter-option">
+        <input type="checkbox" class="state-filter" value="duplicated" ${currentFilter.states.includes('duplicated') ? 'checked' : ''}>
+        <span>⚠ Duplicadas (${stateCount.duplicated})</span>
+      </label>
+      <label class="filter-option">
+        <input type="checkbox" class="state-filter" value="normal" ${currentFilter.states.includes('normal') ? 'checked' : ''}>
+        <span>✓ Normales (${stateCount.normal})</span>
+      </label>
+    </div>
+  `;
+
   html += `
     <div class="filter-actions">
       <button class="btn-select-all">Todos</button>
@@ -3245,13 +3741,14 @@ function showColumnFilterDropdown(th, tipo) {
       <button class="btn-apply">Aplicar</button>
     </div>
   `;
+  html += `<div style="padding:0 8px;"><div style="font-size:11px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;">Valores</div></div>`;
   html += `<div class="filter-options-container">`;
   valuesArray.forEach(val => {
-    const checked = currentFilter.includes(val);
+    const checked = currentFilter.values.includes(val);
     const displayVal = val === '' ? '(vacío)' : escapeHtml(val);
     html += `
       <label class="filter-option">
-        <input type="checkbox" value="${escapeHtml(val)}" ${checked ? 'checked' : ''}>
+        <input type="checkbox" class="value-filter" value="${escapeHtml(val)}" ${checked ? 'checked' : ''}>
         <span>${displayVal}</span>
       </label>
     `;
@@ -3262,39 +3759,44 @@ function showColumnFilterDropdown(th, tipo) {
   document.body.appendChild(dropdown);
   activeFilterDropdown = dropdown;
 
-  // Búsqueda en tiempo real
+  // Búsqueda en tiempo real (solo en valores)
   const searchInput = dropdown.querySelector('.filter-search');
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
-    dropdown.querySelectorAll('.filter-option').forEach(opt => {
-      const text = opt.textContent.toLowerCase();
-      opt.style.display = text.includes(query) ? 'flex' : 'none';
+    dropdown.querySelectorAll('.value-filter').forEach(cb => {
+      const label = cb.closest('.filter-option');
+      const text = label.textContent.toLowerCase();
+      label.style.display = text.includes(query) ? 'flex' : 'none';
     });
   });
 
   // Botón "Todos"
   dropdown.querySelector('.btn-select-all').addEventListener('click', () => {
-    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+    dropdown.querySelectorAll('.value-filter').forEach(cb => cb.checked = true);
   });
 
   // Botón "Ninguno"
   dropdown.querySelector('.btn-clear').addEventListener('click', () => {
-    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    dropdown.querySelectorAll('.value-filter').forEach(cb => cb.checked = false);
   });
 
   // Botón "Aplicar"
   dropdown.querySelector('.btn-apply').addEventListener('click', () => {
-    const selected = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+    const selectedValues = Array.from(dropdown.querySelectorAll('.value-filter:checked')).map(cb => cb.value);
+    const selectedStates = Array.from(dropdown.querySelectorAll('.state-filter:checked')).map(cb => cb.value);
 
-    if (selected.length === valuesArray.length) {
+    if (selectedValues.length === valuesArray.length && selectedStates.length === 4) {
       // Si están todos seleccionados, quitar el filtro
       delete appState.tableFilters[tipo][col];
     } else {
-      appState.tableFilters[tipo][col] = selected;
+      appState.tableFilters[tipo][col] = {
+        values: selectedValues,
+        states: selectedStates
+      };
     }
 
     renderMasterTable(tipo);
-    scheduleGuardado();
+    guardarVistasEnSessionStorage();
     dropdown.remove();
     activeFilterDropdown = null;
   });
@@ -3367,6 +3869,7 @@ function showHiddenColumnsModal(tipo) {
   overlay.querySelector('#btn-show-all-cols').addEventListener('click', () => {
     appState.hiddenColumns[tipo] = [];
     renderMasterTable(tipo);
+    guardarVistasEnSessionStorage();
     overlay.remove();
   });
 
@@ -3488,7 +3991,7 @@ function showSortModal(tipo) {
   overlay.querySelector('#btn-clear-sort').addEventListener('click', () => {
     appState.tableSorts[tipo] = [];
     renderMasterTable(tipo);
-    scheduleGuardado();
+    guardarVistasEnSessionStorage();
     overlay.remove();
   });
 
@@ -3496,7 +3999,7 @@ function showSortModal(tipo) {
   overlay.querySelector('#btn-apply-sort').addEventListener('click', () => {
     appState.tableSorts[tipo] = updateSorts();
     renderMasterTable(tipo);
-    scheduleGuardado();
+    guardarVistasEnSessionStorage();
     overlay.remove();
   });
 
@@ -3511,12 +4014,31 @@ function closePopover(){
 }
 
 // Event listeners para zoom y ordenamiento
-document.getElementById('zoom-instrumentos').addEventListener('input', (e) => {
-  const zoom = e.target.value;
-  document.getElementById('zoom-value-instrumentos').textContent = zoom + '%';
-  const inner = document.getElementById('master-table-inner-instrumentos');
-  if (inner) inner.style.transform = `scale(${zoom / 100})`;
-});
+function setupZoomControls(tipo) {
+  const slider = document.getElementById(`zoom-${tipo}`);
+  const input = document.getElementById(`zoom-input-${tipo}`);
+  const btnUp = document.getElementById(`zoom-up-${tipo}`);
+  const btnDown = document.getElementById(`zoom-down-${tipo}`);
+
+  if (!slider || !input) return;
+
+  const updateZoom = (value) => {
+    const zoom = Math.max(50, Math.min(150, parseInt(value)));
+    slider.value = zoom;
+    input.value = zoom;
+    const inner = document.getElementById(`master-table-inner-${tipo}`);
+    if (inner) inner.style.transform = `scale(${zoom / 100})`;
+  };
+
+  slider.addEventListener('input', (e) => updateZoom(e.target.value));
+  input.addEventListener('input', (e) => updateZoom(e.target.value));
+  input.addEventListener('change', (e) => updateZoom(e.target.value));
+
+  if (btnUp) btnUp.addEventListener('click', () => updateZoom(parseInt(input.value) + 5));
+  if (btnDown) btnDown.addEventListener('click', () => updateZoom(parseInt(input.value) - 5));
+}
+
+setupZoomControls('instrumentos');
 
 document.getElementById('btn-sort-instrumentos').addEventListener('click', () => {
   showSortModal('instrumentos');
@@ -3525,6 +4047,13 @@ document.getElementById('btn-sort-instrumentos').addEventListener('click', () =>
 document.getElementById('btn-show-columns-instrumentos').addEventListener('click', () => {
   showHiddenColumnsModal('instrumentos');
 });
+
+const btnSaveViewInst = document.getElementById('btn-save-view-instrumentos');
+if (btnSaveViewInst) {
+  btnSaveViewInst.addEventListener('click', () => {
+    guardarVistasEnSupabase();
+  });
+}
 
 async function showCellInfoPopover(e, td){
   closePopover();
@@ -4012,10 +4541,13 @@ function exportarBaseDatosDirecta(mode, withComments) {
   }
 }
 
-// Botón de exportar base de datos desde la pestaña Base de datos
-document.getElementById('btn-export-db').addEventListener('click', () => {
-  showExportDatabaseModal();
-});
+// Botón de exportar base de datos desde el header
+const btnExportDbHeader = document.getElementById('btn-export-db-header');
+if (btnExportDbHeader) {
+  btnExportDbHeader.addEventListener('click', () => {
+    showExportDatabaseModal();
+  });
+}
 
 // btn-export-excel y btn-export-document pertenecen a la sección "Exportar documentos"
 // que todavía está en desarrollo (su HTML está comentado), así que estos elementos
