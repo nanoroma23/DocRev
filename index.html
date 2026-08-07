@@ -361,8 +361,8 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .seg-card-body{ display:flex; align-items:center; gap:14px; }
-  .seg-card-legend{ flex:1; display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .seg-card-body{ display:flex; align-items:center; justify-content:center; gap:22px; }
+  .seg-card-legend{ display:flex; flex-direction:column; gap:7px; min-width:0; }
   .seg-legend-item{
     display:flex;
     align-items:center;
@@ -371,6 +371,7 @@
     color:var(--text-muted);
   }
   .seg-legend-item b{ margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600; }
+  .seg-legend-item .seg-porcentaje{ color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px; }
   .seg-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
   .seg-card-chart{ flex-shrink:0; }
   .seg-card-new{
@@ -3068,6 +3069,40 @@ function cargarCacheBaseDeDatos(proyectoId){
   }catch(e){ return false; }
 }
 
+// Guarda filtros, orden y filtros de documentos del proyecto activo en Supabase
+async function guardarPreferenciasProyecto(){
+  if(!proyectoActivo) return;
+  const preferencias = {
+    filtros: serializarFiltrosSeguimiento(FILTROS),
+    nivelesOrden: nivelesOrden,
+    filtrosDocs: {
+      tipo: filtrosDocsProyecto.tipo ? [...filtrosDocsProyecto.tipo] : null,
+      proyecto: filtrosDocsProyecto.proyecto ? [...filtrosDocsProyecto.proyecto] : null,
+      proveedor: filtrosDocsProyecto.proveedor ? [...filtrosDocsProyecto.proveedor] : null,
+    },
+  };
+  proyectoActivo.preferencias = preferencias;
+  const { error } = await supabaseClient.from('proyectos').update({ preferencias }).eq('id', proyectoActivo.id);
+  if(error) console.error('Error al guardar las preferencias del proyecto:', error);
+}
+
+// Guarda si una columna está oculta o no
+async function guardarColumnaOculta(nombre, oculta){
+  if(!proyectoActivo) return;
+  const { error } = await supabaseClient.from('columnas')
+    .update({ oculta }).eq('proyecto_id', proyectoActivo.id).eq('nombre', nombre);
+  if(error) console.error('Error al guardar si la columna está oculta:', error);
+}
+
+// Guarda el orden actual de todas las columnas
+async function guardarOrdenColumnas(){
+  if(!proyectoActivo) return;
+  const resultados = await Promise.all(COLUMNAS.map((nombre, idx) =>
+    supabaseClient.from('columnas').update({ orden: idx }).eq('proyecto_id', proyectoActivo.id).eq('nombre', nombre)
+  ));
+  resultados.forEach(({ error }) => { if(error) console.error('Error al guardar el orden de columnas:', error); });
+}
+
 async function cargarBaseDeDatos(proyectoId){
   const { data: colsData, error: colsErr } = await supabaseClient
     .from('columnas').select('*').eq('proyecto_id', proyectoId).order('orden');
@@ -3087,7 +3122,22 @@ async function cargarBaseDeDatos(proyectoId){
   if(filasErr) console.error('Error al cargar instrumentos:', filasErr);
 
   FILAS = (filasData || []).map(filaDesdeSupabase);
-  FILTROS = {};
+
+  // Restaura filtros, orden y filtros de documentos guardados para este proyecto
+  const prefs = (proyectoActivo && proyectoActivo.preferencias) || {};
+  FILTROS = reconstruirFiltrosSeguimiento(prefs.filtros);
+  nivelesOrden = prefs.nivelesOrden || [];
+  if(nivelesOrden.length) FILAS.sort(compararPorNiveles);
+  filtrosDocsProyecto = {
+    tipo: prefs.filtrosDocs && prefs.filtrosDocs.tipo ? new Set(prefs.filtrosDocs.tipo) : null,
+    proyecto: prefs.filtrosDocs && prefs.filtrosDocs.proyecto ? new Set(prefs.filtrosDocs.proyecto) : null,
+    proveedor: prefs.filtrosDocs && prefs.filtrosDocs.proveedor ? new Set(prefs.filtrosDocs.proveedor) : null,
+  };
+  if(tabActiva === 'documentos'){
+    actualizarBotonesFiltroDocs();
+    renderDocumentos();
+  }
+
   cargandoBaseDeDatos = false;
   guardarCacheBaseDeDatos(proyectoId);
   renderTabla();
@@ -3181,6 +3231,7 @@ function renderHead(){
 
       columnaArrastrada = null;
       renderTabla();
+      guardarOrdenColumnas();
     });
     th.addEventListener('dragend', ()=>{
       columnaArrastrada = null;
@@ -3196,6 +3247,7 @@ function renderHead(){
   });
 }
 let columnaArrastrada = null;
+let columnaArrastradaSeg = null;
 
 // ---- Menú de opciones de columna (ocultar / eliminar) ----
 let columnaMenuActual = null;
@@ -3212,6 +3264,7 @@ document.getElementById('cerrar-columna-opciones').addEventListener('click', ()=
 document.getElementById('btn-ocultar-columna').addEventListener('click', ()=>{
   if(!columnaMenuActual) return;
   columnasOcultas.add(columnaMenuActual);
+  guardarColumnaOculta(columnaMenuActual, true);
   document.getElementById('overlay-columna-opciones').classList.remove('open');
   renderTabla();
 });
@@ -3291,6 +3344,7 @@ function renderColumnasOcultasList(){
   cont.querySelectorAll('[data-mostrar-col]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       columnasOcultas.delete(btn.dataset.mostrarCol);
+      guardarColumnaOculta(btn.dataset.mostrarCol, false);
       renderTabla();
       renderColumnasOcultasList();
       if(columnasOcultas.size === 0) document.getElementById('overlay-mostrar-columnas').classList.remove('open');
@@ -3343,10 +3397,10 @@ function abrirFiltro(col){
   const chksValor = () => [...popup.querySelectorAll('.chk-valor')];
 
   function actualizarEstadoTodos(){
-    const visibles = chksValor().filter(c => c.closest('.filter-option').style.display !== 'none');
-    const marcados = visibles.filter(c => c.checked);
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
     if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
-    else if(marcados.length === visibles.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
     else { chkTodos.checked = false; chkTodos.indeterminate = true; }
   }
 
@@ -3358,12 +3412,14 @@ function abrirFiltro(col){
   });
   popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  // Buscador interno: filtra las opciones visibles en la lista, y el "seleccionar todo"
-  // pasa a estado parcial (tilde intermedio) para reflejar que solo se ve un subconjunto
+  // Buscador interno: filtra las opciones visibles y desmarca automáticamente lo que no
+  // coincide con la búsqueda, así "seleccionar todo" queda parcial y funciona como filtro rápido
   popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
-      opt.style.display = opt.dataset.valor.includes(q) ? 'flex' : 'none';
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+      if(!coincide) opt.querySelector('.chk-valor').checked = false;
     });
     actualizarEstadoTodos();
   });
@@ -3374,12 +3430,14 @@ function abrirFiltro(col){
     FILTROS[col] = null;
     cerrarFiltros();
     renderTabla();
+    guardarPreferenciasProyecto();
   });
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
     renderTabla();
+    guardarPreferenciasProyecto();
   });
 }
 
@@ -3544,6 +3602,8 @@ function renderSeguimientos(){
   const cont = document.getElementById('seguimiento-tarjetas');
   const tarjetas = SEGUIMIENTOS.map(seg=>{
     const { ok, nook, ver } = contarEstadosSeguimiento(seg);
+    const total = ok + nook + ver;
+    const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
     const svg = generarSvgTorta([
       { count:ok, color:'#5CA378' },
       { count:nook, color:'#A6483B' },
@@ -3554,9 +3614,9 @@ function renderSeguimientos(){
         <div class="seg-card-titulo">${seg.titulo}</div>
         <div class="seg-card-body">
           <div class="seg-card-legend">
-            <div class="seg-legend-item"><span class="seg-dot" style="background:#5CA378;"></span>OK <b>${ok}</b></div>
-            <div class="seg-legend-item"><span class="seg-dot" style="background:#A6483B;"></span>NO OK <b>${nook}</b></div>
-            <div class="seg-legend-item"><span class="seg-dot" style="background:#A39B87;"></span>VER <b>${ver}</b></div>
+            <div class="seg-legend-item"><span class="seg-dot" style="background:#5CA378;"></span>OK <b>${ok}</b><span class="seg-porcentaje">${pct(ok)}</span></div>
+            <div class="seg-legend-item"><span class="seg-dot" style="background:#A6483B;"></span>NO OK <b>${nook}</b><span class="seg-porcentaje">${pct(nook)}</span></div>
+            <div class="seg-legend-item"><span class="seg-dot" style="background:#A39B87;"></span>VER <b>${ver}</b><span class="seg-porcentaje">${pct(ver)}</span></div>
           </div>
           <div class="seg-card-chart">${svg}</div>
         </div>
@@ -4017,9 +4077,9 @@ function renderTablaSeguimiento(){
   const thead = document.getElementById('seg-thead-row');
   thead.innerHTML = `<th class="col-num col-key"></th>` +
     seg.columnas.map(c => `
-      <th class="${c===colPrincipal ? 'col-key' : ''}" data-seg-col="${c}">
+      <th class="${c===colPrincipal ? 'col-key' : 'col-draggable'}" data-seg-col="${c}">
         <div class="th-inner">
-          <span>${c}</span>
+          <span class="${c===colPrincipal ? '' : 'col-nombre-drag'}" ${c===colPrincipal ? '' : 'draggable="true"'}>${c}</span>
           <span class="th-filter ${seg.filtrosVista[c] ? 'active':''}" data-seg-tabla-filtro="${c}">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
@@ -4051,6 +4111,45 @@ function renderTablaSeguimiento(){
       e.stopPropagation();
       abrirFiltroSeguimientoTabla(el.dataset.segTablaFiltro);
     });
+  });
+
+  // Arrastrar el nombre de una columna para reordenarla (la columna principal queda fija),
+  // mismo mecanismo que en Base de Datos: el "draggable" vive solo en el texto del título
+  thead.querySelectorAll('th.col-draggable').forEach(th=>{
+    const nombreDrag = th.querySelector('.col-nombre-drag');
+    nombreDrag.addEventListener('dragstart', (e)=>{
+      columnaArrastradaSeg = th.dataset.segCol;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    th.addEventListener('dragover', (e)=>{
+      if(!columnaArrastradaSeg || columnaArrastradaSeg === th.dataset.segCol) return;
+      e.preventDefault();
+      th.classList.add('col-drag-over');
+    });
+    th.addEventListener('dragleave', ()=>{
+      th.classList.remove('col-drag-over');
+    });
+    th.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      th.classList.remove('col-drag-over');
+      const destino = th.dataset.segCol;
+      if(!columnaArrastradaSeg || columnaArrastradaSeg === destino) return;
+
+      const desdeIdx = seg.columnas.indexOf(columnaArrastradaSeg);
+      seg.columnas.splice(desdeIdx, 1);
+      const hastaIdx = seg.columnas.indexOf(destino);
+      seg.columnas.splice(hastaIdx, 0, columnaArrastradaSeg);
+
+      columnaArrastradaSeg = null;
+      renderTablaSeguimiento();
+      guardarSeguimientoEnSupabase(seg);
+    });
+    th.addEventListener('dragend', ()=>{
+      columnaArrastradaSeg = null;
+      thead.querySelectorAll('.col-drag-over').forEach(t => t.classList.remove('col-drag-over'));
+    });
+    const popupEl = th.querySelector('.filter-popup');
+    if(popupEl) popupEl.addEventListener('mousedown', e => e.stopPropagation());
   });
 
   const tbody = document.getElementById('seg-tbody');
@@ -4100,6 +4199,7 @@ async function guardarSeguimientoEnSupabase(seg){
   if(!seg.__id) return;
   const { error } = await supabaseClient.from('seguimientos').update({
     titulo: seg.titulo,
+    columnas: seg.columnas || [],
     estados: seg.estados || {},
     comentarios: seg.comentarios || {},
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
@@ -4158,10 +4258,10 @@ function abrirFiltroSeguimientoTabla(col){
   const chksValor = () => [...popup.querySelectorAll('.chk-valor-seg-tabla')];
 
   function actualizarEstadoTodos(){
-    const visibles = chksValor().filter(c => c.closest('.filter-option').style.display !== 'none');
-    const marcados = visibles.filter(c => c.checked);
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
     if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
-    else if(marcados.length === visibles.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
     else { chkTodos.checked = false; chkTodos.indeterminate = true; }
   }
 
@@ -4174,11 +4274,14 @@ function abrirFiltroSeguimientoTabla(col){
   });
   chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  // Buscador interno: filtra las opciones visibles en la lista, igual que en Base de Datos
+  // Buscador interno: desmarca automáticamente lo que no coincide con la búsqueda,
+  // así funciona como filtro rápido y "seleccionar todo" queda parcial
   popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
-      opt.style.display = opt.dataset.valor.includes(q) ? 'flex' : 'none';
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+      if(!coincide) opt.querySelector('.chk-valor-seg-tabla').checked = false;
     });
     actualizarEstadoTodos();
   });
@@ -4803,6 +4906,7 @@ function abrirFiltroDocs(campo, btnId, popupId){
     popup.innerHTML = '';
     actualizarBotonesFiltroDocs();
     renderDocumentos();
+    guardarPreferenciasProyecto();
   });
   popup.querySelector(`#apply-${campo}`).addEventListener('click', ()=>{
     const marcadas = chksValor().filter(c=>c.checked).map(c=>c.value);
@@ -4811,6 +4915,7 @@ function abrirFiltroDocs(campo, btnId, popupId){
     popup.innerHTML = '';
     actualizarBotonesFiltroDocs();
     renderDocumentos();
+    guardarPreferenciasProyecto();
   });
 }
 
@@ -4967,6 +5072,7 @@ document.getElementById('aplicar-ordenar').addEventListener('click', ()=>{
   FILAS.sort(compararPorNiveles);
   document.getElementById('overlay-ordenar').classList.remove('open');
   renderTabla();
+  guardarPreferenciasProyecto();
 });
 
 // ---- Editar celda: cualquier celda de la base, con el historial de documentos como referencia ----
@@ -6962,6 +7068,7 @@ async function cargarProyectos(){
     id: p.id,
     nombre: p.nombre,
     fecha: new Date(p.fecha_creacion).toLocaleDateString('es-AR'),
+    preferencias: p.preferencias || {},
   }));
   cargandoProyectos = false;
   try{ localStorage.setItem('docrev_proyectos_cache', JSON.stringify(PROYECTOS)); }catch(e){}
