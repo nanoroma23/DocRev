@@ -443,6 +443,29 @@
     white-space:normal;
     overflow-wrap:break-word;
   }
+  .seg-col-eye-btn{
+    -webkit-appearance:none;
+    appearance:none;
+    border:none;
+    background:none;
+    padding:0;
+    width:24px; height:24px;
+    min-width:24px;
+    border-radius:5px;
+    color:var(--text-dim);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background 0.12s ease, color 0.12s ease;
+  }
+  .seg-col-eye-btn:hover{
+    background:var(--card);
+    color:var(--text);
+  }
+  .seg-col-eye-btn.hidden{
+    color:var(--red);
+  }
   .seg-col-filtro-btn{
     -webkit-appearance:none;
     appearance:none;
@@ -512,9 +535,11 @@
     border:1px solid var(--line);
     border-radius:8px;
     overflow-x:auto;
-    overflow-y:visible;
+    overflow-y:auto;
     background:var(--card);
     width:100%;
+    min-height:400px;
+    max-height:calc(100vh - 140px);
   }
   table.datatable{
     width:100%;
@@ -532,7 +557,9 @@
     padding:0;
     border-bottom:1px solid var(--line);
     border-right:1px solid var(--line);
-    position:relative;
+    position:sticky;
+    top:0;
+    z-index:10;
     min-width:80px;
   }
   table.datatable thead th .resize-handle{
@@ -575,7 +602,9 @@
   .th-filter.active:hover{ background:var(--green-dark); }
 
   table.datatable th.col-num, table.datatable td.col-num{
-    width:56px;
+    width:40px;
+    min-width:40px;
+    max-width:40px;
     text-align:center;
   }
   table.datatable th.col-key, table.datatable td.col-key{
@@ -626,6 +655,14 @@
   table.datatable td.tag-clickable:hover{
     text-decoration-color:var(--green);
     background:var(--green-soft);
+  }
+  table.datatable td.tag-duplicado{
+    background:rgba(255,193,7,0.25) !important;
+    border-left:3px solid #FFC107;
+    font-weight:600;
+  }
+  table.datatable td.tag-duplicado:hover{
+    background:rgba(255,193,7,0.40) !important;
   }
   table.datatable td.celda-conflicto{
     background:rgba(216,105,90,0.18) !important;
@@ -1049,6 +1086,25 @@
   }
   .comentario-anterior-texto b{ color:var(--green-dark); }
   .field-input:focus, .field-select:focus{ border-color:var(--green); }
+
+  /* Estados con colores */
+  .seg-estado-select.estado-ok{
+    background:#D4EDDA;
+    border-color:#28A745;
+    color:#155724;
+    font-weight:600;
+  }
+  .seg-estado-select.estado-no-ok{
+    background:#F8D7DA;
+    border-color:#DC3545;
+    color:#721C24;
+    font-weight:600;
+  }
+  .seg-estado-select.estado-ver{
+    background:var(--bg);
+    border-color:var(--line);
+    color:var(--text);
+  }
 
   .file-drop{
     position:relative;
@@ -2381,7 +2437,7 @@
   <div class="overlay" id="overlay-gestionar-columnas-seg">
     <div class="modal" style="width:420px;">
       <h3>Gestionar columnas</h3>
-      <p>Agregá o quitá columnas de este seguimiento. La primera columna es la principal y no se puede quitar.</p>
+      <p>Agregá o quitá columnas de este seguimiento. La columna principal puede ocultarse usando el ícono del ojo.</p>
 
       <label class="field-label" style="margin-top:12px;">Columna principal (fija)</label>
       <div style="background:var(--green-soft); border:1px solid var(--green); border-radius:6px; padding:10px 12px; font-family:var(--font-mono); font-weight:600; color:var(--green-dark);" id="seg-col-principal-display"></div>
@@ -3005,6 +3061,7 @@ function filaDesdeSupabase(row){
     __conflictos: new Set(row.conflictos || []),
     __resueltos: new Set(row.resueltos || []),
     __comentarios: row.comentarios_celda || {},
+    __duplicados: row.duplicados || {},
   };
   Object.entries(row.datos || {}).forEach(([col, valor]) => { fila[col] = valor; });
   return fila;
@@ -3019,7 +3076,7 @@ function datosDeFila(fila){
   return datos;
 }
 
-// Guarda una fila entera (datos + historial + conflictos + resueltos) contra Supabase
+// Guarda una fila entera (datos + historial + conflictos + resueltos + duplicados) contra Supabase
 async function guardarFilaEnSupabase(fila){
   if(!fila.__id) return { ok:true }; // filas recién creadas ya se guardan en el insert que las crea
   const { error } = await supabaseClient.from('instrumentos').update({
@@ -3029,6 +3086,7 @@ async function guardarFilaEnSupabase(fila){
     resueltos: [...(fila.__resueltos || [])],
     documentos: [...(fila.__documentos || [])],
     comentarios_celda: fila.__comentarios || {},
+    duplicados: fila.__duplicados || {},
     actualizado_en: new Date().toISOString(),
   }).eq('id', fila.__id);
   if(error){
@@ -3662,6 +3720,10 @@ function renderTabla(){
       let dataAttr = '';
       if(col==='TAG'){
         cls.push('tag-clickable col-key');
+        // Marcar si hay duplicados en algún documento
+        if(f.__duplicados && Object.keys(f.__duplicados).length > 0){
+          cls.push('tag-duplicado');
+        }
       } else {
         const enConflicto = f.__conflictos && f.__conflictos.has(col);
         const resuelto = f.__resueltos && f.__resueltos.has(col);
@@ -3705,6 +3767,7 @@ async function cargarSeguimientos(proyectoId){
     id: row.id,
     titulo: row.titulo,
     columnas: row.columnas || [],
+    columnaPrincipal: row.columna_principal || (row.columnas && row.columnas[0]) || null,
     filtros: reconstruirFiltrosSeguimiento(row.filtros),
     filtrosVista: reconstruirFiltrosSeguimiento(row.filtros_vista),
     ordenVista: row.orden_vista || [],
@@ -4128,6 +4191,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     proyecto_id: proyectoActivo.id,
     titulo: nombre,
     columnas: columnasFinales,
+    columna_principal: columnasFinales[0],
     filtros: serializarFiltrosSeguimiento(filtrosFinal),
     filtros_vista: {},
     orden_vista: [],
@@ -4149,6 +4213,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     id: data.id,
     titulo: nombre,
     columnas: columnasFinales,
+    columnaPrincipal: columnasFinales[0],
     filtros: filtrosFinal,
     filtrosVista: {},
     ordenVista: [],
@@ -4262,7 +4327,7 @@ function valoresUnicosSeguimiento(seg, col){
 function filasDeSeguimientoVista(seg){
   // Filas del seguimiento (respetando el filtro fijo), aplicando encima los filtros
   // de tabla (mutables) y el orden que el usuario haya elegido para esta vista
-  const colPrincipal = seg.columnas[0];
+  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
 
   let filas = filasDeSeguimiento(seg).filter(fila=>{
     return Object.entries(seg.filtrosVista).every(([col, permitidos])=>{
@@ -4302,26 +4367,36 @@ function filasDeSeguimientoVista(seg){
 function renderTablaSeguimiento(){
   const seg = seguimientoActivo;
   const filas = filasDeSeguimientoVista(seg);
-  const colPrincipal = seg.columnas[0]; // Primera columna = columna principal (KEY)
+
+  // La columna principal puede estar oculta, así que verificamos
+  const colPrincipal = seg.columnaPrincipal || (seg.columnas.length > 0 ? seg.columnas[0] : null);
+  const mostrarPrincipal = colPrincipal && seg.columnas.includes(colPrincipal);
+  const columnasSecundarias = seg.columnas.filter(c => c !== colPrincipal);
 
   const thead = document.getElementById('seg-thead-row');
-  thead.innerHTML = `<th class="col-num col-key"></th>` +
-    seg.columnas.map(c => {
-      const anchoStyle = seguimientoColumnasAnchos[c] ? `style="width:${seguimientoColumnasAnchos[c]}px; min-width:${seguimientoColumnasAnchos[c]}px;"` : '';
-      return `
-      <th class="${c===colPrincipal ? 'col-key' : 'col-draggable'}" data-seg-col="${c}" ${anchoStyle}>
+
+  // Columna número (más angosta)
+  let html = `<th class="col-num col-key" style="width:40px; min-width:40px;"></th>`;
+
+  // Columna principal (si está visible)
+  if(mostrarPrincipal){
+    const anchoColPrincipal = seguimientoColumnasAnchos[colPrincipal] ? `style="width:${seguimientoColumnasAnchos[colPrincipal]}px; min-width:${seguimientoColumnasAnchos[colPrincipal]}px;"` : '';
+    html += `
+      <th class="col-key" data-seg-col="${colPrincipal}" ${anchoColPrincipal}>
         <div class="th-inner">
-          <span class="${c===colPrincipal ? '' : 'col-nombre-drag'}" ${c===colPrincipal ? '' : 'draggable="true"'}>${c}</span>
-          <span class="th-filter ${seg.filtrosVista[c] ? 'active':''}" data-seg-tabla-filtro="${c}">
+          <span>${colPrincipal}</span>
+          <span class="th-filter ${seg.filtrosVista[colPrincipal] ? 'active':''}" data-seg-tabla-filtro="${colPrincipal}">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
         </div>
         <div class="resize-handle"></div>
-        <div class="filter-popup" id="seg-popup-${c}"></div>
-      </th>
-      `;
-    }).join('') +
-    `<th>
+        <div class="filter-popup" id="seg-popup-${colPrincipal}"></div>
+      </th>`;
+  }
+
+  // Columna Estado (siempre visible, después de la principal si existe)
+  html += `
+    <th style="width:100px; min-width:100px;">
       <div class="th-inner">
         <span>Estado</span>
         <span class="th-filter ${seg.filtrosVista['__ESTADO__'] ? 'active':''}" data-seg-tabla-filtro="__ESTADO__">
@@ -4330,7 +4405,27 @@ function renderTablaSeguimiento(){
       </div>
       <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__ESTADO__"></div>
-    </th>
+    </th>`;
+
+  // Columnas secundarias
+  html += columnasSecundarias.map(c => {
+    const anchoStyle = seguimientoColumnasAnchos[c] ? `style="width:${seguimientoColumnasAnchos[c]}px; min-width:${seguimientoColumnasAnchos[c]}px;"` : '';
+    return `
+      <th class="col-draggable" data-seg-col="${c}" ${anchoStyle}>
+        <div class="th-inner">
+          <span class="col-nombre-drag" draggable="true">${c}</span>
+          <span class="th-filter ${seg.filtrosVista[c] ? 'active':''}" data-seg-tabla-filtro="${c}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </span>
+        </div>
+        <div class="resize-handle"></div>
+        <div class="filter-popup" id="seg-popup-${c}"></div>
+      </th>
+    `;
+  }).join('');
+
+  // Columna Comentarios (al final)
+  html += `
     <th>
       <div class="th-inner">
         <span>Comentarios</span>
@@ -4341,6 +4436,8 @@ function renderTablaSeguimiento(){
       <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__COMENTARIOS__"></div>
     </th>`;
+
+  thead.innerHTML = html;
 
   thead.querySelectorAll('[data-seg-tabla-filtro]').forEach(el=>{
     el.addEventListener('click', (e)=>{
@@ -4430,30 +4527,49 @@ function renderTablaSeguimiento(){
   }
 
   tbody.innerHTML = filas.map((f,i)=>{
-    const valorKey = f.TAG;  // el TAG es lo único garantizado único por fila; la columna principal es solo visual
+    const valorKey = f.TAG;
     const estado = seg.estados[valorKey] || 'VER';
     const comentario = seg.comentarios[valorKey] || '';
-    return `
-      <tr>
-        <td class="col-num col-key">${i+1}</td>
-        ${seg.columnas.map(c => `<td class="col-tag ${c===colPrincipal ? 'col-key':''}">${f[c] ?? ''}</td>`).join('')}
-        <td>
-          <select class="field-select seg-estado-select" data-key="${valorKey}" style="width:auto; padding:4px 6px; font-size:12px;">
-            <option value="VER" ${estado==='VER' ? 'selected':''}>VER</option>
-            <option value="OK" ${estado==='OK' ? 'selected':''}>OK</option>
-            <option value="NO OK" ${estado==='NO OK' ? 'selected':''}>NO OK</option>
-          </select>
-        </td>
-        <td>
-          <input type="text" class="field-input seg-comentario-input" data-key="${valorKey}" value="${comentario}" style="padding:4px 6px; font-size:12px;">
-        </td>
-      </tr>
-    `;
+    const estadoClass = estado === 'OK' ? 'estado-ok' : estado === 'NO OK' ? 'estado-no-ok' : 'estado-ver';
+
+    // Columna número
+    let rowHtml = `<td class="col-num col-key">${i+1}</td>`;
+
+    // Columna principal (si está visible)
+    if(mostrarPrincipal){
+      rowHtml += `<td class="col-tag col-key">${f[colPrincipal] ?? ''}</td>`;
+    }
+
+    // Estado (siempre visible, después de la principal si existe)
+    rowHtml += `
+      <td>
+        <select class="field-select seg-estado-select ${estadoClass}" data-key="${valorKey}" style="width:auto; padding:4px 6px; font-size:12px;">
+          <option value="VER" ${estado==='VER' ? 'selected':''}>VER</option>
+          <option value="OK" ${estado==='OK' ? 'selected':''}>OK</option>
+          <option value="NO OK" ${estado==='NO OK' ? 'selected':''}>NO OK</option>
+        </select>
+      </td>`;
+
+    // Columnas secundarias
+    rowHtml += columnasSecundarias.map(c => `<td class="col-tag">${f[c] ?? ''}</td>`).join('');
+
+    // Comentarios (al final)
+    rowHtml += `
+      <td>
+        <input type="text" class="field-input seg-comentario-input" data-key="${valorKey}" value="${comentario}" style="padding:4px 6px; font-size:12px;">
+      </td>`;
+
+    return `<tr>${rowHtml}</tr>`;
   }).join('');
 
   tbody.querySelectorAll('.seg-estado-select').forEach(sel=>{
     sel.addEventListener('change', ()=>{
       seg.estados[sel.dataset.key] = sel.value;
+      // Actualizar clase según el nuevo estado
+      sel.classList.remove('estado-ok', 'estado-no-ok', 'estado-ver');
+      if(sel.value === 'OK') sel.classList.add('estado-ok');
+      else if(sel.value === 'NO OK') sel.classList.add('estado-no-ok');
+      else sel.classList.add('estado-ver');
       guardarSeguimientoEnSupabase(seg);
     });
   });
@@ -4471,6 +4587,7 @@ async function guardarSeguimientoEnSupabase(seg){
   const { error } = await supabaseClient.from('seguimientos').update({
     titulo: seg.titulo,
     columnas: seg.columnas || [],
+    columna_principal: seg.columnaPrincipal || (seg.columnas && seg.columnas[0]) || null,
     estados: seg.estados || {},
     comentarios: seg.comentarios || {},
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
@@ -4490,7 +4607,7 @@ function abrirFiltroSeguimientoTabla(col){
     valores = ['VER', 'OK', 'NO OK'];
   } else if(col === '__COMENTARIOS__'){
     // Valores únicos de comentarios existentes
-    const colPrincipal = seg.columnas[0];
+    const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
     const filas = filasDeSeguimientoVista(seg);
     valores = [...new Set(filas.map(f => seg.comentarios[f.TAG] || ''))].filter(v => v).sort();
     if(valores.length === 0) valores = ['(sin comentarios)'];
@@ -4577,24 +4694,59 @@ function abrirFiltroSeguimientoTabla(col){
 // ---- Gestionar columnas del seguimiento ----
 document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>{
   const seg = seguimientoActivo;
-  const colPrincipal = seg.columnas[0];
+  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
 
   document.getElementById('seg-col-principal-display').textContent = colPrincipal;
 
   const cont = document.getElementById('seg-columnas-gestionar-list');
-  const columnasDisponibles = COLUMNAS.filter(c => c !== colPrincipal);
 
-  cont.innerHTML = columnasDisponibles.map(col => {
+  // Ahora se puede ocultar la columna principal también
+  cont.innerHTML = COLUMNAS.map(col => {
     const incluida = seg.columnas.includes(col);
+    const esPrincipal = col === colPrincipal;
     return `
       <div class="seg-col-row">
         <label class="seg-col-label">
-          <input type="checkbox" class="seg-col-gestionar-check" value="${col}" ${incluida ? 'checked' : ''}>
-          <span class="seg-col-nombre">${col}</span>
+          <input type="checkbox" class="seg-col-gestionar-check" value="${col}" ${incluida ? 'checked' : ''} ${esPrincipal ? 'style="opacity:0;pointer-events:none;"' : ''}>
+          <span class="seg-col-nombre">${col}${esPrincipal ? ' (Principal)' : ''}</span>
         </label>
+        ${esPrincipal ? `
+          <button type="button" class="seg-col-eye-btn ${incluida ? '' : 'hidden'}" data-col="${col}" title="${incluida ? 'Ocultar columna' : 'Mostrar columna'}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              ${incluida ?
+                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>' :
+                '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'}
+            </svg>
+          </button>
+        ` : ''}
       </div>
     `;
   }).join('');
+
+  // Event listener para el botón de ojo de la columna principal
+  const eyeBtn = cont.querySelector('.seg-col-eye-btn');
+  if(eyeBtn){
+    eyeBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const col = eyeBtn.dataset.col;
+      const checkbox = cont.querySelector(`.seg-col-gestionar-check[value="${col}"]`);
+      const incluida = checkbox.checked;
+
+      if(incluida){
+        // Ocultar: desmarcar checkbox
+        checkbox.checked = false;
+        eyeBtn.classList.add('hidden');
+        eyeBtn.title = 'Mostrar columna';
+        eyeBtn.querySelector('svg').innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+      } else {
+        // Mostrar: marcar checkbox
+        checkbox.checked = true;
+        eyeBtn.classList.remove('hidden');
+        eyeBtn.title = 'Ocultar columna';
+        eyeBtn.querySelector('svg').innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+      }
+    });
+  }
 
   document.getElementById('overlay-gestionar-columnas-seg').classList.add('open');
 });
@@ -4605,12 +4757,19 @@ document.getElementById('cancel-gestionar-columnas-seg').addEventListener('click
 
 document.getElementById('aplicar-gestionar-columnas-seg').addEventListener('click', async ()=>{
   const seg = seguimientoActivo;
-  const colPrincipal = seg.columnas[0];
+  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
   const checks = [...document.querySelectorAll('.seg-col-gestionar-check:checked')];
   const columnasSeleccionadas = checks.map(c => c.value);
 
-  // Actualizar columnas: principal + seleccionadas
-  seg.columnas = [colPrincipal, ...columnasSeleccionadas];
+  // La columna principal siempre se mantiene como principal, esté o no visible
+  if(!seg.columnaPrincipal) seg.columnaPrincipal = colPrincipal;
+
+  // Si la columna principal está en las seleccionadas, va primero; sino solo las demás
+  if(columnasSeleccionadas.includes(colPrincipal)){
+    seg.columnas = [colPrincipal, ...columnasSeleccionadas.filter(c => c !== colPrincipal)];
+  } else {
+    seg.columnas = columnasSeleccionadas;
+  }
 
   await guardarSeguimientoEnSupabase(seg);
 
@@ -4623,7 +4782,7 @@ let nivelesOrdenSeg = [];
 
 document.getElementById('seg-ordenar').addEventListener('click', ()=>{
   const seg = seguimientoActivo;
-  nivelesOrdenSeg = seg.ordenVista.length ? seg.ordenVista.map(n=>({...n})) : [{ columna: seg.columnas[0], orden:'asc' }];
+  nivelesOrdenSeg = seg.ordenVista.length ? seg.ordenVista.map(n=>({...n})) : [{ columna: (seg.columnaPrincipal || seg.columnas[0]), orden:'asc' }];
   renderNivelesOrdenSeg();
   document.getElementById('overlay-ordenar-seguimiento').classList.add('open');
 });
@@ -4661,7 +4820,7 @@ function renderNivelesOrdenSeg(){
 document.getElementById('btn-agregar-nivel-orden-seg').addEventListener('click', ()=>{
   const seg = seguimientoActivo;
   const usadas = nivelesOrdenSeg.map(n => n.columna);
-  const disponible = seg.columnas.find(c => !usadas.includes(c)) || seg.columnas[0];
+  const disponible = seg.columnas.find(c => !usadas.includes(c)) || (seg.columnaPrincipal || seg.columnas[0]);
   nivelesOrdenSeg.push({ columna: disponible, orden:'asc' });
   renderNivelesOrdenSeg();
 });
@@ -4708,9 +4867,29 @@ document.getElementById('seg-exportar').addEventListener('click', ()=>{
     return obj;
   });
   const hoja = XLSX.utils.json_to_sheet(datos, { header: [...seg.columnas, 'Estado', 'Comentarios'] });
+
+  // Aplicar colores a las celdas de Estado
+  const estadoColIndex = seg.columnas.length; // Índice de la columna Estado
+  const range = XLSX.utils.decode_range(hoja['!ref']);
+
+  for(let R = range.s.r + 1; R <= range.e.r; ++R) { // +1 para saltar el header
+    const cellRef = XLSX.utils.encode_cell({ r: R, c: estadoColIndex });
+    const cell = hoja[cellRef];
+    if(cell && cell.v) {
+      if(!cell.s) cell.s = {};
+      if(cell.v === 'OK') {
+        cell.s.fill = { patternType: 'solid', fgColor: { rgb: 'D4EDDA' } };
+        cell.s.font = { color: { rgb: '155724' }, bold: true };
+      } else if(cell.v === 'NO OK') {
+        cell.s.fill = { patternType: 'solid', fgColor: { rgb: 'F8D7DA' } };
+        cell.s.font = { color: { rgb: '721C24' }, bold: true };
+      }
+    }
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, hoja, seg.titulo.slice(0,28) || 'Seguimiento');
-  XLSX.writeFile(wb, `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}.xlsx`);
+  XLSX.writeFile(wb, `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}.xlsx`, { cellStyles: true });
 });
 
 document.getElementById('seg-importar').addEventListener('click', ()=>{
@@ -4903,6 +5082,13 @@ async function eliminarDocumento(idx){
       });
     }
     if(cambio) filasParaActualizar.push(fila);
+
+    // Si este documento causaba una advertencia de TAG duplicado, esa advertencia
+    // ya no tiene sentido sin él (era específica a lo que traía ese archivo)
+    if(fila.__duplicados && fila.__duplicados[nombreDoc]){
+      delete fila.__duplicados[nombreDoc];
+      if(!cambio) filasParaActualizar.push(fila);
+    }
 
     return true;
   });
@@ -5466,7 +5652,26 @@ document.getElementById('confirmar-conflicto-celda').addEventListener('click', (
 function abrirDetalleInstrumento(fila){
   document.getElementById('detalle-instrumento-titulo').textContent = fila.TAG || 'Detalle';
   const cont = document.getElementById('detalle-campos');
-  cont.innerHTML = COLUMNAS.map(col => `
+
+  // Mostrar advertencia de duplicados si existe
+  let advertenciaDuplicados = '';
+  if(fila.__duplicados && Object.keys(fila.__duplicados).length > 0){
+    const advertencias = Object.entries(fila.__duplicados).map(([doc, info]) => {
+      if(info.identicos){
+        return `⚠️ En <b>${doc}</b> este TAG aparece <b>${info.cantidad} veces</b> con el mismo contenido (filas idénticas)`;
+      } else {
+        return `⚠️ En <b>${doc}</b> este TAG aparece <b>${info.cantidad} veces</b> con <b>contenido diferente</b>`;
+      }
+    }).join('<br>');
+    advertenciaDuplicados = `
+      <div style="background:#FFF3CD; border:1px solid #FFC107; border-radius:6px; padding:12px; margin-bottom:16px;">
+        <div style="font-weight:600; color:#856404; margin-bottom:8px;">⚠️ TAG Duplicado</div>
+        <div style="font-size:12.5px; color:#856404; line-height:1.5;">${advertencias}</div>
+      </div>
+    `;
+  }
+
+  cont.innerHTML = advertenciaDuplicados + COLUMNAS.map(col => `
     <div class="detalle-campo">
       <div class="detalle-label">${col}</div>
       <div class="detalle-valor">${fila[col] ?? '—'}</div>
@@ -7162,9 +7367,38 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
     columnasNuevas.forEach(n => COLUMNAS.push(n));
   }
 
+  // Detectar TAGs duplicados en el documento
+  const nombresCol = (filaTituloIdx !== null && tablaData[filaTituloIdx]) ? tablaData[filaTituloIdx] : [];
+  const tagsPorDocumento = {}; // { TAG: [fila1, fila2, ...] }
+
+  tablaData.forEach((fila, r)=>{
+    if(r === filaTituloIdx) return;
+    const datosFila = {};
+    colsIdxASubir.forEach(idx=>{
+      let valor = fila[idx];
+      if(nombresCol[idx] === 'TAG' && typeof valor === 'string') valor = valor.trim().toUpperCase();
+      datosFila[nombresCol[idx]] = valor;
+    });
+    const tagValor = datosFila['TAG'];
+    if(tagValor){
+      if(!tagsPorDocumento[tagValor]) tagsPorDocumento[tagValor] = [];
+      tagsPorDocumento[tagValor].push(datosFila);
+    }
+  });
+
+  // Analizar duplicados: ¿son idénticos o diferentes?
+  const tagsDuplicados = {}; // { TAG: { identicos: boolean, documento: string } }
+  Object.entries(tagsPorDocumento).forEach(([tag, filas])=>{
+    if(filas.length > 1){
+      // Verificar si todas las filas son idénticas
+      const primera = JSON.stringify(filas[0]);
+      const identicos = filas.every(f => JSON.stringify(f) === primera);
+      tagsDuplicados[tag] = { identicos, documento: archivoActual, cantidad: filas.length };
+    }
+  });
+
   // Por cada fila del rango (menos la fila título): si el TAG ya existe en la base,
   // fusiona los datos en esa fila y detecta conflictos; si no existe, crea una fila nueva.
-  const nombresCol = (filaTituloIdx !== null && tablaData[filaTituloIdx]) ? tablaData[filaTituloIdx] : [];
   let filasNuevas = 0;
   let filasFusionadas = 0;
   const filasParaInsertar = [];   // filas nuevas, se insertan en Supabase en bloque
@@ -7188,14 +7422,23 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
 
     if(filaExistente){
       fusionarFilaConDocumento(filaExistente, datosFila, archivoActual);
+      // Agregar info de duplicados si existe
+      if(tagsDuplicados[tagValor]){
+        if(!filaExistente.__duplicados) filaExistente.__duplicados = {};
+        filaExistente.__duplicados[archivoActual] = tagsDuplicados[tagValor];
+      }
       filasFusionadas++;
       filasParaActualizar.push(filaExistente);
     } else {
-      const nuevaFila = { __documentos: new Set(archivoActual ? [archivoActual] : []), __historial: {}, __conflictos: new Set(), __resueltos: new Set() };
+      const nuevaFila = { __documentos: new Set(archivoActual ? [archivoActual] : []), __historial: {}, __conflictos: new Set(), __resueltos: new Set(), __duplicados: {} };
       Object.keys(datosFila).forEach(col=>{
         nuevaFila[col] = datosFila[col];
         if(datosFila[col]) nuevaFila.__historial[col] = { [archivoActual]: datosFila[col] };
       });
+      // Agregar info de duplicados si existe
+      if(tagsDuplicados[tagValor]){
+        nuevaFila.__duplicados[archivoActual] = tagsDuplicados[tagValor];
+      }
       FILAS.push(nuevaFila);
       filasNuevas++;
       filasParaInsertar.push(nuevaFila);
@@ -7211,6 +7454,7 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
         datos: datosDeFila(f),
         documentos: [...f.__documentos],
         historial: f.__historial,
+        duplicados: f.__duplicados || {},
       }))
     ).select();
 
