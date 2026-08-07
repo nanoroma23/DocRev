@@ -511,14 +511,15 @@
   .datatable-wrap{
     border:1px solid var(--line);
     border-radius:8px;
-    overflow:visible;
+    overflow-x:auto;
+    overflow-y:visible;
     background:var(--card);
     width:100%;
   }
   table.datatable{
     width:100%;
     border-collapse:collapse;
-    table-layout:fixed;
+    table-layout:auto;
   }
   table.datatable thead th{
     text-align:left;
@@ -532,6 +533,20 @@
     border-bottom:1px solid var(--line);
     border-right:1px solid var(--line);
     position:relative;
+    min-width:80px;
+  }
+  table.datatable thead th .resize-handle{
+    position:absolute;
+    top:0;
+    right:0;
+    width:5px;
+    height:100%;
+    cursor:col-resize;
+    z-index:10;
+  }
+  table.datatable thead th .resize-handle:hover{
+    background:var(--green);
+    opacity:0.3;
   }
   table.datatable thead th:first-child{ border-top-left-radius:7px; }
   table.datatable thead th:last-child{ border-right:none; }
@@ -591,10 +606,15 @@
   }
   table.datatable td.col-tag{
     font-family:var(--font-mono);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    max-width:0; /* fuerza a que el ellipsis respete el ancho de columna con table-layout:fixed */
+    white-space:normal;
+    word-break:break-word;
+    overflow-wrap:break-word;
+    max-width:300px;
+    min-width:100px;
+    position:relative;
+  }
+  table.datatable td.col-tag[title]{
+    cursor:help;
   }
   table.datatable td.tag-clickable{
     cursor:pointer;
@@ -2628,22 +2648,21 @@
           <label>Hoja</label>
           <select class="field-select" id="select-hoja-campo"></select>
         </div>
-        <p class="rango-label" style="margin-top:0;">Campos a extraer</p>
-        <div class="campos-list" id="campos-list"></div>
 
-        <label class="field-label" style="margin-top:10px;">Nombre del campo</label>
-        <select class="field-select" id="select-nombre-campo">
-          <option value="">Elegí un nombre existente</option>
-          <option value="__nuevo__">+ Nuevo nombre...</option>
-        </select>
+        <label class="field-label" style="margin-top:10px;">Nombre del campo y celda (la misma en todas las hojas elegidas)</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select class="field-select" id="select-nombre-campo" style="flex:1; margin:0;">
+            <option value="">Elegí un nombre existente</option>
+            <option value="__nuevo__">+ Nuevo nombre...</option>
+          </select>
+          <div class="rango-field" id="celda-field" style="flex:1; margin:0;">
+            <span id="celda-field-text">Celda</span>
+          </div>
+        </div>
         <input type="text" class="field-input" id="input-nombre-campo-nuevo" placeholder="Nombre del campo" style="display:none; margin-top:6px;">
 
-        <label class="field-label">Celda con el valor (la misma en todas las hojas elegidas)</label>
-        <div class="rango-field" id="celda-field">
-          <span id="celda-field-text">Click para elegir la celda</span>
-        </div>
-
-        <button class="btn-col" id="btn-agregar-campo" style="width:100%; justify-content:center; margin-top:10px;" disabled>+ Agregar campo</button>
+        <p class="rango-label" style="margin-top:16px;">Campos a extraer</p>
+        <div class="campos-list" id="campos-list"></div>
 
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-campo">Cancelar</button>
@@ -2818,14 +2837,21 @@
 
   <!-- Modal opciones de columna -->
   <div class="overlay" id="overlay-columna-opciones">
-    <div class="modal" style="width:300px;">
-      <h3 id="columna-opciones-titulo">Columna</h3>
+    <div class="modal" style="width:340px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <h3 id="columna-opciones-titulo" style="margin:0;">Columna</h3>
+        <button class="lapiz-btn-inline" id="btn-editar-nombre-columna" title="Editar nombre">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+      </div>
+      <input type="text" class="field-input" id="input-nuevo-nombre-columna" placeholder="Nuevo nombre de la columna" style="display:none; margin-bottom:12px;">
       <div class="columna-opciones-acciones">
         <button class="btn-accion-columna" id="btn-ocultar-columna">Ocultar columna</button>
         <button class="btn-accion-columna danger" id="btn-eliminar-columna">Eliminar columna</button>
       </div>
       <div class="modal-actions" style="margin-top:14px;">
-        <button class="btn" id="cerrar-columna-opciones">Cerrar</button>
+        <button class="btn" id="cancel-columna-opciones">Cancelar</button>
+        <button class="btn btn-primary" id="confirmar-columna-opciones">Confirmar</button>
       </div>
     </div>
   </div>
@@ -2966,6 +2992,7 @@ let FILAS = [];
 let FILTROS = {}; // { columna: Set(valoresPermitidos) | null }
 let filtroAbierto = null;
 let columnasOcultas = new Set();
+let columnasAnchos = {}; // { columna: ancho en px }
 let filtroDocumentos = null; // null = todos, o Set con las claves de documento tildadas ('__sin_documento__' incluida)
 
 // ---- Conversión entre filas de Supabase (tabla "instrumentos") y el formato que usa la app ----
@@ -3094,6 +3121,44 @@ async function guardarColumnaOculta(nombre, oculta){
   if(error) console.error('Error al guardar si la columna está oculta:', error);
 }
 
+// Guarda el ancho de una columna
+async function guardarAnchoColumna(nombre, ancho){
+  if(!proyectoActivo) return;
+  const { error } = await supabaseClient.from('columnas')
+    .update({ ancho }).eq('proyecto_id', proyectoActivo.id).eq('nombre', nombre);
+  if(error) console.error('Error al guardar el ancho de la columna:', error);
+}
+
+// Renombra una columna
+async function renombrarColumna(proyectoId, nombreViejo, nuevoNombre){
+  if(!proyectoActivo) return;
+
+  // Actualizar la columna en la tabla columnas
+  const { error: errorColumna } = await supabaseClient.from('columnas')
+    .update({ nombre: nuevoNombre })
+    .eq('proyecto_id', proyectoId)
+    .eq('nombre', nombreViejo);
+  if(errorColumna) console.error('Error al renombrar columna:', errorColumna);
+
+  // Actualizar los valores en todas las filas
+  const { data: filas } = await supabaseClient.from('filas')
+    .select('id, valores')
+    .eq('proyecto_id', proyectoId);
+
+  if(filas){
+    for(const fila of filas){
+      const valores = fila.valores || {};
+      if(nombreViejo in valores){
+        valores[nuevoNombre] = valores[nombreViejo];
+        delete valores[nombreViejo];
+        await supabaseClient.from('filas')
+          .update({ valores })
+          .eq('id', fila.id);
+      }
+    }
+  }
+}
+
 // Guarda el orden actual de todas las columnas
 async function guardarOrdenColumnas(){
   if(!proyectoActivo) return;
@@ -3111,9 +3176,14 @@ async function cargarBaseDeDatos(proyectoId){
   if(colsData && colsData.length){
     COLUMNAS = colsData.map(c => c.nombre);
     columnasOcultas = new Set(colsData.filter(c => c.oculta).map(c => c.nombre));
+    columnasAnchos = {};
+    colsData.forEach(c => {
+      if(c.ancho) columnasAnchos[c.nombre] = c.ancho;
+    });
   } else {
     COLUMNAS = ['TAG'];
     columnasOcultas = new Set();
+    columnasAnchos = {};
     await supabaseClient.from('columnas').insert({ proyecto_id: proyectoId, nombre:'TAG', orden:0 });
   }
 
@@ -3181,17 +3251,21 @@ function filasFiltradas(){
 function renderHead(){
   const row = document.getElementById('thead-row');
   const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
-  row.innerHTML = `<th class="col-num col-key"></th>` + columnasVisibles.map(col => `
-      <th data-col="${col}" class="${col==='TAG' ? 'col-key' : 'col-draggable'}">
+  row.innerHTML = `<th class="col-num col-key"></th>` + columnasVisibles.map(col => {
+    const anchoStyle = columnasAnchos[col] ? `style="width:${columnasAnchos[col]}px; min-width:${columnasAnchos[col]}px;"` : '';
+    return `
+      <th data-col="${col}" class="${col==='TAG' ? 'col-key' : 'col-draggable'}" ${anchoStyle}>
         <div class="th-inner">
           <span class="${col==='TAG' ? '' : 'col-nombre-drag'}" ${col==='TAG' ? '' : 'draggable="true"'}>${col}</span>
           <span class="th-filter ${FILTROS[col] ? 'active' : ''}" data-col-filter="${col}">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
         </div>
+        <div class="resize-handle"></div>
         <div class="filter-popup" id="popup-${col}"></div>
       </th>
-    `).join('');
+    `;
+  }).join('');
 
   row.querySelectorAll('.th-filter').forEach(el=>{
     el.addEventListener('click', (e)=>{
@@ -3206,6 +3280,13 @@ function renderHead(){
   // filtro y su popup quedan totalmente afuera de esa cadena y no interfieren.
   row.querySelectorAll('th.col-draggable').forEach(th=>{
     const nombreDrag = th.querySelector('.col-nombre-drag');
+
+    // Click en el nombre abre el menú de opciones
+    nombreDrag.addEventListener('click', (e)=>{
+      if(columnaArrastrada) return; // Si está arrastrando, no abrir menú
+      e.stopPropagation();
+      abrirMenuColumna(th.dataset.col);
+    });
     nombreDrag.addEventListener('dragstart', (e)=>{
       columnaArrastrada = th.dataset.col;
       e.dataTransfer.effectAllowed = 'move';
@@ -3237,13 +3318,42 @@ function renderHead(){
       columnaArrastrada = null;
       row.querySelectorAll('.col-drag-over').forEach(t => t.classList.remove('col-drag-over'));
     });
-    th.querySelector('.th-inner').addEventListener('click', (e)=>{
-      if(e.target.closest('.th-filter')) return;
-      e.stopPropagation();
-      abrirMenuColumna(th.dataset.col);
-    });
     const popupEl = th.querySelector('.filter-popup');
     if(popupEl) popupEl.addEventListener('mousedown', e => e.stopPropagation());
+  });
+
+  // Agregar funcionalidad de redimensionamiento de columnas
+  row.querySelectorAll('.resize-handle').forEach(handle => {
+    let startX, startWidth, th, columna;
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      th = handle.closest('th');
+      columna = th.dataset.col;
+      startX = e.pageX;
+      startWidth = th.offsetWidth;
+
+      const onMouseMove = (e) => {
+        const width = startWidth + (e.pageX - startX);
+        const newWidth = Math.max(80, width);
+        th.style.width = newWidth + 'px';
+        th.style.minWidth = newWidth + 'px';
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        // Guardar el ancho final
+        const finalWidth = th.offsetWidth;
+        columnasAnchos[columna] = finalWidth;
+        guardarAnchoColumna(columna, finalWidth);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   });
 }
 let columnaArrastrada = null;
@@ -3255,26 +3365,103 @@ let columnaMenuActual = null;
 function abrirMenuColumna(col){
   columnaMenuActual = col;
   document.getElementById('columna-opciones-titulo').textContent = col;
+  document.getElementById('input-nuevo-nombre-columna').style.display = 'none';
+  document.getElementById('input-nuevo-nombre-columna').value = col;
   document.getElementById('overlay-columna-opciones').classList.add('open');
 }
-document.getElementById('cerrar-columna-opciones').addEventListener('click', ()=>{
+let accionColumnaSeleccionada = null;
+let editandoNombreColumna = false;
+
+document.getElementById('btn-editar-nombre-columna').addEventListener('click', ()=>{
+  editandoNombreColumna = true;
+  const input = document.getElementById('input-nuevo-nombre-columna');
+  input.style.display = 'block';
+  input.focus();
+  input.select();
+});
+
+document.getElementById('cancel-columna-opciones').addEventListener('click', ()=>{
   document.getElementById('overlay-columna-opciones').classList.remove('open');
+  accionColumnaSeleccionada = null;
+  editandoNombreColumna = false;
+});
+
+document.getElementById('confirmar-columna-opciones').addEventListener('click', async ()=>{
+  // Si está editando el nombre
+  if(editandoNombreColumna){
+    const nuevoNombre = document.getElementById('input-nuevo-nombre-columna').value.trim();
+    if(!nuevoNombre || nuevoNombre === columnaMenuActual){
+      editandoNombreColumna = false;
+      document.getElementById('overlay-columna-opciones').classList.remove('open');
+      return;
+    }
+
+    // Verificar que no exista otra columna con ese nombre
+    if(COLUMNAS.includes(nuevoNombre)){
+      alert('Ya existe una columna con ese nombre');
+      return;
+    }
+
+    // Renombrar la columna
+    const nombreViejo = columnaMenuActual;
+    const idx = COLUMNAS.indexOf(nombreViejo);
+    COLUMNAS[idx] = nuevoNombre;
+
+    // Actualizar todas las filas
+    FILAS.forEach(f => {
+      if(nombreViejo in f){
+        f[nuevoNombre] = f[nombreViejo];
+        delete f[nombreViejo];
+      }
+    });
+
+    // Actualizar filtros
+    if(FILTROS[nombreViejo]){
+      FILTROS[nuevoNombre] = FILTROS[nombreViejo];
+      delete FILTROS[nombreViejo];
+    }
+
+    // Guardar en base de datos
+    await renombrarColumna(proyectoActual.id, nombreViejo, nuevoNombre);
+
+    editandoNombreColumna = false;
+    document.getElementById('overlay-columna-opciones').classList.remove('open');
+    renderTabla();
+    return;
+  }
+
+  // Si está ocultando o eliminando
+  if(!accionColumnaSeleccionada || !columnaMenuActual) return;
+
+  if(accionColumnaSeleccionada === 'ocultar'){
+    columnasOcultas.add(columnaMenuActual);
+    guardarColumnaOculta(columnaMenuActual, true);
+    document.getElementById('overlay-columna-opciones').classList.remove('open');
+    renderTabla();
+  } else if(accionColumnaSeleccionada === 'eliminar'){
+    document.getElementById('overlay-columna-opciones').classList.remove('open');
+    document.getElementById('eliminar-columna-texto').textContent =
+      `Vas a eliminar la columna "${columnaMenuActual}" de la base de datos. Se va a borrar ese dato de todas las filas. Esta acción no se puede deshacer.`;
+    document.getElementById('overlay-eliminar-columna').classList.add('open');
+  }
+
+  accionColumnaSeleccionada = null;
 });
 
 document.getElementById('btn-ocultar-columna').addEventListener('click', ()=>{
-  if(!columnaMenuActual) return;
-  columnasOcultas.add(columnaMenuActual);
-  guardarColumnaOculta(columnaMenuActual, true);
-  document.getElementById('overlay-columna-opciones').classList.remove('open');
-  renderTabla();
+  accionColumnaSeleccionada = 'ocultar';
+  document.querySelector('#btn-ocultar-columna').style.background = 'var(--green-soft)';
+  document.querySelector('#btn-ocultar-columna').style.borderColor = 'var(--green)';
+  document.querySelector('#btn-eliminar-columna').style.background = '';
+  document.querySelector('#btn-eliminar-columna').style.borderColor = '';
 });
 
 document.getElementById('btn-eliminar-columna').addEventListener('click', ()=>{
-  if(!columnaMenuActual) return;
-  document.getElementById('overlay-columna-opciones').classList.remove('open');
-  document.getElementById('eliminar-columna-texto').textContent =
-    `Vas a eliminar la columna "${columnaMenuActual}" de la base de datos. Se va a borrar ese dato de todas las filas. Esta acción no se puede deshacer.`;
-  document.getElementById('overlay-eliminar-columna').classList.add('open');
+  accionColumnaSeleccionada = 'eliminar';
+  document.querySelector('#btn-eliminar-columna').style.background = 'var(--red-soft)';
+  document.querySelector('#btn-eliminar-columna').style.borderColor = 'var(--red)';
+  document.querySelector('#btn-ocultar-columna').style.background = '';
+  document.querySelector('#btn-ocultar-columna').style.borderColor = '';
 });
 document.getElementById('cancel-eliminar-columna').addEventListener('click', ()=>{
   document.getElementById('overlay-eliminar-columna').classList.remove('open');
@@ -3484,7 +3671,9 @@ function renderTabla(){
         cls.push('celda-editable');
         dataAttr = `data-col-editable="${col}"`;
       }
-      return `<td class="${cls.join(' ')}" ${dataAttr} title="${f[col] ?? ''}">${f[col] ?? ''}</td>`;
+      const valor = f[col] ?? '';
+      const valorEscapado = String(valor).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
     }).join('');
     return `<tr data-fila-idx="${i}"><td class="col-num col-key">${i+1}</td>${celdas}</tr>`;
   }).join('');
@@ -3543,6 +3732,7 @@ function serializarFiltrosSeguimiento(filtros){
   return resultado;
 }
 let seguimientoActivo = null;
+let seguimientoColumnasAnchos = {}; // { columna: ancho en px } para el seguimiento activo
 let columnasSeguimientoSeleccionadas = new Set();
 let filtrosSeguimientoTemp = {}; // { col: Set(valores) | null }, se arma mientras se crea el seguimiento
 
@@ -3971,10 +4161,50 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
   abrirVistaSeguimientos();
 });
 
+// Cargar anchos de columnas para un seguimiento
+async function cargarAnchosSeguimiento(seguimientoId){
+  seguimientoColumnasAnchos = {};
+  const { data, error } = await supabaseClient
+    .from('seguimientos_columnas_config')
+    .select('*')
+    .eq('seguimiento_id', seguimientoId);
+
+  if(error) {
+    console.error('Error al cargar anchos de columnas del seguimiento:', error);
+    return;
+  }
+
+  if(data && data.length){
+    data.forEach(config => {
+      if(config.ancho) seguimientoColumnasAnchos[config.columna] = config.ancho;
+    });
+  }
+}
+
+// Guardar ancho de columna para un seguimiento
+async function guardarAnchoColumnaSeguimiento(seguimientoId, columna, ancho){
+  const { error } = await supabaseClient
+    .from('seguimientos_columnas_config')
+    .upsert({
+      seguimiento_id: seguimientoId,
+      columna: columna,
+      ancho: ancho,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'seguimiento_id,columna'
+    });
+
+  if(error) console.error('Error al guardar ancho de columna del seguimiento:', error);
+}
+
 // ---- Tabla de un seguimiento puntual ----
-function abrirTablaSeguimiento(id){
+async function abrirTablaSeguimiento(id){
   seguimientoActivo = SEGUIMIENTOS.find(s => s.id === id);
   if(!seguimientoActivo) return;
+
+  // Cargar anchos de columnas del seguimiento
+  await cargarAnchosSeguimiento(id);
+
   document.getElementById('seguimiento-tarjetas').style.display = 'none';
   document.getElementById('seguimiento-tabla-vista').style.display = 'block';
   document.getElementById('seg-tabla-titulo').textContent = seguimientoActivo.titulo;
@@ -4076,17 +4306,21 @@ function renderTablaSeguimiento(){
 
   const thead = document.getElementById('seg-thead-row');
   thead.innerHTML = `<th class="col-num col-key"></th>` +
-    seg.columnas.map(c => `
-      <th class="${c===colPrincipal ? 'col-key' : 'col-draggable'}" data-seg-col="${c}">
+    seg.columnas.map(c => {
+      const anchoStyle = seguimientoColumnasAnchos[c] ? `style="width:${seguimientoColumnasAnchos[c]}px; min-width:${seguimientoColumnasAnchos[c]}px;"` : '';
+      return `
+      <th class="${c===colPrincipal ? 'col-key' : 'col-draggable'}" data-seg-col="${c}" ${anchoStyle}>
         <div class="th-inner">
           <span class="${c===colPrincipal ? '' : 'col-nombre-drag'}" ${c===colPrincipal ? '' : 'draggable="true"'}>${c}</span>
           <span class="th-filter ${seg.filtrosVista[c] ? 'active':''}" data-seg-tabla-filtro="${c}">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
         </div>
+        <div class="resize-handle"></div>
         <div class="filter-popup" id="seg-popup-${c}"></div>
       </th>
-    `).join('') +
+      `;
+    }).join('') +
     `<th>
       <div class="th-inner">
         <span>Estado</span>
@@ -4094,6 +4328,7 @@ function renderTablaSeguimiento(){
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
         </span>
       </div>
+      <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__ESTADO__"></div>
     </th>
     <th>
@@ -4103,6 +4338,7 @@ function renderTablaSeguimiento(){
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
         </span>
       </div>
+      <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__COMENTARIOS__"></div>
     </th>`;
 
@@ -4150,6 +4386,41 @@ function renderTablaSeguimiento(){
     });
     const popupEl = th.querySelector('.filter-popup');
     if(popupEl) popupEl.addEventListener('mousedown', e => e.stopPropagation());
+  });
+
+  // Agregar funcionalidad de redimensionamiento de columnas en seguimiento
+  thead.querySelectorAll('.resize-handle').forEach(handle => {
+    let startX, startWidth, th, columna;
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      th = handle.closest('th');
+      columna = th.dataset.segCol;
+      if(!columna) return; // Skip para columnas Estado y Comentarios
+      startX = e.pageX;
+      startWidth = th.offsetWidth;
+
+      const onMouseMove = (e) => {
+        const width = startWidth + (e.pageX - startX);
+        const newWidth = Math.max(80, width);
+        th.style.width = newWidth + 'px';
+        th.style.minWidth = newWidth + 'px';
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        // Guardar el ancho final
+        const finalWidth = th.offsetWidth;
+        seguimientoColumnasAnchos[columna] = finalWidth;
+        guardarAnchoColumnaSeguimiento(seg.id, columna, finalWidth);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   });
 
   const tbody = document.getElementById('seg-tbody');
@@ -6621,8 +6892,6 @@ function resetearCampoCelda(){
 }
 
 function validarFormularioCampo(){
-  const hayNombreYCelda = !!(obtenerNombreCampo() && celdaConfirmada);
-  document.getElementById('btn-agregar-campo').disabled = !hayNombreYCelda;
   document.getElementById('confirmar-campo').disabled = camposDefinidos.length === 0;
 }
 
@@ -6655,20 +6924,6 @@ document.getElementById('select-nombre-campo').addEventListener('change', ()=>{
 });
 document.getElementById('input-nombre-campo-nuevo').addEventListener('input', validarFormularioCampo);
 
-// Agrega el campo actual (nombre + celda) a la lista, y limpia el formulario para cargar el siguiente
-document.getElementById('btn-agregar-campo').addEventListener('click', ()=>{
-  const nombre = obtenerNombreCampo();
-  if(!nombre || !celdaConfirmada) return;
-  camposDefinidos.push({ nombre, celda: { ...celdaConfirmada } });
-  renderListaCampos();
-
-  document.getElementById('select-nombre-campo').value = '';
-  document.getElementById('input-nombre-campo-nuevo').value = '';
-  document.getElementById('input-nombre-campo-nuevo').style.display = 'none';
-  resetearCampoCelda();
-  poblarSelectorNombreCampo();
-});
-
 document.getElementById('cancel-campo').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
@@ -6700,6 +6955,20 @@ document.getElementById('confirmar-celda-picker').addEventListener('click', ()=>
   const campo = document.getElementById('celda-field');
   campo.classList.add('filled');
   document.getElementById('celda-field-text').textContent = `${letraCol(celdaConfirmada.c)}${celdaConfirmada.r}`;
+
+  // Agregar automáticamente el campo
+  const nombre = obtenerNombreCampo();
+  if(nombre && celdaConfirmada) {
+    camposDefinidos.push({ nombre, celda: { ...celdaConfirmada } });
+    renderListaCampos();
+
+    document.getElementById('select-nombre-campo').value = '';
+    document.getElementById('input-nombre-campo-nuevo').value = '';
+    document.getElementById('input-nombre-campo-nuevo').style.display = 'none';
+    resetearCampoCelda();
+    poblarSelectorNombreCampo();
+  }
+
   validarFormularioCampo();
   mostrarPasoFloat('campo');
 });
