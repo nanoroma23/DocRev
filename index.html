@@ -34,10 +34,11 @@
   .topbar{
     display:flex;
     align-items:center;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
     padding:9px 32px;
     gap:14px;
     border-bottom:1px solid var(--line);
+    position:relative;
   }
   .brand{ order:1; }
   .crumb{ order:2; }
@@ -73,7 +74,7 @@
     display:none;
     align-items:flex-end;
     gap:4px;
-    overflow-x:auto;
+    overflow:visible;
   }
   .tab{
     display:flex;
@@ -106,6 +107,9 @@
   .topbar-center{
     flex:0 0 auto;
     width:min(460px, 40vw);
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
   }
   .search{
     display:flex;
@@ -497,6 +501,11 @@
     color:var(--text);
   }
   .btn-col:hover{ background:var(--green-soft); border-color:var(--green); }
+  #btn-modo-edicion.activo{
+    background:var(--green-dark);
+    border-color:var(--green-dark);
+    color:#fff;
+  }
 
   .datatable-wrap{
     border:1px solid var(--line);
@@ -1596,53 +1605,47 @@
       min-width: 100% !important;
     }
 
-    /* Topbar responsive: se parte en 2 renglones */
+    /* Topbar responsive: grilla explícita de 2 renglones */
     .topbar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas:
+        "brand crumb crumb"
+        "tabsrow tabsrow menu";
+      align-items: center;
+      row-gap: 8px;
       padding: 8px 12px;
       gap: 6px;
     }
 
-    .brand {
-      font-size: 18px;
-    }
+    .brand { grid-area: brand; font-size: 18px; }
+    .crumb { grid-area: crumb; }
+    .topbar-break { display: none; }
 
-    .topbar-break {
-      display: block;
-      flex-basis: 100%;
-      height: 0;
-    }
+    .topbar-center { grid-area: tabsrow; width: 100%; position: static; transform: none; }
+    .search { padding: 7px 10px; }
+    .search input { font-size: 14px; }
 
-    .topbar-center {
-      width: 100%;
-      margin-top: 2px;
-    }
-
-    .search {
-      padding: 7px 10px;
-    }
-
-    .search input {
-      font-size: 14px;
-    }
-
-    .menu-btn {
-      display: flex;
-    }
+    .menu-btn { display: flex; }
+    .topbar-right { grid-area: menu; margin-left: 0; justify-self: end; }
 
     .tabs {
-      flex: 1;
-      margin-top: 2px;
-      overflow-x: auto;
+      grid-area: tabsrow;
+      width: 100%;
+      overflow: visible;
       justify-content: flex-start;
     }
 
     .tab {
-      font-size: 12px;
-      padding: 0 10px;
+      flex: 1 1 0; /* las 3 pestañas se reparten el ancho en partes iguales */
+      min-width: 0; /* clave: sin esto, el texto más largo fuerza el desborde del resto */
+      font-size: 11.5px;
+      padding: 0 6px;
       height: 28px;
-      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    
+
     /* Grid de proyectos */
     .grid {
       padding: 12px;
@@ -2177,6 +2180,10 @@
       <div class="project-toolbar">
         <button class="btn-tag" id="btn-agregar-tag">+ Agregar tag</button>
         <button class="btn-col" id="btn-agregar-columna">+ Agregar columna</button>
+        <button class="btn-col" id="btn-modo-edicion" title="Mientras está apagado, tocar una celda solo la muestra; no deja editarla">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Editar base de datos
+        </button>
         <button class="btn-col" id="btn-mostrar-columnas" style="display:none;">Mostrar columnas</button>
         <div style="flex:1;"></div>
         <button class="btn-col" id="btn-exportar">
@@ -2768,7 +2775,8 @@
   <!-- Modal editar celda -->
   <div class="overlay" id="overlay-conflicto-celda">
     <div class="modal" style="width:380px;">
-      <h3 id="conflicto-titulo">Campo</h3>
+      <h3 id="conflicto-titulo" style="display:inline;">Campo</h3>
+      <span id="conflicto-modo-lectura-badge" class="conflicto-badge-oficial" style="position:static; display:none; margin-left:6px;">Solo lectura</span>
 
       <div id="conflicto-historial-bloque" style="display:none;">
         <p>Así figura en cada documento:</p>
@@ -3309,11 +3317,11 @@ function abrirFiltro(col){
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
     <div class="filter-search">
-      <input type="text" placeholder="Buscar valor..." id="search-${col}">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup">
     </div>
     <div class="filter-list" id="list-${col}">
       <label class="filter-option">
-        <input type="checkbox" id="chk-todos-${col}" ${seleccion.size===valores.length ? 'checked':''}>
+        <input type="checkbox" class="chk-todos-popup" ${seleccion.size===valores.length ? 'checked':''}>
         <span>Seleccionar todo</span>
       </label>
       ${valores.map(v => `
@@ -3324,39 +3332,50 @@ function abrirFiltro(col){
       `).join('')}
     </div>
     <div class="filter-popup-actions">
-      <button class="btn-mini" id="clear-${col}">Limpiar</button>
-      <button class="btn-mini primary" id="apply-${col}">Aplicar</button>
+      <button class="btn-mini btn-limpiar-popup">Limpiar</button>
+      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
   `;
   popup.classList.add('open');
   popup.addEventListener('click', e => e.stopPropagation());
 
-  const chkTodos = popup.querySelector(`#chk-todos-${col}`);
+  const chkTodos = popup.querySelector('.chk-todos-popup');
   const chksValor = () => [...popup.querySelectorAll('.chk-valor')];
+
+  function actualizarEstadoTodos(){
+    const visibles = chksValor().filter(c => c.closest('.filter-option').style.display !== 'none');
+    const marcados = visibles.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === visibles.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
 
   chkTodos.addEventListener('change', ()=>{
     chksValor().forEach(c => {
       if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
     });
+    actualizarEstadoTodos();
   });
-  popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', ()=>{
-    chkTodos.checked = chksValor().every(x => x.checked);
-  }));
+  popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  // Buscador interno: filtra las opciones visibles en la lista
-  popup.querySelector(`#search-${col}`).addEventListener('input', (e)=>{
+  // Buscador interno: filtra las opciones visibles en la lista, y el "seleccionar todo"
+  // pasa a estado parcial (tilde intermedio) para reflejar que solo se ve un subconjunto
+  popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
       opt.style.display = opt.dataset.valor.includes(q) ? 'flex' : 'none';
     });
+    actualizarEstadoTodos();
   });
 
-  popup.querySelector(`#clear-${col}`).addEventListener('click', ()=>{
+  actualizarEstadoTodos();
+
+  popup.querySelector('.btn-limpiar-popup').addEventListener('click', ()=>{
     FILTROS[col] = null;
     cerrarFiltros();
     renderTabla();
   });
-  popup.querySelector(`#apply-${col}`).addEventListener('click', ()=>{
+  popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
@@ -3961,11 +3980,11 @@ function filasDeSeguimientoVista(seg){
 
       // Filtros especiales para Estado y Comentarios
       if(col === '__ESTADO__'){
-        const estado = seg.estados[fila[colPrincipal]] || 'VER';
+        const estado = seg.estados[fila.TAG] || 'VER';
         return permitidos.has(estado);
       }
       if(col === '__COMENTARIOS__'){
-        const comentario = seg.comentarios[fila[colPrincipal]] || '';
+        const comentario = seg.comentarios[fila.TAG] || '';
         if(permitidos.has('(sin comentarios)')) return !comentario;
         return permitidos.has(comentario);
       }
@@ -4041,7 +4060,7 @@ function renderTablaSeguimiento(){
   }
 
   tbody.innerHTML = filas.map((f,i)=>{
-    const valorKey = f[colPrincipal] ?? '';  // Valor de la columna principal
+    const valorKey = f.TAG;  // el TAG es lo único garantizado único por fila; la columna principal es solo visual
     const estado = seg.estados[valorKey] || 'VER';
     const comentario = seg.comentarios[valorKey] || '';
     return `
@@ -4102,7 +4121,7 @@ function abrirFiltroSeguimientoTabla(col){
     // Valores únicos de comentarios existentes
     const colPrincipal = seg.columnas[0];
     const filas = filasDeSeguimientoVista(seg);
-    valores = [...new Set(filas.map(f => seg.comentarios[f[colPrincipal]] || ''))].filter(v => v).sort();
+    valores = [...new Set(filas.map(f => seg.comentarios[f.TAG] || ''))].filter(v => v).sort();
     if(valores.length === 0) valores = ['(sin comentarios)'];
   } else {
     valores = valoresUnicosSeguimiento(seg, col);
@@ -4113,7 +4132,7 @@ function abrirFiltroSeguimientoTabla(col){
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
     <div class="filter-search">
-      <input type="text" placeholder="Buscar valor..." id="search-seg-${col}">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup">
     </div>
     <div class="filter-list">
       <label class="filter-option">
@@ -4137,21 +4156,34 @@ function abrirFiltroSeguimientoTabla(col){
 
   const chkTodos = popup.querySelector('#chk-todos-seg-tabla');
   const chksValor = () => [...popup.querySelectorAll('.chk-valor-seg-tabla')];
+
+  function actualizarEstadoTodos(){
+    const visibles = chksValor().filter(c => c.closest('.filter-option').style.display !== 'none');
+    const marcados = visibles.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === visibles.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+
   chkTodos.checked = seleccion.size === valores.length;
-  chkTodos.addEventListener('change', ()=> chksValor().forEach(c => {
-    if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
-  }));
-  chksValor().forEach(c => c.addEventListener('change', ()=>{
-    chkTodos.checked = chksValor().every(x => x.checked);
-  }));
+  chkTodos.addEventListener('change', ()=> {
+    chksValor().forEach(c => {
+      if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
+    });
+    actualizarEstadoTodos();
+  });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
   // Buscador interno: filtra las opciones visibles en la lista, igual que en Base de Datos
-  popup.querySelector(`#search-seg-${col}`).addEventListener('input', (e)=>{
+  popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
       opt.style.display = opt.dataset.valor.includes(q) ? 'flex' : 'none';
     });
+    actualizarEstadoTodos();
   });
+
+  actualizarEstadoTodos();
 
   popup.querySelector('#clear-seg-tabla').addEventListener('click', ()=>{
     seg.filtrosVista[col] = null;
@@ -4938,6 +4970,7 @@ document.getElementById('aplicar-ordenar').addEventListener('click', ()=>{
 });
 
 // ---- Editar celda: cualquier celda de la base, con el historial de documentos como referencia ----
+let modoEdicionBaseDeDatos = false;
 let conflictoFilaActual = null;
 let conflictoColActual = null;
 
@@ -4966,6 +4999,7 @@ function abrirEditarCelda(fila, col){
     `).join('');
     cont.querySelectorAll('.conflicto-opcion').forEach(op=>{
       op.addEventListener('click', ()=>{
+        if(!modoEdicionBaseDeDatos) return;
         cont.querySelectorAll('.conflicto-opcion').forEach(o => o.classList.remove('selected'));
         op.classList.add('selected');
         document.getElementById('input-valor-celda').value = op.dataset.valor;
@@ -4986,6 +5020,12 @@ function abrirEditarCelda(fila, col){
   }
   document.getElementById('input-comentario-celda').value = '';
 
+  // Modo solo lectura: mientras "Editar base de datos" esté apagado, se puede ver la celda pero no tocarla
+  document.getElementById('input-valor-celda').readOnly = !modoEdicionBaseDeDatos;
+  document.getElementById('input-comentario-celda').readOnly = !modoEdicionBaseDeDatos;
+  document.getElementById('confirmar-conflicto-celda').style.display = modoEdicionBaseDeDatos ? '' : 'none';
+  document.getElementById('conflicto-modo-lectura-badge').style.display = modoEdicionBaseDeDatos ? 'none' : 'inline-block';
+
   document.getElementById('overlay-conflicto-celda').classList.add('open');
   document.getElementById('input-valor-celda').focus();
 }
@@ -4999,6 +5039,7 @@ document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)
 });
 
 document.getElementById('confirmar-conflicto-celda').addEventListener('click', ()=>{
+  if(!modoEdicionBaseDeDatos) return;
   if(!conflictoFilaActual || !conflictoColActual) return;
   const fila = conflictoFilaActual;
   const col = conflictoColActual;
@@ -5101,6 +5142,11 @@ document.getElementById('confirm-agregar-tag').addEventListener('click', async (
 });
 
 const overlayAgregarColumna = document.getElementById('overlay-agregar-columna');
+document.getElementById('btn-modo-edicion').addEventListener('click', ()=>{
+  modoEdicionBaseDeDatos = !modoEdicionBaseDeDatos;
+  document.getElementById('btn-modo-edicion').classList.toggle('activo', modoEdicionBaseDeDatos);
+});
+
 document.getElementById('btn-agregar-columna').addEventListener('click', ()=>{
   document.getElementById('input-agregar-columna').value = '';
   overlayAgregarColumna.classList.add('open');
