@@ -5844,11 +5844,11 @@ document.getElementById('confirm-agregar-columna').addEventListener('click', asy
   const btn = document.getElementById('confirm-agregar-columna');
   btn.disabled = true;
 
-  const { error } = await supabaseClient.from('columnas').insert({
+  const { error } = await supabaseClient.from('columnas').upsert({
     proyecto_id: proyectoActivo.id,
     nombre,
     orden: COLUMNAS.length,
-  });
+  }, { onConflict: 'proyecto_id,nombre', ignoreDuplicates: true });
 
   btn.disabled = false;
 
@@ -7461,8 +7461,9 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
   // Agrega las columnas nuevas a la base real (si no existían ya)
   const columnasNuevas = nombresASubir.filter(n => !COLUMNAS.includes(n));
   if(columnasNuevas.length){
-    const { error: errCols } = await supabaseClient.from('columnas').insert(
-      columnasNuevas.map((n, i) => ({ proyecto_id: proyectoActivo.id, nombre: n, orden: COLUMNAS.length + i }))
+    const { error: errCols } = await supabaseClient.from('columnas').upsert(
+      columnasNuevas.map((n, i) => ({ proyecto_id: proyectoActivo.id, nombre: n, orden: COLUMNAS.length + i })),
+      { onConflict: 'proyecto_id,nombre', ignoreDuplicates: true }
     );
     if(errCols) console.error('Error al guardar columnas nuevas en Supabase:', errCols);
     columnasNuevas.forEach(n => COLUMNAS.push(n));
