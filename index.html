@@ -2981,30 +2981,6 @@ async function guardarFilaEnSupabase(fila){
 }
 
 // Carga columnas + instrumentos de un proyecto desde Supabase
-// Carga los documentos de un proyecto (sin descargar los archivos originales todavía, eso es al toque)
-async function cargarDocumentos(proyectoId){
-  const { data, error } = await supabaseClient
-    .from('documentos').select('*').eq('proyecto_id', proyectoId).order('fecha');
-  if(error){
-    console.error('Error al cargar documentos:', error);
-    return;
-  }
-  DOCUMENTOS_PROYECTO = (data || []).map(row => ({
-    __id: row.id,
-    nombre: row.nombre,
-    fecha: new Date(row.fecha).toLocaleDateString('es-AR'),
-    tipo: row.tipo,
-    proyecto: row.numero_proyecto,
-    proveedor: row.proveedor,
-    tipoCarga: row.tipo_carga,
-    columnas: row.columnas || [],
-    filas: row.filas_aportadas || 0,
-    extracciones: row.extracciones || [],
-    archivo_path: row.archivo_path,
-    workbook: null, // se descarga recién cuando hace falta (Abrir documento / Extraer tabla)
-  }));
-  if(tabActiva === 'documentos') renderDocumentos();
-}
 
 // Descarga y parsea el archivo original de un documento desde Storage, solo la primera vez que hace falta
 async function obtenerWorkbookDelDocumento(doc){
@@ -5462,7 +5438,8 @@ function documentoDesdeSupabase(row){
     columnas: row.columnas || [],
     filas: row.filas_aportadas || 0,
     extracciones: row.extracciones || [],
-    workbook: null, // el archivo original solo existe en memoria de la sesión que lo subió
+    archivo_path: row.archivo_path,
+    workbook: null, // el archivo original se descarga de Storage recién cuando hace falta
   };
 }
 
