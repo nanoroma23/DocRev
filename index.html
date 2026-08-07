@@ -3757,10 +3757,20 @@ function abrirFiltro(col){
     else { chkTodos.checked = false; chkTodos.indeterminate = true; }
   }
 
+  let chkTodosEraParcial = false;
+  chkTodos.addEventListener('mousedown', ()=>{ chkTodosEraParcial = chkTodos.indeterminate; });
   chkTodos.addEventListener('change', ()=>{
-    chksValor().forEach(c => {
-      if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
-    });
+    if(chkTodosEraParcial){
+      // Estaba en estado parcial (por ejemplo, después de buscar "008"): tocarlo
+      // desmarca todo lo visible, para que elijas manualmente cuál de esos querés
+      chksValor().forEach(c => {
+        if(c.closest('.filter-option').style.display !== 'none') c.checked = false;
+      });
+    } else {
+      chksValor().forEach(c => {
+        if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
+      });
+    }
     actualizarEstadoTodos();
   });
   popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', actualizarEstadoTodos));
@@ -4727,8 +4737,9 @@ function abrirFiltroSeguimientoTabla(col){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
-    <div class="filter-search">
-      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup">
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
+      <button class="btn-mini primary" id="apply-seg-tabla">Aplicar</button>
     </div>
     <div class="filter-list">
       <label class="filter-option">
@@ -4744,7 +4755,6 @@ function abrirFiltroSeguimientoTabla(col){
     </div>
     <div class="filter-popup-actions">
       <button class="btn-mini" id="clear-seg-tabla">Limpiar</button>
-      <button class="btn-mini primary" id="apply-seg-tabla">Aplicar</button>
     </div>
   `;
   popup.classList.add('open');
@@ -4762,10 +4772,18 @@ function abrirFiltroSeguimientoTabla(col){
   }
 
   chkTodos.checked = seleccion.size === valores.length;
+  let chkTodosEraParcialSeg = false;
+  chkTodos.addEventListener('mousedown', ()=>{ chkTodosEraParcialSeg = chkTodos.indeterminate; });
   chkTodos.addEventListener('change', ()=> {
-    chksValor().forEach(c => {
-      if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
-    });
+    if(chkTodosEraParcialSeg){
+      chksValor().forEach(c => {
+        if(c.closest('.filter-option').style.display !== 'none') c.checked = false;
+      });
+    } else {
+      chksValor().forEach(c => {
+        if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked;
+      });
+    }
     actualizarEstadoTodos();
   });
   chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
@@ -7707,7 +7725,7 @@ function applyZoom(zoom){
   zoomLevel = Math.max(50, Math.min(200, zoom));
   zoomInput.value = zoomLevel;
   dataTables.forEach(table => {
-    table.style.fontSize = `${zoomLevel}%`;
+    table.style.zoom = `${zoomLevel}%`;
   });
   showZoomControl();
 }
