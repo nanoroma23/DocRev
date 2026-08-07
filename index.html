@@ -32,6 +32,9 @@
 
   /* ---- Topbar ---- */
   .topbar{
+    border-bottom:1px solid var(--line);
+  }
+  .topbar-fila1{
     display:flex;
     align-items:center;
     padding:9px 32px;
@@ -70,29 +73,37 @@
 
   .tabs{
     display:none;
-    align-items:stretch;
-    gap:4px;
-    margin-left:6px;
+    align-items:flex-end;
+    gap:3px;
+    padding:10px 28px 0;
+    overflow-x:auto;
   }
   .tab{
     display:flex;
     align-items:center;
     justify-content:center;
-    height:30px;
+    height:32px;
     white-space:nowrap;
     font-size:13px;
     font-weight:500;
     color:var(--text-muted);
-    padding:0 14px;
-    border-radius:6px;
+    padding:0 22px;
     cursor:pointer;
     box-sizing:border-box;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-bottom:none;
+    clip-path: polygon(12% 0, 88% 0, 100% 100%, 0% 100%);
+    flex-shrink:0;
+    transition:background 0.12s ease, color 0.12s ease;
   }
-  .tab:hover{ background:var(--card); color:var(--text); }
+  .tab:hover{ background:var(--green-soft); color:var(--text); }
   .tab.active{
-    background:var(--green-soft);
-    color:var(--green-dark);
+    background:var(--green-dark);
+    color:#fff;
     font-weight:600;
+    height:36px;
+    border-color:var(--green-dark);
   }
 
   .topbar-center{
@@ -382,6 +393,12 @@
     margin-bottom:12px;
   }
   .seg-tabla-titulo{ font-weight:600; font-size:14px; color:var(--text); }
+  .toolbar-divider{
+    width:1px;
+    align-self:stretch;
+    background:var(--line);
+    margin:0 4px;
+  }
 
   .seg-col-row{
     display:flex;
@@ -1685,6 +1702,14 @@
     
     table.datatable {
       min-width: 600px;
+      table-layout: auto;
+    }
+
+    table.datatable td.col-tag {
+      white-space: nowrap;
+      max-width: none;
+      overflow: visible;
+      text-overflow: unset;
     }
     
     table.datatable thead th {
@@ -2058,8 +2083,11 @@
       font-size: 16px;
     }
 
-    .topbar {
+    .topbar-fila1 {
       padding: 6px 10px;
+    }
+    .tabs {
+      padding: 8px 10px 0;
     }
 
     .grid {
@@ -2119,31 +2147,33 @@
 <body>
 
   <div class="topbar">
-    <div class="topbar-left">
-      <div class="brand"><span class="doc">Doc</span><span class="rev">Rev</span></div>
-      <div class="crumb" id="crumb">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-        <span id="crumb-name"></span>
+    <div class="topbar-fila1">
+      <div class="topbar-left">
+        <div class="brand"><span class="doc">Doc</span><span class="rev">Rev</span></div>
+        <div class="crumb" id="crumb">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+          <span id="crumb-name"></span>
+        </div>
       </div>
-      <div class="tabs" id="tabs">
-        <div class="tab active" data-tab="basedatos">Base de Datos</div>
-        <div class="tab" data-tab="documentos">Documentos</div>
-        <div class="tab" data-tab="seguimiento">Seguimiento</div>
+      <div class="topbar-center" id="topbar-search">
+        <div class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Buscar proyecto..." id="buscador">
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="menu-btn" id="menu-btn"><span></span><span></span><span></span></button>
+        <div class="menu-dropdown" id="menu-dropdown">
+          <div class="menu-item" id="menu-rename">Renombrar proyecto</div>
+          <div class="menu-divider"></div>
+          <div class="menu-item danger" id="menu-delete">Eliminar proyecto</div>
+        </div>
       </div>
     </div>
-    <div class="topbar-center" id="topbar-search">
-      <div class="search">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" placeholder="Buscar proyecto..." id="buscador">
-      </div>
-    </div>
-    <div class="topbar-right">
-      <button class="menu-btn" id="menu-btn"><span></span><span></span><span></span></button>
-      <div class="menu-dropdown" id="menu-dropdown">
-        <div class="menu-item" id="menu-rename">Renombrar proyecto</div>
-        <div class="menu-divider"></div>
-        <div class="menu-item danger" id="menu-delete">Eliminar proyecto</div>
-      </div>
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-tab="basedatos">Base de Datos</div>
+      <div class="tab" data-tab="documentos">Documentos</div>
+      <div class="tab" data-tab="seguimiento">Seguimiento</div>
     </div>
   </div>
 
@@ -2185,6 +2215,7 @@
       <div class="docs-toolbar">
         <div class="docs-toolbar-left">
           <button class="btn-tag" id="btn-agregar-documento">+ Agregar documento</button>
+          <button class="btn-col" id="btn-actualizar-documento">Actualizar documento</button>
 
           <div class="filtro-doc-wrap">
             <button class="btn-col" id="btn-filtro-doc-tipo">
@@ -2211,9 +2242,6 @@
         <div class="docs-search">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Buscar documento...">
-        </div>
-        <div class="docs-toolbar-right">
-          <button class="btn-col" id="btn-actualizar-documento">Actualizar documento</button>
         </div>
       </div>
       <div class="docs-list" id="docs-list"></div>
@@ -2289,6 +2317,7 @@
           <button class="btn-col" id="seg-exportar">Exportar</button>
           <button class="btn-col" id="seg-importar">Importar</button>
           <input type="file" id="seg-importar-input" accept=".xlsx,.xls" style="display:none;">
+          <div class="toolbar-divider"></div>
           <button class="btn btn-danger" id="seg-eliminar">Eliminar</button>
         </div>
         <div class="datatable-wrap">
