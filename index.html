@@ -532,6 +532,7 @@
   }
 
   .datatable-wrap{
+    position:relative;
     border:1px solid var(--line);
     border-radius:8px;
     overflow-x:auto;
@@ -738,6 +739,28 @@
   table.sheet-grid td.celda-actualizacion-distinta{
     background:rgba(70,120,180,0.18) !important;
     font-weight:600;
+  }
+  table.sheet-grid td.titulo-columna-nueva{
+    background:#D4ECF5 !important;
+    border-bottom:2px solid #4A9CC4 !important;
+  }
+  .nota-titulos-nuevos{
+    display:none;
+    align-items:center;
+    gap:8px;
+    padding:8px 24px;
+    font-size:12px;
+    color:var(--text-muted);
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+  }
+  .nota-titulos-nuevos.open{ display:flex; }
+  .nota-titulos-nuevos-swatch{
+    width:12px; height:12px;
+    border-radius:3px;
+    background:#D4ECF5;
+    border:1px solid #4A9CC4;
+    flex-shrink:0;
   }
   .detalle-campos{
     display:flex;
@@ -1483,29 +1506,42 @@
   .rango-field{
     display:flex;
     align-items:center;
-    justify-content:center;
     height:38px;
     border:1px dashed var(--line);
     border-radius:6px;
     background:var(--bg);
+    padding:0 4px;
+  }
+  .rango-field-input{
+    width:100%;
+    height:100%;
+    border:none;
+    background:transparent;
+    outline:none;
+    text-align:center;
     color:var(--text-dim);
     font-family:var(--font-mono);
     font-size:13px;
-    cursor:pointer;
   }
-  .rango-field:hover{ border-color:var(--green); color:var(--green-dark); }
+  .rango-field:focus-within{ border-color:var(--green); }
   .rango-field.filled{
     border-style:solid;
     border-color:var(--green);
-    color:var(--green-dark);
     background:var(--green-soft);
-    font-weight:600;
   }
+  .rango-field.filled .rango-field-input{ color:var(--green-dark); font-weight:600; }
   .rango-field.active{
     border-style:solid;
     border-color:var(--accent, var(--green));
     cursor:default;
   }
+  .rango-field span{
+    width:100%;
+    text-align:center;
+    color:var(--text-dim);
+    cursor:pointer;
+  }
+  .rango-field.filled span{ color:var(--green-dark); font-weight:600; }
   .float-window-body p{ font-size:13px; color:var(--text-muted); margin-bottom:12px; }
   .option-card{
     border:1px solid var(--line);
@@ -1777,6 +1813,7 @@
     .datatable-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      height: calc(100vh - 260px) !important;
     }
     
     table.datatable {
@@ -2219,9 +2256,9 @@
 
   /* ---- Control de Zoom Flotante ---- */
   .zoom-control{
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2230,12 +2267,14 @@
     border-radius: 8px;
     padding: 6px 10px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    z-index: 100;
+    z-index: 5;
     font-family: var(--font-mono);
+    transition: opacity 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
   }
   .zoom-control.visible{
     opacity: 1;
-    transform: translateY(0);
     pointer-events: all;
   }
   .zoom-btn{
@@ -2374,7 +2413,7 @@
           Ordenar
         </button>
       </div>
-      <div class="datatable-wrap">
+      <div class="datatable-wrap" id="datatable-wrap-basedatos">
         <table class="datatable">
           <thead>
             <tr id="thead-row"></tr>
@@ -2492,7 +2531,7 @@
           <div class="toolbar-divider"></div>
           <button class="btn btn-danger" id="seg-eliminar">Eliminar</button>
         </div>
-        <div class="datatable-wrap">
+        <div class="datatable-wrap" id="datatable-wrap-seguimiento">
           <table class="datatable">
             <thead><tr id="seg-thead-row"></tr></thead>
             <tbody id="seg-tbody"></tbody>
@@ -2656,6 +2695,10 @@
         <button class="btn btn-primary" id="subir-basedatos">Subir a base de datos</button>
       </div>
     </div>
+    <div class="nota-titulos-nuevos" id="nota-titulos-nuevos">
+      <span class="nota-titulos-nuevos-swatch"></span>
+      Los títulos en celeste son columnas nuevas — todavía no existen en la base de datos.
+    </div>
     <div class="sheet-grid-wrap">
       <table class="sheet-grid" id="sheet-grid"></table>
     </div>
@@ -2701,8 +2744,9 @@
         </div>
         <p class="rango-label">Seleccioná el rango de datos con título:</p>
         <div class="rango-field" id="rango-field">
-          <span id="rango-field-text">Click para seleccionar el rango</span>
+          <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Escribí el rango, ej: A1:F50" autocomplete="off" autocapitalize="characters">
         </div>
+        <button class="btn" type="button" id="btn-elegir-rango-visual" style="width:100%; margin-top:8px;">Elegir tocando la hoja</button>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-rango">Cancelar</button>
           <div style="display:flex; gap:8px;">
@@ -6341,6 +6385,7 @@ document.getElementById('select-hoja-rango').addEventListener('change', (e)=> al
 function cerrarFlujoCarga(){
   document.getElementById('sheet-fullscreen').classList.remove('open');
   document.getElementById('sheet-final-topbar').classList.remove('open');
+  document.getElementById('nota-titulos-nuevos').classList.remove('open');
   document.getElementById('overlay-subir-bd').classList.remove('open');
   floatWindow.classList.remove('open');
   limpiarSeleccionVisual();
@@ -6477,20 +6522,69 @@ document.getElementById('confirmar-tipo-carga').addEventListener('click', ()=>{
   mostrarPasoFloat('rango');
 });
 
-// ---- Campo de rango (paso 2): al tocarlo, se abre la mini-ventana de selección activa ----
+// ---- Campo de rango (paso 2): se puede escribir a mano, o tocar "Elegir en la hoja" ----
 let rangoConfirmado = null; // ej: "B2:E10"
 
 function resetearCampoRango(){
   rangoConfirmado = null;
   const campo = document.getElementById('rango-field');
   campo.classList.remove('filled');
-  document.getElementById('rango-field-text').textContent = 'Click para seleccionar el rango';
+  document.getElementById('rango-field-text').value = '';
   document.getElementById('continuar-rango').disabled = true;
 }
 
-document.getElementById('rango-field').addEventListener('click', ()=>{
+document.getElementById('btn-elegir-rango-visual').addEventListener('click', ()=>{
   iniciarSeleccionRango();
   mostrarPasoFloat('picker');
+});
+
+// Escribir el rango a mano (para cuando no se puede hacer shift+click, como en el celular)
+function parsearRangoEscrito(texto){
+  const match = texto.trim().toUpperCase().match(/^([A-Z]+)\s*(\d+)\s*:\s*([A-Z]+)\s*(\d+)$/);
+  if(!match) return null;
+  const [, colLetra1, filaStr1, colLetra2, filaStr2] = match;
+  const c1raw = XLSX.utils.decode_col(colLetra1);
+  const c2raw = XLSX.utils.decode_col(colLetra2);
+  const r1raw = Number(filaStr1);
+  const r2raw = Number(filaStr2);
+  return {
+    r1: Math.min(r1raw, r2raw),
+    r2: Math.max(r1raw, r2raw),
+    c1: Math.min(c1raw, c2raw),
+    c2: Math.max(c1raw, c2raw),
+  };
+}
+
+function confirmarRangoEscrito(){
+  const input = document.getElementById('rango-field-text');
+  const texto = input.value.trim();
+  if(!texto) return;
+
+  const rango = parsearRangoEscrito(texto);
+  if(!rango){
+    alert('Ese rango no tiene un formato válido. Escribilo así: A1:F50');
+    return;
+  }
+  if(rango.c2 >= GRID_COLS.length){
+    alert('Ese rango tiene columnas que no existen en esta hoja.');
+    return;
+  }
+
+  rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
+  rangoConfirmadoObj = rango;
+
+  const campo = document.getElementById('rango-field');
+  campo.classList.add('filled');
+  input.value = rangoConfirmado;
+  document.getElementById('continuar-rango').disabled = false;
+
+  avanzarATitulo();
+}
+document.getElementById('rango-field-text').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    confirmarRangoEscrito();
+  }
 });
 
 // ---- Selección de rango tipo Excel: click y arrastrar, o click + Shift + click ----
@@ -6662,6 +6756,8 @@ function renderTablaFinal(){
       const mostrarLapiz = (r === filaTituloIdx && modoGrilla === 'final');
       const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
 
+      if(esTitulo && valor && !COLUMNAS.includes(valor)) cls.push('titulo-columna-nueva');
+
       let valorMostrado = valor;
       if(celdasDiferentesActualizar.has(`${r}-${c}`)){
         cls.push('celda-actualizacion-distinta');
@@ -6689,7 +6785,7 @@ document.getElementById('confirmar-picker').addEventListener('click', ()=>{
 
   const campo = document.getElementById('rango-field');
   campo.classList.add('filled');
-  document.getElementById('rango-field-text').textContent = rangoConfirmado;
+  document.getElementById('rango-field-text').value = rangoConfirmado;
   document.getElementById('continuar-rango').disabled = false;
 
   avanzarATitulo();
@@ -6747,6 +6843,7 @@ document.getElementById('confirmar-titulo').addEventListener('click', ()=>{
   floatWindow.classList.remove('open');
   document.getElementById('float-backdrop').classList.remove('open');
   document.getElementById('sheet-final-topbar').classList.add('open');
+  document.getElementById('nota-titulos-nuevos').classList.add('open');
   actualizarBotonesColumnasTopbar();
   renderTablaFinal();
 });
@@ -6759,6 +6856,7 @@ document.getElementById('cancel-final').addEventListener('click', ()=>{
 // Atrás (topbar final -> paso 4): vuelve a poder elegir otra fila de título
 document.getElementById('atras-final').addEventListener('click', ()=>{
   document.getElementById('sheet-final-topbar').classList.remove('open');
+  document.getElementById('nota-titulos-nuevos').classList.remove('open');
 
   if(opcionCargaSeleccionada === 'tag-hoja'){
     modoGrilla = 'preview';
@@ -6838,6 +6936,7 @@ document.getElementById('btn-unificar-columnas').addEventListener('click', ()=>{
   document.getElementById('unir-columnas-letras').textContent = 'Ninguna columna seleccionada';
   poblarNombresExistentes();
   document.getElementById('sheet-final-topbar').classList.remove('open');
+  document.getElementById('nota-titulos-nuevos').classList.remove('open');
   renderTablaFinal();
   mostrarPasoFloat('unir');
   floatWindow.classList.add('open');
@@ -6954,6 +7053,7 @@ document.getElementById('btn-sacar-columnas').addEventListener('click', ()=>{
   document.getElementById('sacar-columnas-letras').textContent = 'Ninguna columna seleccionada';
   document.getElementById('confirmar-sacar').disabled = true;
   document.getElementById('sheet-final-topbar').classList.remove('open');
+  document.getElementById('nota-titulos-nuevos').classList.remove('open');
   renderTablaFinal();
   mostrarPasoFloat('sacar');
   floatWindow.classList.add('open');
@@ -7042,6 +7142,7 @@ function volverAModoFinal(){
   floatWindow.classList.remove('open');
   document.getElementById('float-backdrop').classList.remove('open');
   document.getElementById('sheet-final-topbar').classList.add('open');
+  document.getElementById('nota-titulos-nuevos').classList.add('open');
   renderTablaFinal();
 }
 
@@ -7072,6 +7173,7 @@ function abrirRenombrarColumna(c){
   document.getElementById('renombrar-col-letra').textContent = `(${XLSX.utils.encode_col(c)})`;
 
   document.getElementById('sheet-final-topbar').classList.remove('open');
+  document.getElementById('nota-titulos-nuevos').classList.remove('open');
   mostrarPasoFloat('renombrar');
   floatWindow.classList.add('open');
 }
@@ -7317,6 +7419,7 @@ document.getElementById('confirmar-campo').addEventListener('click', ()=>{
   floatWindow.classList.remove('open');
   document.getElementById('float-backdrop').classList.remove('open');
   document.getElementById('sheet-final-topbar').classList.add('open');
+  document.getElementById('nota-titulos-nuevos').classList.add('open');
   actualizarBotonesColumnasTopbar();
   renderTablaFinal();
 });
@@ -7707,7 +7810,7 @@ async function cargarProyectos(){
 render();
 cargarProyectos();
 
-// ========== CONTROL DE ZOOM FLOTANTE ==========
+// ========== CONTROL DE ZOOM FLOTANTE (vive adentro del recuadro de cada tabla) ==========
 let zoomLevel = 100;
 let zoomTimeout = null;
 const zoomControl = document.getElementById('zoom-control');
@@ -7717,17 +7820,38 @@ const zoomOutBtn = document.getElementById('zoom-out');
 const zoomResetBtn = document.getElementById('zoom-reset');
 const dataTables = document.querySelectorAll('.datatable-wrap');
 
+// Mueve el control de zoom adentro del recuadro de tabla que esté visible en este momento,
+// así nunca puede quedar flotando encima de otra ventana
+function moverZoomAlRecuadroActivo(){
+  let destino = null;
+  if(vista === 'project'){
+    if(tabActiva === 'basedatos') destino = document.getElementById('datatable-wrap-basedatos');
+    else if(tabActiva === 'seguimiento' && document.getElementById('seguimiento-tabla-vista').style.display !== 'none'){
+      destino = document.getElementById('datatable-wrap-seguimiento');
+    }
+  }
+  if(destino && zoomControl.parentElement !== destino){
+    destino.appendChild(zoomControl);
+  }
+}
+
 function applyZoom(zoom){
   zoomLevel = Math.max(50, Math.min(200, zoom));
-  zoomInput.value = zoomLevel;
+  if(document.activeElement !== zoomInput) zoomInput.value = zoomLevel;
   dataTables.forEach(table => {
     table.style.zoom = `${zoomLevel}%`;
   });
+  moverZoomAlRecuadroActivo();
   showZoomControl();
 }
 
 function showZoomControl(){
+  moverZoomAlRecuadroActivo();
   zoomControl.classList.add('visible');
+  clearTimeout(zoomTimeout);
+  zoomTimeout = setTimeout(() => {
+    zoomControl.classList.remove('visible');
+  }, 5000);
 }
 
 // Ctrl/Cmd + Rueda del mouse
@@ -7787,10 +7911,16 @@ zoomInBtn.addEventListener('click', () => applyZoom(zoomLevel + 10));
 zoomOutBtn.addEventListener('click', () => applyZoom(zoomLevel - 10));
 zoomResetBtn.addEventListener('click', () => applyZoom(100));
 
-// Input manual
-zoomInput.addEventListener('input', () => {
-  const value = parseInt(zoomInput.value) || 100;
-  applyZoom(value);
+// Input manual: se aplica al confirmar (Enter o al salir del campo), no en cada tecla,
+// para no autocorregir el valor mientras todavía estás escribiendo
+zoomInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    applyZoom(parseInt(zoomInput.value) || 100);
+    zoomInput.blur();
+  }
+});
+zoomInput.addEventListener('blur', () => {
+  applyZoom(parseInt(zoomInput.value) || 100);
 });
 
 zoomInput.addEventListener('focus', () => {
