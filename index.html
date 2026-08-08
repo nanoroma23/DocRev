@@ -7819,6 +7819,7 @@ const zoomInBtn = document.getElementById('zoom-in');
 const zoomOutBtn = document.getElementById('zoom-out');
 const zoomResetBtn = document.getElementById('zoom-reset');
 const dataTables = document.querySelectorAll('.datatable-wrap');
+const tablasInternas = document.querySelectorAll('table.datatable');
 
 // Mueve el control de zoom adentro del recuadro de tabla que esté visible en este momento,
 // así nunca puede quedar flotando encima de otra ventana
@@ -7838,8 +7839,10 @@ function moverZoomAlRecuadroActivo(){
 function applyZoom(zoom){
   zoomLevel = Math.max(50, Math.min(200, zoom));
   if(document.activeElement !== zoomInput) zoomInput.value = zoomLevel;
-  dataTables.forEach(table => {
-    table.style.zoom = `${zoomLevel}%`;
+  // El zoom se aplica a la TABLA de adentro, nunca al contenedor: así el recuadro
+  // (con su alto fijo) queda quieto, y solo cambia cuánto contenido entra ahí
+  tablasInternas.forEach(tabla => {
+    tabla.style.zoom = `${zoomLevel}%`;
   });
   moverZoomAlRecuadroActivo();
   showZoomControl();
