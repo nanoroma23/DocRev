@@ -540,12 +540,12 @@
     background:var(--card);
     width:100%;
     height:calc(100vh - 140px);
-    transition:zoom 0.12s ease;
   }
   table.datatable{
     width:100%;
     border-collapse:collapse;
     table-layout:auto;
+    transition:zoom 0.12s ease;
   }
   table.datatable thead th{
     text-align:left;
@@ -2597,6 +2597,22 @@
 
   <!-- Popup filtro de columna en crear seguimiento (se renderiza dinámicamente dentro de cada botón) -->
 
+  <!-- Modal gráficos adicionales -->
+  <div class="overlay" id="overlay-graficos-adicionales">
+    <div class="modal" style="width:700px; max-width:90vw; max-height:85vh; overflow-y:auto;">
+      <h3 id="graficos-adicionales-titulo">Gráficos adicionales</h3>
+      <p style="margin-bottom:16px;">Seleccioná una columna para ver la distribución de estados por sus valores.</p>
+      <label class="field-label">Columna a graficar</label>
+      <select class="field-select" id="graficos-columna-select" style="margin-bottom:16px;">
+        <option value="">Seleccionar columna...</option>
+      </select>
+      <div id="graficos-adicionales-container" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px;"></div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn" id="cerrar-graficos-adicionales">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal nuevo proyecto -->
   <div class="overlay" id="overlay-nuevo-proyecto">
     <div class="modal">
@@ -3335,34 +3351,23 @@ async function guardarAnchoColumna(nombre, ancho){
   if(error) console.error('Error al guardar el ancho de la columna:', error);
 }
 
-// Renombra una columna
+// Renombra una columna: actualiza su nombre en "columnas", y persiste cada fila local
+// (que ya viene renombrada en memoria) usando el mismo mecanismo del resto de la app
 async function renombrarColumna(proyectoId, nombreViejo, nuevoNombre){
   if(!proyectoActivo) return;
 
-  // Actualizar la columna en la tabla columnas
   const { error: errorColumna } = await supabaseClient.from('columnas')
     .update({ nombre: nuevoNombre })
     .eq('proyecto_id', proyectoId)
     .eq('nombre', nombreViejo);
   if(errorColumna) console.error('Error al renombrar columna:', errorColumna);
 
-  // Actualizar los valores en todas las filas
-  const { data: filas } = await supabaseClient.from('filas')
-    .select('id, valores')
-    .eq('proyecto_id', proyectoId);
-
-  if(filas){
-    for(const fila of filas){
-      const valores = fila.valores || {};
-      if(nombreViejo in valores){
-        valores[nuevoNombre] = valores[nombreViejo];
-        delete valores[nombreViejo];
-        await supabaseClient.from('filas')
-          .update({ valores })
-          .eq('id', fila.id);
-      }
-    }
-  }
+  // FILAS ya tiene el renombrado aplicado en memoria (se hizo antes de llamar a esta función);
+  // solo hace falta persistir cada fila que tenía algo cargado en esa columna
+  const filasAfectadas = FILAS.filter(f => f[nuevoNombre] !== undefined);
+  const resultados = await Promise.all(filasAfectadas.map(f => guardarFilaEnSupabase(f)));
+  const fallidas = resultados.filter(r => !r.ok).length;
+  if(fallidas) console.error(`${fallidas} fila(s) no se pudieron actualizar en Supabase tras el renombrado.`);
 }
 
 // Guarda el orden actual de todas las columnas
@@ -3628,7 +3633,7 @@ document.getElementById('confirmar-columna-opciones').addEventListener('click', 
     }
 
     // Guardar en base de datos
-    await renombrarColumna(proyectoActual.id, nombreViejo, nuevoNombre);
+    await renombrarColumna(proyectoActivo.id, nombreViejo, nuevoNombre);
 
     editandoNombreColumna = false;
     document.getElementById('overlay-columna-opciones').classList.remove('open');
@@ -3763,8 +3768,9 @@ function abrirFiltro(col){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
-    <div class="filter-search">
-      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup">
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
+      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
     <div class="filter-list" id="list-${col}">
       <label class="filter-option">
@@ -3777,10 +3783,6 @@ function abrirFiltro(col){
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
-    </div>
-    <div class="filter-popup-actions">
-      <button class="btn-mini btn-limpiar-popup">Limpiar</button>
-      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
   `;
   popup.classList.add('open');
@@ -3815,26 +3817,23 @@ function abrirFiltro(col){
   });
   popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  // Buscador interno: filtra las opciones visibles y desmarca automáticamente lo que no
-  // coincide con la búsqueda, así "seleccionar todo" queda parcial y funciona como filtro rápido
+  // Buscador interno: filtra las opciones visibles y marca solo lo que coincide,
+  // desmarcando el resto (resetea la selección al buscar)
   popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
       const coincide = opt.dataset.valor.includes(q);
       opt.style.display = coincide ? 'flex' : 'none';
-      if(!coincide) opt.querySelector('.chk-valor').checked = false;
+      // Si hay búsqueda, marca solo los que coinciden y desmarca el resto
+      if(q) {
+        opt.querySelector('.chk-valor').checked = coincide;
+      }
     });
     actualizarEstadoTodos();
   });
 
   actualizarEstadoTodos();
 
-  popup.querySelector('.btn-limpiar-popup').addEventListener('click', ()=>{
-    FILTROS[col] = null;
-    cerrarFiltros();
-    renderTabla();
-    guardarPreferenciasProyecto();
-  });
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
@@ -3986,6 +3985,20 @@ function contarEstadosSeguimiento(seg){
   return { ok, nook, ver };
 }
 
+// Cuenta estados por valores de una columna específica
+function contarEstadosPorColumna(seg, columna){
+  const resultados = {};
+  filasDeSeguimiento(seg).forEach(f=>{
+    const valor = (f[columna] ?? '(vacío)').toString();
+    if(!resultados[valor]) resultados[valor] = { ok:0, nook:0, ver:0 };
+    const estado = seg.estados[f.TAG] || 'VER';
+    if(estado==='OK') resultados[valor].ok++;
+    else if(estado==='NO OK') resultados[valor].nook++;
+    else resultados[valor].ver++;
+  });
+  return resultados;
+}
+
 // Genera un gráfico de torta chico en SVG, sin depender de ninguna librería externa
 function generarSvgTorta(valores){
   const total = valores.reduce((s,v)=>s+v.count,0);
@@ -4021,13 +4034,17 @@ function renderSeguimientos(){
       { count:ver, color:'#A39B87' },
     ]);
     return `
-      <div class="seg-card" data-seg-id="${seg.id}">
-        <div class="seg-card-titulo">${seg.titulo}</div>
-        <div class="seg-card-body">
+      <div class="seg-card">
+        <div class="seg-card-titulo" style="display:flex; justify-content:space-between; align-items:center;">
+          <span data-seg-id="${seg.id}" style="flex:1; cursor:pointer;">${seg.titulo}</span>
+          <button class="btn-mini" onclick="event.stopPropagation(); abrirGraficosAdicionales('${seg.id}')" style="font-size:10px; padding:3px 8px;" title="Ver gráficos adicionales">📊</button>
+        </div>
+        <div class="seg-card-body" data-seg-id="${seg.id}" style="cursor:pointer;">
           <div class="seg-card-legend">
             <div class="seg-legend-item"><span class="seg-dot" style="background:#5CA378;"></span>OK <b>${ok}</b><span class="seg-porcentaje">${pct(ok)}</span></div>
             <div class="seg-legend-item"><span class="seg-dot" style="background:#A6483B;"></span>NO OK <b>${nook}</b><span class="seg-porcentaje">${pct(nook)}</span></div>
             <div class="seg-legend-item"><span class="seg-dot" style="background:#A39B87;"></span>VER <b>${ver}</b><span class="seg-porcentaje">${pct(ver)}</span></div>
+            <div class="seg-legend-item" style="margin-top:4px; padding-top:4px; border-top:1px solid var(--line);"><span style="font-weight:600;">TOTAL</span> <b>${total}</b></div>
           </div>
           <div class="seg-card-chart">${svg}</div>
         </div>
@@ -4037,8 +4054,8 @@ function renderSeguimientos(){
 
   cont.innerHTML = tarjetas + `<div class="seg-card seg-card-new" id="seg-crear-tile">+ Crear seguimiento</div>`;
 
-  cont.querySelectorAll('.seg-card[data-seg-id]').forEach(card=>{
-    card.addEventListener('click', ()=> abrirTablaSeguimiento(card.dataset.segId));
+  cont.querySelectorAll('[data-seg-id]').forEach(elem=>{
+    elem.addEventListener('click', ()=> abrirTablaSeguimiento(elem.dataset.segId));
   });
   document.getElementById('seg-crear-tile').addEventListener('click', abrirModalCrearSeguimiento);
 }
@@ -4219,8 +4236,9 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
   // Crear contenido del popup con el estilo estándar
   popup.innerHTML = `
     <div class="filter-popup-head">${col}</div>
-    <div class="filter-search">
-      <input type="text" placeholder="Buscar..." class="filter-search-input-seg">
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+      <input type="text" placeholder="Buscar..." class="filter-search-input-seg" style="flex:1;">
+      <button class="btn-mini primary" onclick="aplicarFiltroSeguimientoCol('${col.replace(/'/g, "\\'")}')">Aplicar</button>
     </div>
     <div class="filter-list">
       <label class="filter-option">
@@ -4233,10 +4251,6 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
-    </div>
-    <div class="filter-popup-actions">
-      <button class="btn-mini" onclick="cerrarFiltroSeguimientoCol()">Cancelar</button>
-      <button class="btn-mini primary" onclick="aplicarFiltroSeguimientoCol('${col.replace(/'/g, "\\'")}')">Aplicar</button>
     </div>
   `;
 
@@ -4793,9 +4807,6 @@ function abrirFiltroSeguimientoTabla(col){
         </label>
       `).join('')}
     </div>
-    <div class="filter-popup-actions">
-      <button class="btn-mini" id="clear-seg-tabla">Limpiar</button>
-    </div>
   `;
   popup.classList.add('open');
   popup.addEventListener('click', e => e.stopPropagation());
@@ -4828,26 +4839,23 @@ function abrirFiltroSeguimientoTabla(col){
   });
   chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  // Buscador interno: desmarca automáticamente lo que no coincide con la búsqueda,
-  // así funciona como filtro rápido y "seleccionar todo" queda parcial
+  // Buscador interno: filtra las opciones visibles y marca solo lo que coincide,
+  // desmarcando el resto (resetea la selección al buscar)
   popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
     popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
       const coincide = opt.dataset.valor.includes(q);
       opt.style.display = coincide ? 'flex' : 'none';
-      if(!coincide) opt.querySelector('.chk-valor-seg-tabla').checked = false;
+      // Si hay búsqueda, marca solo los que coinciden y desmarca el resto
+      if(q) {
+        opt.querySelector('.chk-valor-seg-tabla').checked = coincide;
+      }
     });
     actualizarEstadoTodos();
   });
 
   actualizarEstadoTodos();
 
-  popup.querySelector('#clear-seg-tabla').addEventListener('click', ()=>{
-    seg.filtrosVista[col] = null;
-    cerrarFiltros();
-    renderTablaSeguimiento();
-    guardarSeguimientoEnSupabase(seg);
-  });
   popup.querySelector('#apply-seg-tabla').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     seg.filtrosVista[col] = marcados.length === valores.length ? null : new Set(marcados);
@@ -5087,6 +5095,90 @@ document.getElementById('seg-importar-input').addEventListener('change', ()=>{
     input.value = '';
   };
   lector.readAsArrayBuffer(file);
+});
+
+// ---- Gráficos adicionales por columna ----
+let seguimientoGraficosActivo = null;
+
+function abrirGraficosAdicionales(segId){
+  const seg = SEGUIMIENTOS.find(s => s.id === segId);
+  if(!seg) return;
+
+  seguimientoGraficosActivo = seg;
+  document.getElementById('graficos-adicionales-titulo').textContent = `Gráficos adicionales - ${seg.titulo}`;
+
+  // Llenar select con columnas del seguimiento (excepto la principal)
+  const select = document.getElementById('graficos-columna-select');
+  const columnasParaGraficar = seg.columnas.filter(c => c !== seg.columnaPrincipal);
+  select.innerHTML = '<option value="">Seleccionar columna...</option>' +
+    columnasParaGraficar.map(col => `<option value="${col}">${col}</option>`).join('');
+
+  // Limpiar contenedor de gráficos
+  document.getElementById('graficos-adicionales-container').innerHTML = '';
+
+  document.getElementById('overlay-graficos-adicionales').classList.add('open');
+}
+
+document.getElementById('graficos-columna-select').addEventListener('change', (e) => {
+  const columna = e.target.value;
+  const container = document.getElementById('graficos-adicionales-container');
+
+  if(!columna || !seguimientoGraficosActivo){
+    container.innerHTML = '';
+    return;
+  }
+
+  const seg = seguimientoGraficosActivo;
+  const estadosPorValor = contarEstadosPorColumna(seg, columna);
+
+  // Generar una tarjeta por cada valor de la columna
+  const tarjetas = Object.entries(estadosPorValor).map(([valor, counts]) => {
+    const total = counts.ok + counts.nook + counts.ver;
+    const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
+    const svg = generarSvgTorta([
+      { count:counts.ok, color:'#5CA378' },
+      { count:counts.nook, color:'#A6483B' },
+      { count:counts.ver, color:'#A39B87' },
+    ]);
+
+    return `
+      <div style="background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px;">
+        <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${valor}</div>
+        <div style="display:flex; align-items:center; justify-content:center; gap:22px;">
+          <div style="display:flex; flex-direction:column; gap:7px; min-width:0;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+              <span class="seg-dot" style="background:#5CA378;"></span>OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ok}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ok)}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+              <span class="seg-dot" style="background:#A6483B;"></span>NO OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.nook}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.nook)}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+              <span class="seg-dot" style="background:#A39B87;"></span>VER <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ver}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ver)}</span>
+            </div>
+            <div style="margin-top:4px; padding-top:4px; border-top:1px solid var(--line); display:flex; align-items:center; gap:6px; font-size:12px;">
+              <span style="font-weight:600;">TOTAL</span> <b style="margin-left:auto; font-family:var(--font-mono);">${total}</b>
+            </div>
+          </div>
+          <div style="flex-shrink:0;">${svg}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = tarjetas;
+});
+
+document.getElementById('cerrar-graficos-adicionales').addEventListener('click', () => {
+  document.getElementById('overlay-graficos-adicionales').classList.remove('open');
+  seguimientoGraficosActivo = null;
+});
+
+// Cerrar al hacer click en el overlay
+document.getElementById('overlay-graficos-adicionales').addEventListener('click', (e) => {
+  if(e.target.id === 'overlay-graficos-adicionales'){
+    document.getElementById('overlay-graficos-adicionales').classList.remove('open');
+    seguimientoGraficosActivo = null;
+  }
 });
 
 // ---- Pestaña Documentos: lista los documentos de donde se fue sacando información ----
@@ -5488,6 +5580,9 @@ function abrirFiltroDocs(campo, btnId, popupId){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar por ${campo === 'proyecto' ? 'número de proyecto' : campo}</div>
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center; padding:7px 8px; border-bottom:1px solid var(--line);">
+      <button class="btn-mini primary" id="apply-${campo}" style="width:100%;">Aplicar</button>
+    </div>
     <div class="filter-list">
       <label class="filter-option">
         <input type="checkbox" id="chk-todos-${campo}">
@@ -5499,10 +5594,6 @@ function abrirFiltroDocs(campo, btnId, popupId){
           <span>${v}</span>
         </label>
       `).join('')}
-    </div>
-    <div class="filter-popup-actions">
-      <button class="btn-mini" id="clear-${campo}">Limpiar</button>
-      <button class="btn-mini primary" id="apply-${campo}">Aplicar</button>
     </div>
   `;
   popup.classList.add('open');
@@ -5516,14 +5607,6 @@ function abrirFiltroDocs(campo, btnId, popupId){
     chkTodos.checked = chksValor().every(x => x.checked);
   }));
 
-  popup.querySelector(`#clear-${campo}`).addEventListener('click', ()=>{
-    filtrosDocsProyecto[campo] = null;
-    popup.classList.remove('open');
-    popup.innerHTML = '';
-    actualizarBotonesFiltroDocs();
-    renderDocumentos();
-    guardarPreferenciasProyecto();
-  });
   popup.querySelector(`#apply-${campo}`).addEventListener('click', ()=>{
     const marcadas = chksValor().filter(c=>c.checked).map(c=>c.value);
     filtrosDocsProyecto[campo] = marcadas.length === valores.length ? null : new Set(marcadas);
@@ -5567,6 +5650,9 @@ function abrirFiltroDocumentos(){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar por documento</div>
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center; padding:7px 8px; border-bottom:1px solid var(--line);">
+      <button class="btn-mini primary" id="apply-doc" style="width:100%;">Aplicar</button>
+    </div>
     <div class="filter-list">
       <label class="filter-option">
         <input type="checkbox" id="chk-todos-doc" ${seleccion.size===valores.length ? 'checked':''}>
@@ -5578,10 +5664,6 @@ function abrirFiltroDocumentos(){
           <span>${v==='__sin_documento__' ? 'Sin documento' : v}</span>
         </label>
       `).join('')}
-    </div>
-    <div class="filter-popup-actions">
-      <button class="btn-mini" id="clear-doc">Limpiar</button>
-      <button class="btn-mini primary" id="apply-doc">Aplicar</button>
     </div>
   `;
   popup.classList.add('open');
@@ -5596,12 +5678,6 @@ function abrirFiltroDocumentos(){
     chkTodos.checked = chksValor().every(x => x.checked);
   }));
 
-  popup.querySelector('#clear-doc').addEventListener('click', ()=>{
-    filtroDocumentos = null;
-    popup.classList.remove('open');
-    popup.innerHTML = '';
-    renderTabla();
-  });
   popup.querySelector('#apply-doc').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     filtroDocumentos = marcados.length === valores.length ? null : new Set(marcados);
@@ -6493,9 +6569,19 @@ function mostrarPasoFloat(paso){
 function abrirVentanaFlotante(){
   floatWindow.style.top = '110px';
   floatWindow.style.left = 'calc(50% - 170px)';
-  opcionCargaSeleccionada = null;
+
+  // Preseleccionar "tabla" por defecto
+  opcionCargaSeleccionada = 'tabla';
   document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('confirmar-tipo-carga').disabled = true;
+  const cardTabla = document.querySelector('.option-card[data-opcion="tabla"]');
+  if(cardTabla) {
+    cardTabla.classList.add('selected');
+    document.getElementById('confirmar-tipo-carga').disabled = false;
+  } else {
+    opcionCargaSeleccionada = null;
+    document.getElementById('confirmar-tipo-carga').disabled = true;
+  }
+
   mostrarPasoFloat('tipo');
   floatWindow.classList.add('open');
 }
@@ -6573,6 +6659,11 @@ function confirmarRangoEscrito(){
   rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
   rangoConfirmadoObj = rango;
 
+  // Sincronizar con la selección visual
+  selAnchor = { r: rango.r1, c: rango.c1 };
+  selEnd = { r: rango.r2, c: rango.c2 };
+  pintarSeleccion();
+
   const campo = document.getElementById('rango-field');
   campo.classList.add('filled');
   input.value = rangoConfirmado;
@@ -6584,6 +6675,33 @@ document.getElementById('rango-field-text').addEventListener('keydown', (e)=>{
   if(e.key === 'Enter'){
     e.preventDefault();
     confirmarRangoEscrito();
+  }
+});
+
+// Actualizar selección visual mientras se escribe el rango
+document.getElementById('rango-field-text').addEventListener('input', (e)=>{
+  const texto = e.target.value.trim();
+  if(!texto) {
+    limpiarSeleccionVisual();
+    selAnchor = null;
+    selEnd = null;
+    return;
+  }
+
+  const rango = parsearRangoEscrito(texto);
+  if(rango && rango.c2 < GRID_COLS.length) {
+    selAnchor = { r: rango.r1, c: rango.c1 };
+    selEnd = { r: rango.r2, c: rango.c2 };
+    // Actualizar solo la selección visual, sin actualizar el campo de texto picker
+    const r1 = Math.min(selAnchor.r, selEnd.r), r2 = Math.max(selAnchor.r, selEnd.r);
+    const c1 = Math.min(selAnchor.c, selEnd.c), c2 = Math.max(selAnchor.c, selEnd.c);
+    document.querySelectorAll('td.cell').forEach(td=>{
+      const r = Number(td.dataset.r), c = Number(td.dataset.c);
+      td.classList.toggle('selected', r>=r1 && r<=r2 && c>=c1 && c<=c2);
+    });
+    const rangoTexto = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
+    pickerFieldText.textContent = rangoTexto;
+    confirmarPicker.disabled = false;
   }
 });
 
@@ -6617,7 +6735,11 @@ function pintarSeleccion(){
     const r = Number(td.dataset.r), c = Number(td.dataset.c);
     td.classList.toggle('selected', r>=r1 && r<=r2 && c>=c1 && c<=c2);
   });
-  pickerFieldText.textContent = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
+  const rangoTexto = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
+  pickerFieldText.textContent = rangoTexto;
+  // Sincronizar con el campo de texto para escribir manualmente
+  const rangoInput = document.getElementById('rango-field-text');
+  if(rangoInput) rangoInput.value = rangoTexto;
   confirmarPicker.disabled = false;
 }
 
@@ -6756,7 +6878,8 @@ function renderTablaFinal(){
       const mostrarLapiz = (r === filaTituloIdx && modoGrilla === 'final');
       const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
 
-      if(esTitulo && valor && !COLUMNAS.includes(valor)) cls.push('titulo-columna-nueva');
+      // Solo mostrar títulos celestes en la pantalla final donde se ponen nombres
+      if(esTitulo && valor && !COLUMNAS.includes(valor) && modoGrilla === 'final') cls.push('titulo-columna-nueva');
 
       let valorMostrado = valor;
       if(celdasDiferentesActualizar.has(`${r}-${c}`)){
@@ -7840,7 +7963,9 @@ function applyZoom(zoom){
   zoomLevel = Math.max(50, Math.min(200, zoom));
   if(document.activeElement !== zoomInput) zoomInput.value = zoomLevel;
   // El zoom se aplica a la TABLA de adentro, nunca al contenedor: así el recuadro
-  // (con su alto fijo) queda quieto, y solo cambia cuánto contenido entra ahí
+  // (con su alto fijo) queda quieto, y solo cambia cuánto contenido entra ahí.
+  // Usamos la propiedad CSS "zoom" (no transform:scale) porque scale rompe los
+  // encabezados "position:sticky" de la tabla al scrollear con zoom aplicado.
   tablasInternas.forEach(tabla => {
     tabla.style.zoom = `${zoomLevel}%`;
   });
