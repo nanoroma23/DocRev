@@ -71,6 +71,7 @@
   .crumb svg{ opacity:0.6; }
   .crumb.seg-tabla-titulo-crumb{
     display:flex;
+    order:0;
     font-size:14px;
     font-weight:600;
     color:var(--text);
@@ -572,6 +573,7 @@
     background:var(--card);
     width:100%;
     height:calc(100vh - 140px);
+    touch-action:pan-x pan-y;
   }
   table.datatable{
     width:100%;
@@ -3078,20 +3080,8 @@
   <!-- Modal editar celda -->
   <div class="overlay" id="overlay-conflicto-celda">
     <div class="modal" style="width:380px;">
-      <h3 id="conflicto-titulo" style="display:inline;">Campo</h3>
-      <span id="conflicto-modo-lectura-badge" class="conflicto-badge-oficial" style="position:static; display:none; margin-left:6px;">Solo lectura</span>
-
-      <div id="conflicto-historial-bloque" style="display:none;">
-        <p>Así figura en cada documento:</p>
-        <div id="conflicto-opciones-list"></div>
-      </div>
-
-      <label class="field-label" style="margin-top:10px;">Valor</label>
+      <label class="field-label" style="margin-top:0;">Valor</label>
       <input type="text" class="field-input" id="input-valor-celda">
-
-      <div id="comentario-anterior-bloque" style="display:none;">
-        <div class="comentario-anterior-texto" id="comentario-anterior-texto"></div>
-      </div>
 
       <label class="field-label" style="margin-top:10px;">Comentario (opcional)</label>
       <textarea class="field-input" id="input-comentario-celda" rows="2" placeholder="Ej: confirmado según revisión de planos, rev. C"></textarea>
@@ -5912,53 +5902,13 @@ function abrirEditarCelda(fila, col){
   conflictoFilaActual = fila;
   conflictoColActual = col;
 
-  document.getElementById('conflicto-titulo').textContent = `${col} — TAG ${fila.TAG || ''}`;
-
-  const historial = (fila.__historial && fila.__historial[col]) || {};
-  const entradas = Object.entries(historial);
-  const bloqueHistorial = document.getElementById('conflicto-historial-bloque');
-  const cont = document.getElementById('conflicto-opciones-list');
-
-  if(entradas.length === 0){
-    bloqueHistorial.style.display = 'none';
-    cont.innerHTML = '';
-  } else {
-    bloqueHistorial.style.display = 'block';
-    cont.innerHTML = entradas.map(([doc, valor]) => `
-      <div class="conflicto-opcion ${valor===fila[col] ? 'selected':''}" data-valor="${valor}">
-        <div class="conflicto-opcion-doc">${doc}</div>
-        <div class="conflicto-opcion-valor">${valor}</div>
-        ${valor===fila[col] ? '<span class="conflicto-badge-oficial">Valor actual</span>' : ''}
-      </div>
-    `).join('');
-    cont.querySelectorAll('.conflicto-opcion').forEach(op=>{
-      op.addEventListener('click', ()=>{
-        if(!modoEdicionBaseDeDatos) return;
-        cont.querySelectorAll('.conflicto-opcion').forEach(o => o.classList.remove('selected'));
-        op.classList.add('selected');
-        document.getElementById('input-valor-celda').value = op.dataset.valor;
-      });
-    });
-  }
-
   document.getElementById('input-valor-celda').value = fila[col] ?? '';
-
-  const comentarioPrevio = (fila.__comentarios && fila.__comentarios[col]) || null;
-  const bloqueComentario = document.getElementById('comentario-anterior-bloque');
-  if(comentarioPrevio && comentarioPrevio.texto){
-    bloqueComentario.style.display = 'block';
-    document.getElementById('comentario-anterior-texto').innerHTML =
-      `<b>Último comentario (${comentarioPrevio.fecha}):</b> ${comentarioPrevio.texto}`;
-  } else {
-    bloqueComentario.style.display = 'none';
-  }
   document.getElementById('input-comentario-celda').value = '';
 
   // Modo solo lectura: mientras "Editar base de datos" esté apagado, se puede ver la celda pero no tocarla
   document.getElementById('input-valor-celda').readOnly = !modoEdicionBaseDeDatos;
   document.getElementById('input-comentario-celda').readOnly = !modoEdicionBaseDeDatos;
   document.getElementById('confirmar-conflicto-celda').style.display = modoEdicionBaseDeDatos ? '' : 'none';
-  document.getElementById('conflicto-modo-lectura-badge').style.display = modoEdicionBaseDeDatos ? 'none' : 'inline-block';
 
   document.getElementById('overlay-conflicto-celda').classList.add('open');
   document.getElementById('input-valor-celda').focus();
@@ -8367,10 +8317,11 @@ dataTables.forEach(table => {
   }, { passive: false });
 });
 
-// Touch: pellizcar (pinch zoom)
+// Touch: pellizcar (pinch zoom) — en pasos de 5, igual que los botones y la rueda
 dataTables.forEach(table => {
   let initialDistance = 0;
   let initialZoom = 100;
+  let ultimoPasoAplicado = 100;
 
   table.addEventListener('touchstart', (e) => {
     if(e.touches.length === 2){
@@ -8382,6 +8333,7 @@ dataTables.forEach(table => {
         touch2.clientY - touch1.clientY
       );
       initialZoom = zoomLevel;
+      ultimoPasoAplicado = zoomLevel;
     }
   }, { passive: false });
 
@@ -8395,8 +8347,12 @@ dataTables.forEach(table => {
         touch2.clientY - touch1.clientY
       );
       const scale = currentDistance / initialDistance;
-      const newZoom = Math.round(initialZoom * scale);
-      applyZoom(newZoom);
+      const objetivo = initialZoom * scale;
+      const pasoRedondeado = Math.round(objetivo / 5) * 5;
+      if(pasoRedondeado !== ultimoPasoAplicado){
+        ultimoPasoAplicado = pasoRedondeado;
+        applyZoom(pasoRedondeado);
+      }
     }
   }, { passive: false });
 });
