@@ -778,12 +778,11 @@
   .nota-titulos-nuevos{
     display:none;
     align-items:center;
-    gap:8px;
-    padding:8px 24px;
-    font-size:12px;
+    gap:6px;
+    font-size:13px;
+    font-weight:500;
     color:var(--text-muted);
-    background:var(--card);
-    border-bottom:1px solid var(--line);
+    margin-left:16px;
   }
   .nota-titulos-nuevos.open{ display:flex; }
   .nota-titulos-nuevos-swatch{
@@ -939,6 +938,12 @@
   .filter-search{
     padding:7px 8px;
     border-bottom:1px solid var(--line);
+    display:flex;
+    gap:6px;
+    align-items:stretch;
+  }
+  .filter-search .btn-mini{
+    align-self:stretch;
   }
   .filter-search input{
     width:100%;
@@ -1408,14 +1413,15 @@
   .campo-chip{
     display:flex;
     align-items:center;
-    gap:6px;
+    gap:10px;
     font-family:var(--font-mono);
-    font-size:11.5px;
-    padding:4px 6px 4px 10px;
-    border-radius:5px;
+    font-size:13px;
+    padding:8px 10px 8px 14px;
+    border-radius:6px;
     background:var(--green-soft);
     color:var(--green-dark);
     font-weight:600;
+    min-width:300px;
   }
   .campo-chip .quitar-campo{
     width:14px; height:14px;
@@ -1434,6 +1440,19 @@
   table.sheet-grid td.cell.selected{
     background:rgba(47,93,69,0.16);
     box-shadow: inset 0 0 0 1px var(--green);
+  }
+  table.sheet-grid td.cell.selected-pending{
+    background:rgba(47,93,69,0.08);
+    box-shadow: inset 0 0 0 1px dashed var(--green);
+  }
+  table.sheet-grid tr.fila-titulo-elegida td.cell{
+    background:rgba(70,120,180,0.16) !important;
+    box-shadow: inset 0 1px 0 #4A9CC4, inset 0 -1px 0 #4A9CC4;
+  }
+  table.sheet-grid tr.fila-titulo-elegida td.row-head{
+    background:#4A9CC4;
+    color:#fff;
+    font-weight:700;
   }
   table.sheet-grid{
     border-collapse:separate;
@@ -2614,26 +2633,26 @@
 
   <!-- Modal filtrar documentos: Tipo, Proyecto y Proveedor juntos, mismo formato que el resto -->
   <div class="overlay" id="overlay-filtro-docs">
-    <div class="modal" style="width:300px;">
+    <div class="modal" style="width:340px;">
       <h3>Filtrar documentos</h3>
-      <div class="hojas-list">
-        <div class="seg-col-row" style="position:relative;">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="seg-col-row" style="position:relative; border:none; padding:6px 2px;">
           <span class="seg-col-nombre" style="flex:1; font-weight:600;">Tipo</span>
-          <span class="th-filter" data-campo-doc="tipo" style="position:static;">
+          <span class="th-filter" data-campo-doc="tipo">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
           <div class="filter-popup" id="popup-doc-tipo"></div>
         </div>
-        <div class="seg-col-row" style="position:relative;">
+        <div class="seg-col-row" style="position:relative; border:none; padding:6px 2px;">
           <span class="seg-col-nombre" style="flex:1; font-weight:600;">Número de proyecto</span>
-          <span class="th-filter" data-campo-doc="proyecto" style="position:static;">
+          <span class="th-filter" data-campo-doc="proyecto">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
           <div class="filter-popup" id="popup-doc-proyecto"></div>
         </div>
-        <div class="seg-col-row" style="position:relative;">
+        <div class="seg-col-row" style="position:relative; border:none; padding:6px 2px;">
           <span class="seg-col-nombre" style="flex:1; font-weight:600;">Proveedor</span>
-          <span class="th-filter" data-campo-doc="proveedor" style="position:static;">
+          <span class="th-filter" data-campo-doc="proveedor">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
           <div class="filter-popup" id="popup-doc-proveedor"></div>
@@ -2775,6 +2794,10 @@
     <div class="sheet-final-topbar" id="sheet-final-topbar">
       <div class="sft-left">
         <button class="btn" id="cancel-final">Cancelar</button>
+        <div class="nota-titulos-nuevos" id="nota-titulos-nuevos">
+          <span class="nota-titulos-nuevos-swatch"></span>
+          Títulos que no existen en la base de datos
+        </div>
       </div>
       <div class="sft-center">
         <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
@@ -2784,10 +2807,6 @@
         <button class="btn" id="atras-final">Atrás</button>
         <button class="btn btn-primary" id="subir-basedatos">Subir a base de datos</button>
       </div>
-    </div>
-    <div class="nota-titulos-nuevos" id="nota-titulos-nuevos">
-      <span class="nota-titulos-nuevos-swatch"></span>
-      Los títulos en celeste son columnas nuevas — todavía no existen en la base de datos.
     </div>
     <div class="sheet-grid-wrap">
       <table class="sheet-grid" id="sheet-grid"></table>
@@ -2824,7 +2843,7 @@
         </div>
       </div>
 
-      <!-- Paso 2: selección de rango -->
+      <!-- Paso 2: selección de hoja, título y rango en una sola ventana -->
       <div id="float-step-rango" style="display:none;">
         <div class="float-file-name" id="float-file-name-rango">Documento.xlsx</div>
         <div class="tipo-carga-legend" id="tipo-carga-legend">Documento tipo tabla</div>
@@ -2832,11 +2851,14 @@
           <label>Hoja</label>
           <select class="field-select" id="select-hoja-rango"></select>
         </div>
-        <p class="rango-label">Seleccioná el rango de datos con título:</p>
-        <div class="rango-field" id="rango-field">
-          <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Escribí el rango, ej: A1:F50" autocomplete="off" autocapitalize="characters">
+        <p class="rango-label">Fila de título (tocá el campo para elegir):</p>
+        <div class="rango-field" id="titulo-field" style="cursor:pointer;">
+          <input type="text" id="titulo-field-input" class="rango-field-input" placeholder="Ej: 1" autocomplete="off" inputmode="numeric" readonly style="cursor:pointer;">
         </div>
-        <button class="btn" type="button" id="btn-elegir-rango-visual" style="width:100%; margin-top:8px;">Elegir tocando la hoja</button>
+        <p class="rango-label">Rango de datos (tocá el campo para elegir):</p>
+        <div class="rango-field" id="rango-field" style="cursor:pointer;">
+          <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters" readonly style="cursor:pointer;">
+        </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-rango">Cancelar</button>
           <div style="display:flex; gap:8px;">
@@ -2846,24 +2868,29 @@
         </div>
       </div>
 
-      <!-- Paso 3: mini ventana de selección activa del rango -->
-      <div id="float-step-picker" style="display:none;">
-        <p class="rango-label" style="margin-top:0;">Seleccione el rango de datos</p>
-        <div class="rango-field active" id="rango-field-picker">
-          <span id="rango-field-picker-text">Sin seleccionar</span>
+      <!-- Mini ventana: selección de fila de título -->
+      <div id="float-step-titulo-picker" style="display:none;">
+        <div class="float-file-name" id="float-file-name-titulo">Documento.xlsx</div>
+        <p class="rango-label" style="margin-top:0;">Fila de título (tocá una fila, o escribí el número):</p>
+        <div class="rango-field" id="titulo-field-picker">
+          <input type="text" id="titulo-field-picker-input" class="rango-field-input" placeholder="Ej: 1" autocomplete="off" inputmode="numeric">
         </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="cancel-picker">Cancelar</button>
-          <button class="btn btn-primary" id="confirmar-picker" disabled>Confirmar</button>
+          <button class="btn" id="cancel-titulo-picker">Cancelar</button>
+          <button class="btn btn-primary" id="aplicar-titulo-picker" disabled>Aplicar</button>
         </div>
       </div>
 
-      <!-- Paso 4: selección de la fila de título -->
-      <div id="float-step-titulo" style="display:none;">
-        <p class="rango-label" style="margin-top:0;">Seleccioná la fila de título</p>
+      <!-- Mini ventana: selección de rango de datos -->
+      <div id="float-step-rango-picker" style="display:none;">
+        <div class="float-file-name" id="float-file-name-rango-picker">Documento.xlsx</div>
+        <p class="rango-label" style="margin-top:0;">Rango de datos (arrastrá sobre la hoja, shift+click, o escribí):</p>
+        <div class="rango-field" id="rango-field-picker">
+          <input type="text" id="rango-field-picker-input" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters">
+        </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="atras-titulo">Atrás</button>
-          <button class="btn btn-primary" id="confirmar-titulo" disabled>Confirmar</button>
+          <button class="btn" id="cancel-rango-picker">Cancelar</button>
+          <button class="btn btn-primary" id="aplicar-rango-picker" disabled>Aplicar</button>
         </div>
       </div>
 
@@ -2912,14 +2939,24 @@
         </div>
       </div>
 
-      <!-- Paso 7: renombrar una columna individual -->
+      <!-- Paso 7: renombrar una columna individual con autocompletado -->
       <div id="float-step-renombrar" style="display:none;">
         <p class="rango-label" style="margin-top:0;">Renombrar columna <span id="renombrar-col-letra"></span></p>
-        <select class="field-select" id="select-renombrar-columna"></select>
-        <input type="text" class="field-input" id="input-renombrar-nuevo" placeholder="Nuevo nombre" style="display:none; margin-top:6px;">
+        <div style="position:relative;">
+          <div style="position:relative; display:flex; align-items:center; margin-top:6px;">
+            <input type="text" id="input-renombrar-autocomplete" class="field-input" placeholder="Escribí o elegí un nombre" autocomplete="off" style="margin:0; padding-right:36px; flex:1;">
+            <button id="btn-toggle-dropdown-renombrar" type="button" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-muted);">
+                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div id="autocomplete-dropdown-renombrar" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;">
+          </div>
+        </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-renombrar">Cancelar</button>
-          <button class="btn btn-primary" id="confirmar-renombrar">Confirmar</button>
+          <button class="btn btn-primary" id="confirmar-renombrar" disabled>Confirmar</button>
         </div>
       </div>
 
@@ -2936,46 +2973,45 @@
         </div>
       </div>
 
-      <!-- Paso 9 (Un TAG, una hoja): nombre del campo + celda donde está el valor, se pueden agregar varios -->
+      <!-- Paso 9 (Un TAG, una hoja): selección de celdas con autocompletado -->
       <div id="float-step-campo" style="display:none;">
         <div class="sheet-select-row">
           <label>Hoja</label>
           <select class="field-select" id="select-hoja-campo"></select>
         </div>
 
-        <label class="field-label" style="margin-top:10px;">Nombre del campo y celda (la misma en todas las hojas elegidas)</label>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <select class="field-select" id="select-nombre-campo" style="flex:1; margin:0;">
-            <option value="">Elegí un nombre existente</option>
-            <option value="__nuevo__">+ Nuevo nombre...</option>
-          </select>
-          <div class="rango-field" id="celda-field" style="flex:1; margin:0;">
-            <span id="celda-field-text">Celda</span>
-          </div>
+        <p class="rango-label" style="margin-top:16px;">Campos a extraer:</p>
+        <div class="campos-list-scroll" style="max-height:300px; overflow-y:auto; margin-bottom:12px;">
+          <div class="campos-list" id="celdas-seleccionadas-list"></div>
         </div>
-        <input type="text" class="field-input" id="input-nombre-campo-nuevo" placeholder="Nombre del campo" style="display:none; margin-top:6px;">
-
-        <p class="rango-label" style="margin-top:16px;">Campos a extraer</p>
-        <div class="campos-list" id="campos-list"></div>
 
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-campo">Cancelar</button>
           <div style="display:flex; gap:8px;">
             <button class="btn" id="atras-campo">Atrás</button>
-            <button class="btn btn-primary" id="confirmar-campo" disabled>Continuar</button>
+            <button class="btn btn-primary" id="confirmar-celdas" disabled>Continuar</button>
           </div>
         </div>
       </div>
 
-      <!-- Paso 10 (Un TAG, una hoja): mini ventana de selección activa de la celda -->
-      <div id="float-step-celda-picker" style="display:none;">
-        <p class="rango-label" style="margin-top:0;">Seleccioná la celda</p>
-        <div class="rango-field active" id="celda-field-picker">
-          <span id="celda-field-picker-text">Sin seleccionar</span>
+      <!-- Mini ventana: asignar nombre a una celda con autocompletado -->
+      <div id="float-step-nombre-celda" style="display:none;">
+        <p class="rango-label" style="margin-top:0;">Nombre del campo para <span id="nombre-celda-coord" style="font-weight:600; color:var(--green-dark);"></span>:</p>
+        <div style="position:relative;">
+          <div style="position:relative; display:flex; align-items:center; margin-top:6px;">
+            <input type="text" id="input-nombre-celda-autocomplete" class="field-input" placeholder="Escribí o elegí un nombre" autocomplete="off" style="margin:0; padding-right:36px; flex:1;">
+            <button id="btn-toggle-dropdown" type="button" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-muted);">
+                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div id="autocomplete-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;">
+          </div>
         </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="cancel-celda-picker">Cancelar</button>
-          <button class="btn btn-primary" id="confirmar-celda-picker" disabled>Confirmar</button>
+          <button class="btn" id="cancel-nombre-celda">Cancelar</button>
+          <button class="btn btn-primary" id="confirmar-nombre-celda" disabled>Confirmar</button>
         </div>
       </div>
 
@@ -3848,7 +3884,7 @@ function abrirFiltro(col){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+    <div class="filter-search">
       <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
       <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
@@ -4132,12 +4168,21 @@ function renderSeguimientos(){
   }).join('');
 
   cont.innerHTML = tarjetas + `<div class="seg-card seg-card-new" id="seg-crear-tile">+ Crear seguimiento</div>`;
-
-  cont.querySelectorAll('[data-seg-id]').forEach(elem=>{
-    elem.addEventListener('click', ()=> abrirTablaSeguimiento(elem.dataset.segId));
-  });
   document.getElementById('seg-crear-tile').addEventListener('click', abrirModalCrearSeguimiento);
 }
+
+// Un único listener delegado (atado una sola vez, fuera de renderSeguimientos) para que
+// nunca dependa de que el click llegue justo antes de que se vuelva a dibujar la lista
+document.getElementById('seguimiento-tarjetas').addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-seg-id]');
+  if(!el) return;
+  const seg = SEGUIMIENTOS.find(s => String(s.id) === String(el.dataset.segId));
+  if(!seg){
+    console.error('No se encontró el seguimiento con id', el.dataset.segId);
+    return;
+  }
+  abrirTablaSeguimiento(seg.id);
+});
 
 // ---- Crear seguimiento - Nueva lógica ----
 let columnaPrincipalSeguimiento = null;
@@ -4315,7 +4360,7 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
   // Crear contenido del popup con el estilo estándar
   popup.innerHTML = `
     <div class="filter-popup-head">${col}</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+    <div class="filter-search">
       <input type="text" placeholder="Buscar..." class="filter-search-input-seg" style="flex:1;">
       <button class="btn-mini primary" onclick="aplicarFiltroSeguimientoCol('${col.replace(/'/g, "\\'")}')">Aplicar</button>
     </div>
@@ -4515,8 +4560,11 @@ async function guardarAnchoColumnaSeguimiento(seguimientoId, columna, ancho){
 
 // ---- Tabla de un seguimiento puntual ----
 async function abrirTablaSeguimiento(id){
-  seguimientoActivo = SEGUIMIENTOS.find(s => s.id === id);
-  if(!seguimientoActivo) return;
+  seguimientoActivo = SEGUIMIENTOS.find(s => String(s.id) === String(id));
+  if(!seguimientoActivo){
+    console.error('abrirTablaSeguimiento: no se encontró el seguimiento', id);
+    return;
+  }
 
   // Cargar anchos de columnas del seguimiento
   await cargarAnchosSeguimiento(id);
@@ -4875,7 +4923,7 @@ function abrirFiltroSeguimientoTabla(col){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${col}</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+    <div class="filter-search">
       <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
       <button class="btn-mini primary" id="apply-seg-tabla">Aplicar</button>
     </div>
@@ -5682,7 +5730,7 @@ function abrirFiltroDocCampo(campo){
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar ${etiqueta}</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+    <div class="filter-search">
       <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
       <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
@@ -5803,23 +5851,25 @@ function actualizarBadgeFiltroDocumentos(){
 
 function abrirFiltroDocumentos(){
   cerrarFiltros();
+  filtroAbierto = 'doc-origen';
   const popup = document.getElementById('popup-filtro-documentos');
   const valores = [...new Set(FILAS.flatMap(documentosDeFila))];
   const seleccion = filtroDocumentos || new Set(valores);
 
   popup.innerHTML = `
     <div class="filter-popup-head">Filtrar por documento</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center; padding:7px 8px; border-bottom:1px solid var(--line);">
-      <button class="btn-mini primary" id="apply-doc" style="width:100%;">Aplicar</button>
+    <div class="filter-search">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
+      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
     </div>
     <div class="filter-list">
       <label class="filter-option">
-        <input type="checkbox" id="chk-todos-doc" ${seleccion.size===valores.length ? 'checked':''}>
+        <input type="checkbox" class="chk-todos-popup">
         <span>Seleccionar todo</span>
       </label>
       ${valores.map(v => `
-        <label class="filter-option">
-          <input type="checkbox" class="chk-valor-doc" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+        <label class="filter-option" data-valor="${(v==='__sin_documento__' ? 'Sin documento' : v).toLowerCase()}">
+          <input type="checkbox" class="chk-valor-popup" value="${v}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v==='__sin_documento__' ? 'Sin documento' : v}</span>
         </label>
       `).join('')}
@@ -5828,27 +5878,52 @@ function abrirFiltroDocumentos(){
   popup.classList.add('open');
   popup.addEventListener('click', e => e.stopPropagation());
 
-  const chkTodos = popup.querySelector('#chk-todos-doc');
-  const chksValor = () => [...popup.querySelectorAll('.chk-valor-doc')];
-  chkTodos.addEventListener('change', ()=>{
-    chksValor().forEach(c => c.checked = chkTodos.checked);
-  });
-  chksValor().forEach(c => c.addEventListener('change', ()=>{
-    chkTodos.checked = chksValor().every(x => x.checked);
-  }));
+  const chkTodos = popup.querySelector('.chk-todos-popup');
+  const chksValor = () => [...popup.querySelectorAll('.chk-valor-popup')];
 
-  popup.querySelector('#apply-doc').addEventListener('click', ()=>{
+  function actualizarEstadoTodos(){
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+
+  let eraParcial = false;
+  chkTodos.closest('label').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
+  chkTodos.addEventListener('change', ()=>{
+    if(eraParcial){
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
+    } else {
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
+    }
+    actualizarEstadoTodos();
+  });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
+
+  popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+      if(!coincide) opt.querySelector('.chk-valor-popup').checked = false;
+    });
+    actualizarEstadoTodos();
+  });
+
+  actualizarEstadoTodos();
+
+  popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     filtroDocumentos = marcados.length === valores.length ? null : new Set(marcados);
-    popup.classList.remove('open');
-    popup.innerHTML = '';
+    cerrarFiltros();
+    document.getElementById('btn-filtro-documentos').classList.toggle('btn-filtro-activo', !!filtroDocumentos);
     renderTabla();
   });
 }
 document.getElementById('btn-filtro-documentos').addEventListener('click', (e)=>{
   e.stopPropagation();
-  const popup = document.getElementById('popup-filtro-documentos');
-  if(popup.classList.contains('open')){ cerrarFiltros(); return; }
+  if(filtroAbierto === 'doc-origen'){ cerrarFiltros(); return; }
   abrirFiltroDocumentos();
 });
 
@@ -6782,7 +6857,7 @@ function renderGridHoja(nombreHoja){
 
   let html = '<thead><tr><th class="corner"></th>' + GRID_COLS.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
   for(let r=0; r<=filaFin; r++){
-    html += `<tr><td class="row-head">${r+1}</td>`;
+    html += `<tr data-r-fila="${r+1}"><td class="row-head">${r+1}</td>`;
     for(let c=0; c<=colFin; c++){
       const cellRef = XLSX.utils.encode_cell({ r, c });
       const cell = hoja[cellRef];
@@ -6805,11 +6880,12 @@ function abrirHojaFullscreen(){
   abrirVentanaFlotante();
 }
 
-// Cambiar de hoja (desde cualquiera de los 2 selectores) -> sincroniza el otro, re-renderiza y limpia el rango elegido
+// Cambiar de hoja (desde cualquiera de los 2 selectores) -> sincroniza el otro, re-renderiza y limpia el rango y título elegidos
 function alCambiarHoja(nuevoValor){
   document.getElementById('select-hoja').value = nuevoValor;
   document.getElementById('select-hoja-rango').value = nuevoValor;
   renderGrid();
+  resetearCampoTitulo();
   resetearCampoRango();
 }
 document.getElementById('select-hoja').addEventListener('change', (e)=> alCambiarHoja(e.target.value));
@@ -6822,7 +6898,7 @@ function cerrarFlujoCarga(){
   document.getElementById('overlay-subir-bd').classList.remove('open');
   floatWindow.classList.remove('open');
   limpiarSeleccionVisual();
-  modoGrilla = 'libre';
+  modoGrilla = 'tipo';
   rangoConfirmadoObj = null;
   tablaData = [];
   filaTituloIdx = null;
@@ -6835,8 +6911,8 @@ function cerrarFlujoCarga(){
   hojaPrevisualizada = null;
   hojasIncluidas = new Set();
   hojasSeleccionadasParaCarga = [];
-  celdaConfirmada = null;
-  celdaSeleccionActiva = null;
+  celdasSeleccionadas.clear();
+  celdaEditandoNombre = null;
   camposDefinidos = [];
   modoActualizarDoc = false;
   columnasParaMapear = [];
@@ -6865,18 +6941,15 @@ document.getElementById('cancel-float').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
 
-// ---- Ventana flotante: pasos (tipo de carga -> rango -> selección activa -> fila título -> columnas) ----
+// ---- Ventana flotante: pasos (tipo de carga -> rango + título juntos -> columnas) ----
 const floatWindow = document.getElementById('float-window');
 const floatStepTipo = document.getElementById('float-step-tipo');
 const floatStepRango = document.getElementById('float-step-rango');
-const floatStepPicker = document.getElementById('float-step-picker');
-const floatStepTitulo = document.getElementById('float-step-titulo');
 const floatStepUnir = document.getElementById('float-step-unir');
 const floatStepSacar = document.getElementById('float-step-sacar');
 const floatStepRenombrar = document.getElementById('float-step-renombrar');
 const floatStepHojas = document.getElementById('float-step-hojas');
 const floatStepCampo = document.getElementById('float-step-campo');
-const floatStepCeldaPicker = document.getElementById('float-step-celda-picker');
 let opcionCargaSeleccionada = null;
 let extraccionDesdeDocIdx = null; // índice en DOCUMENTOS_PROYECTO cuando se re-extrae de un documento ya subido
 let modoActualizarDoc = false; // true cuando el flujo viene de "Actualizar documento"
@@ -6885,9 +6958,9 @@ let mapeoActualizarColumnas = {}; // { idxTablaData: nombreColumnaDB }
 let celdasDiferentesActualizar = new Set(); // "fila-col" que difieren de la base actual
 
 // Modo de interacción sobre la grilla:
-// 'libre' (elegir rango), 'titulo' (elegir fila), 'final' (solo lectura),
-// 'unir-columnas' / 'sacar-columnas' (elegir columnas)
-let modoGrilla = 'libre';
+// 'tipo' (inicial), 'titulo' (elegir fila de título), 'rango' (elegir rango de datos),
+// 'final' (solo lectura), 'unir-columnas' / 'sacar-columnas' (elegir columnas), 'celda-multi' (seleccionar múltiples celdas)
+let modoGrilla = 'tipo';
 let rangoConfirmadoObj = null; // {r1,r2,c1,c2} numérico
 
 // ---- Modelo de datos de la tabla ya recortada al rango elegido ----
@@ -6907,20 +6980,30 @@ const NOMBRES_TIPO_CARGA = {
 function mostrarPasoFloat(paso){
   floatStepTipo.style.display = paso==='tipo' ? 'block' : 'none';
   floatStepRango.style.display = paso==='rango' ? 'block' : 'none';
-  floatStepPicker.style.display = paso==='picker' ? 'block' : 'none';
-  floatStepTitulo.style.display = paso==='titulo' ? 'block' : 'none';
+  document.getElementById('float-step-titulo-picker').style.display = paso==='titulo-picker' ? 'block' : 'none';
+  document.getElementById('float-step-rango-picker').style.display = paso==='rango-picker' ? 'block' : 'none';
   floatStepUnir.style.display = paso==='unir' ? 'block' : 'none';
   floatStepSacar.style.display = paso==='sacar' ? 'block' : 'none';
   floatStepRenombrar.style.display = paso==='renombrar' ? 'block' : 'none';
   floatStepHojas.style.display = paso==='hojas' ? 'block' : 'none';
   floatStepCampo.style.display = paso==='campo' ? 'block' : 'none';
-  floatStepCeldaPicker.style.display = paso==='celda-picker' ? 'block' : 'none';
+  document.getElementById('float-step-nombre-celda').style.display = paso==='nombre-celda' ? 'block' : 'none';
   document.getElementById('float-step-mapeo-actualizar').style.display = paso==='mapeo-actualizar' ? 'block' : 'none';
   document.getElementById('sheet-tipo-topbar').classList.toggle('open', paso==='tipo');
 
   // El fondo se oscurece y bloquea la hoja, salvo en los pasos donde hay que tocarla de verdad
-  const pasosConHojaInteractiva = ['picker', 'celda-picker', 'titulo', 'unir', 'sacar'];
+  const pasosConHojaInteractiva = ['titulo-picker', 'rango-picker', 'campo', 'nombre-celda', 'unir', 'sacar'];
   document.getElementById('float-backdrop').classList.toggle('open', !pasosConHojaInteractiva.includes(paso));
+
+  // Cambiar modo de grilla según el paso
+
+  // Cambiar modo de grilla según el paso
+  if(paso === 'titulo-picker') modoGrilla = 'titulo';
+  else if(paso === 'rango-picker') modoGrilla = 'rango';
+  else if(paso === 'campo' || paso === 'nombre-celda') modoGrilla = 'celda-multi';
+  else if(paso === 'unir') modoGrilla = 'unir-columnas';
+  else if(paso === 'sacar') modoGrilla = 'sacar-columnas';
+  else if(paso === 'rango') modoGrilla = 'ninguno';
 }
 
 function abrirVentanaFlotante(){
@@ -6961,6 +7044,7 @@ document.getElementById('confirmar-tipo-carga').addEventListener('click', ()=>{
   document.getElementById('float-file-name-rango').textContent = archivoActual;
   document.getElementById('select-hoja-rango').value = document.getElementById('select-hoja').value;
   document.getElementById('tipo-carga-legend').textContent = NOMBRES_TIPO_CARGA[opcionCargaSeleccionada] || 'Documento';
+  resetearCampoTitulo();
   resetearCampoRango();
   mostrarPasoFloat('rango');
 });
@@ -6968,18 +7052,30 @@ document.getElementById('confirmar-tipo-carga').addEventListener('click', ()=>{
 // ---- Campo de rango (paso 2): se puede escribir a mano, o tocar "Elegir en la hoja" ----
 let rangoConfirmado = null; // ej: "B2:E10"
 
-function resetearCampoRango(){
-  rangoConfirmado = null;
-  const campo = document.getElementById('rango-field');
-  campo.classList.remove('filled');
-  document.getElementById('rango-field-text').value = '';
-  document.getElementById('continuar-rango').disabled = true;
+function resetearCampoTitulo(){
+  filaTituloRaw = null;
+  document.getElementById('titulo-field').classList.remove('filled');
+  document.getElementById('titulo-field-input').value = '';
+  document.getElementById('titulo-field-picker').classList.remove('filled');
+  document.getElementById('titulo-field-picker-input').value = '';
+  document.getElementById('aplicar-titulo-picker').disabled = true;
+  actualizarBotonContinuarRango();
+  limpiarSeleccionVisual();
 }
 
-document.getElementById('btn-elegir-rango-visual').addEventListener('click', ()=>{
-  iniciarSeleccionRango();
-  mostrarPasoFloat('picker');
-});
+function resetearCampoRango(){
+  rangoConfirmado = null;
+  rangoConfirmadoObj = null;
+  selAnchor = null;
+  selEnd = null;
+  document.getElementById('rango-field').classList.remove('filled');
+  document.getElementById('rango-field-text').value = '';
+  document.getElementById('rango-field-picker').classList.remove('filled');
+  document.getElementById('rango-field-picker-input').value = '';
+  document.getElementById('aplicar-rango-picker').disabled = true;
+  actualizarBotonContinuarRango();
+  limpiarSeleccionVisual();
+}
 
 // Escribir el rango a mano (para cuando no se puede hacer shift+click, como en el celular)
 function parsearRangoEscrito(texto){
@@ -6998,88 +7094,26 @@ function parsearRangoEscrito(texto){
   };
 }
 
-function confirmarRangoEscrito(){
-  const input = document.getElementById('rango-field-text');
-  const texto = input.value.trim();
-  if(!texto) return;
-
-  const rango = parsearRangoEscrito(texto);
-  if(!rango){
-    alert('Ese rango no tiene un formato válido. Escribilo así: A1:F50');
-    return;
-  }
-  if(rango.c2 >= GRID_COLS.length){
-    alert('Ese rango tiene columnas que no existen en esta hoja.');
-    return;
-  }
-
-  rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
-  rangoConfirmadoObj = rango;
-
-  // Sincronizar con la selección visual
-  selAnchor = { r: rango.r1, c: rango.c1 };
-  selEnd = { r: rango.r2, c: rango.c2 };
-  pintarSeleccion();
-
-  const campo = document.getElementById('rango-field');
-  campo.classList.add('filled');
-  input.value = rangoConfirmado;
-  document.getElementById('continuar-rango').disabled = false;
-
-  avanzarATitulo();
-}
-document.getElementById('rango-field-text').addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter'){
-    e.preventDefault();
-    confirmarRangoEscrito();
-  }
-});
-
-// Actualizar selección visual mientras se escribe el rango
-document.getElementById('rango-field-text').addEventListener('input', (e)=>{
-  const texto = e.target.value.trim();
-  if(!texto) {
-    limpiarSeleccionVisual();
-    selAnchor = null;
-    selEnd = null;
-    return;
-  }
-
-  const rango = parsearRangoEscrito(texto);
-  if(rango && rango.c2 < GRID_COLS.length) {
-    selAnchor = { r: rango.r1, c: rango.c1 };
-    selEnd = { r: rango.r2, c: rango.c2 };
-    // Actualizar solo la selección visual, sin actualizar el campo de texto picker
-    const r1 = Math.min(selAnchor.r, selEnd.r), r2 = Math.max(selAnchor.r, selEnd.r);
-    const c1 = Math.min(selAnchor.c, selEnd.c), c2 = Math.max(selAnchor.c, selEnd.c);
-    document.querySelectorAll('td.cell').forEach(td=>{
-      const r = Number(td.dataset.r), c = Number(td.dataset.c);
-      td.classList.toggle('selected', r>=r1 && r<=r2 && c>=c1 && c<=c2);
-    });
-    const rangoTexto = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
-    pickerFieldText.textContent = rangoTexto;
-    confirmarPicker.disabled = false;
-  }
-});
-
-// ---- Selección de rango tipo Excel: click y arrastrar, o click + Shift + click ----
+// ---- Gestos sobre la hoja: arrastrar define el rango, un toque simple (sin arrastre) define
+// la fila de título. Funciona igual con mouse que con el dedo. ----
 let selAnchor = null;
 let selEnd = null;
 let arrastrandoSeleccion = false;
+let mousedownPos = null;
+let arrastroDetectado = false;
+let filaTituloRaw = null; // fila de título elegida (número real de la hoja, sin recortar aún)
 const gridEl = document.getElementById('sheet-grid');
-const pickerFieldText = document.getElementById('rango-field-picker-text');
-const confirmarPicker = document.getElementById('confirmar-picker');
 
 function iniciarSeleccionRango(){
   selAnchor = null;
   selEnd = null;
+  filaTituloRaw = null;
   limpiarSeleccionVisual();
-  confirmarPicker.disabled = true;
-  pickerFieldText.textContent = 'Sin seleccionar';
 }
 
 function limpiarSeleccionVisual(){
   document.querySelectorAll('td.cell.selected').forEach(td => td.classList.remove('selected'));
+  document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
 }
 
 function letraCol(ci){ return GRID_COLS[ci]; }
@@ -7093,53 +7127,198 @@ function pintarSeleccion(){
     td.classList.toggle('selected', r>=r1 && r<=r2 && c>=c1 && c<=c2);
   });
   const rangoTexto = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
-  pickerFieldText.textContent = rangoTexto;
-  // Sincronizar con el campo de texto para escribir manualmente
-  const rangoInput = document.getElementById('rango-field-text');
-  if(rangoInput) rangoInput.value = rangoTexto;
-  confirmarPicker.disabled = false;
+  const rangoPickerInput = document.getElementById('rango-field-picker-input');
+  if(rangoPickerInput) rangoPickerInput.value = rangoTexto;
+  document.getElementById('rango-field-picker').classList.add('filled');
+  actualizarBotonAplicarRango();
+}
+
+function pintarFilaTitulo(){
+  document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
+  if(filaTituloRaw !== null){
+    const tr = document.querySelector(`tr[data-r-fila="${filaTituloRaw}"]`);
+    if(tr) tr.classList.add('fila-titulo-elegida');
+  }
+}
+
+function actualizarBotonAplicarTitulo(){
+  const hayTitulo = !!(document.getElementById('titulo-field-picker-input').value.trim());
+  document.getElementById('aplicar-titulo-picker').disabled = !hayTitulo;
+}
+
+function actualizarBotonAplicarRango(){
+  const hayRango = !!(document.getElementById('rango-field-picker-input').value.trim());
+  document.getElementById('aplicar-rango-picker').disabled = !hayRango;
+}
+
+function actualizarBotonContinuarRango(){
+  const hayTitulo = !!(document.getElementById('titulo-field-input').value.trim());
+  const hayRango = !!(document.getElementById('rango-field-text').value.trim());
+  document.getElementById('continuar-rango').disabled = !(hayTitulo && hayRango);
+}
+
+function iniciarGesto(r, c, esShift){
+  if(modoGrilla === 'titulo'){
+    // En modo título, solo guardamos la posición para detectar click simple
+    mousedownPos = { r, c };
+    arrastroDetectado = false;
+    arrastrandoSeleccion = false;
+    return;
+  }
+  if(modoGrilla !== 'rango') return;
+  if(esShift && selAnchor){
+    // Shift+click: extender selección desde el anchor hasta aquí
+    selEnd = { r, c };
+    pintarSeleccion();
+    mousedownPos = null;
+    arrastrandoSeleccion = false;
+    arrastroDetectado = false;
+    return;
+  }
+  mousedownPos = { r, c };
+  arrastroDetectado = false;
+  arrastrandoSeleccion = true;
+}
+function moverGesto(r, c){
+  if(modoGrilla === 'titulo'){
+    // En modo título, cualquier movimiento se detecta como arrastre (y lo ignoramos)
+    if(mousedownPos && (r !== mousedownPos.r || c !== mousedownPos.c)){
+      arrastroDetectado = true;
+    }
+    return;
+  }
+  if(modoGrilla !== 'rango' || !arrastrandoSeleccion || !mousedownPos) return;
+  if(r !== mousedownPos.r || c !== mousedownPos.c){
+    arrastroDetectado = true;
+    selAnchor = mousedownPos;
+    selEnd = { r, c };
+    pintarSeleccion();
+  }
+}
+function finalizarGesto(){
+  if(modoGrilla === 'titulo' && mousedownPos && !arrastroDetectado){
+    // Fue un toque simple, sin arrastre: define la fila de título
+    filaTituloRaw = mousedownPos.r;
+    document.getElementById('titulo-field-picker-input').value = filaTituloRaw;
+    document.getElementById('titulo-field-picker').classList.add('filled');
+    pintarFilaTitulo();
+    actualizarBotonAplicarTitulo();
+  }
+  if(modoGrilla === 'rango' && mousedownPos && !arrastroDetectado){
+    // Click simple sin arrastrar ni shift: establecer anchor (punto inicial para futuro shift+click)
+    selAnchor = mousedownPos;
+    selEnd = mousedownPos;
+    pintarSeleccion();
+  }
+  arrastrandoSeleccion = false;
+  mousedownPos = null;
+  arrastroDetectado = false;
 }
 
 gridEl.addEventListener('mousedown', (e)=>{
-  if(modoGrilla !== 'libre') return;
   const td = e.target.closest('td.cell');
   if(!td) return;
+  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
   e.preventDefault();
-  const r = Number(td.dataset.r), c = Number(td.dataset.c);
-
-  if(e.shiftKey && selAnchor){
-    // Shift + click: fija la segunda esquina sin mover el ancla ni arrastrar
-    selEnd = { r, c };
-    pintarSeleccion();
-    return;
-  }
-
-  selAnchor = { r, c };
-  selEnd = selAnchor;
-  arrastrandoSeleccion = true;
-  pintarSeleccion();
+  iniciarGesto(Number(td.dataset.r), Number(td.dataset.c), e.shiftKey);
 });
 document.addEventListener('mousemove', (e)=>{
-  if(modoGrilla !== 'libre' || !arrastrandoSeleccion) return;
   const td = e.target.closest('td.cell');
   if(!td) return;
-  selEnd = { r:Number(td.dataset.r), c:Number(td.dataset.c) };
-  pintarSeleccion();
+  moverGesto(Number(td.dataset.r), Number(td.dataset.c));
 });
-document.addEventListener('mouseup', ()=>{ arrastrandoSeleccion = false; });
+document.addEventListener('mouseup', finalizarGesto);
 
-// Click consolidado sobre la grilla: deshacer fusión, renombrar, elegir fila título, elegir columnas, o elegir una celda única
-let celdaSeleccionActiva = null; // {r, c} mientras se elige la celda en modo 'celda-unica'
+gridEl.addEventListener('touchstart', (e)=>{
+  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
+  const touch = e.touches[0];
+  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
+  if(!td) return;
+  iniciarGesto(Number(td.dataset.r), Number(td.dataset.c), false);
+}, { passive:true });
+gridEl.addEventListener('touchmove', (e)=>{
+  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
+  if(modoGrilla === 'rango' && !arrastrandoSeleccion) return;
+  if(!mousedownPos) return;
+  const touch = e.touches[0];
+  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
+  if(!td) return;
+  const r = Number(td.dataset.r), c = Number(td.dataset.c);
+  if(r !== mousedownPos.r || c !== mousedownPos.c) e.preventDefault(); // bloquea el scroll solo si ya es un arrastre real
+  moverGesto(r, c);
+}, { passive:false });
+gridEl.addEventListener('touchend', finalizarGesto);
+
+// Escribir el rango a mano en el picker: sincroniza la selección visual en vivo mientras se escribe
+document.getElementById('rango-field-picker-input').addEventListener('input', (e)=>{
+  const texto = e.target.value.trim();
+  if(!texto){
+    document.querySelectorAll('td.cell.selected').forEach(td => td.classList.remove('selected'));
+    selAnchor = null;
+    selEnd = null;
+    document.getElementById('rango-field-picker').classList.remove('filled');
+    actualizarBotonAplicarRango();
+    return;
+  }
+  const rango = parsearRangoEscrito(texto);
+  if(rango && rango.c2 < GRID_COLS.length){
+    selAnchor = { r: rango.r1, c: rango.c1 };
+    selEnd = { r: rango.r2, c: rango.c2 };
+    document.querySelectorAll('td.cell').forEach(td=>{
+      const r = Number(td.dataset.r), c = Number(td.dataset.c);
+      td.classList.toggle('selected', r>=rango.r1 && r<=rango.r2 && c>=rango.c1 && c<=rango.c2);
+    });
+    document.getElementById('rango-field-picker').classList.add('filled');
+    actualizarBotonAplicarRango();
+  }
+});
+
+// Escribir la fila de título a mano en el picker: resalta esa fila en vivo mientras se escribe
+document.getElementById('titulo-field-picker-input').addEventListener('input', (e)=>{
+  const numero = parseInt(e.target.value.trim(), 10);
+  if(!numero || numero < 1){
+    filaTituloRaw = null;
+    document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
+    document.getElementById('titulo-field-picker').classList.remove('filled');
+    actualizarBotonAplicarTitulo();
+    return;
+  }
+  filaTituloRaw = numero;
+  pintarFilaTitulo();
+  document.getElementById('titulo-field-picker').classList.add('filled');
+  actualizarBotonAplicarTitulo();
+});
+
+// Click consolidado sobre la grilla: deshacer fusión, renombrar, elegir fila título, elegir columnas, o seleccionar celdas
 
 gridEl.addEventListener('click', (e)=>{
-  if(modoGrilla === 'celda-unica'){
+  if(modoGrilla === 'celda-multi'){
     const td = e.target.closest('td.cell');
     if(!td) return;
-    document.querySelectorAll('td.cell.selected').forEach(c => c.classList.remove('selected'));
-    td.classList.add('selected');
-    celdaSeleccionActiva = { r: Number(td.dataset.r), c: Number(td.dataset.c) };
-    document.getElementById('celda-field-picker-text').textContent = `${letraCol(celdaSeleccionActiva.c)}${celdaSeleccionActiva.r}`;
-    document.getElementById('confirmar-celda-picker').disabled = false;
+    const r = Number(td.dataset.r), c = Number(td.dataset.c);
+    const key = `${r},${c}`;
+
+    // Verificar si esta celda ya tiene nombre confirmado
+    const yaConfirmada = camposDefinidos.some(campo => campo.celda.r === r && campo.celda.c === c);
+    if(yaConfirmada){
+      // Ya está confirmada, abrir para editar nombre
+      abrirAsignarNombreCelda(r, c);
+      return;
+    }
+
+    // Primer click: abrir directamente para asignar nombre
+    // Si había una celda pendiente, la desmarcamos
+    if(celdaEditandoNombre && celdaEditandoNombre.key !== key){
+      const [rPrev, cPrev] = celdaEditandoNombre.key.split(',').map(Number);
+      const tdPrev = document.querySelector(`td.cell[data-r="${rPrev}"][data-c="${cPrev}"]`);
+      if(tdPrev) tdPrev.classList.remove('selected-pending');
+    }
+
+    // Marcar esta celda como pendiente
+    td.classList.add('selected-pending');
+
+    // Abrir ventana de nombre
+    abrirAsignarNombreCelda(r, c);
     return;
   }
 
@@ -7155,15 +7334,6 @@ gridEl.addEventListener('click', (e)=>{
     return;
   }
 
-  if(modoGrilla === 'titulo'){
-    const tr = e.target.closest('tbody tr');
-    if(!tr || !tr.dataset.filaRecortada) return;
-    filaTituloIdx = Number(tr.dataset.filaRecortada) - 1;
-    document.getElementById('confirmar-titulo').disabled = false;
-    renderTablaFinal();
-    return;
-  }
-
   if(modoGrilla === 'unir-columnas' || modoGrilla === 'sacar-columnas'){
     const th = e.target.closest('thead th');
     if(!th || th.dataset.col === undefined) return;
@@ -7173,12 +7343,6 @@ gridEl.addEventListener('click', (e)=>{
     actualizarSeleccionColumnas();
     return;
   }
-});
-
-// Cancelar (mini-ventana picker): descarta la selección activa, vuelve al paso rango sin guardar
-document.getElementById('cancel-picker').addEventListener('click', ()=>{
-  limpiarSeleccionVisual();
-  mostrarPasoFloat('rango');
 });
 
 // ---- Construye la matriz de datos del rango elegido (como si fuera un excel nuevo) ----
@@ -7255,58 +7419,150 @@ function renderTablaFinal(){
   grid.innerHTML = html;
 }
 
-// Confirmar (mini-ventana picker): guarda el rango elegido y vuelve al paso rango
-document.getElementById('confirmar-picker').addEventListener('click', ()=>{
-  if(!selAnchor || !selEnd) return;
-  const r1 = Math.min(selAnchor.r, selEnd.r), r2 = Math.max(selAnchor.r, selEnd.r);
-  const c1 = Math.min(selAnchor.c, selEnd.c), c2 = Math.max(selAnchor.c, selEnd.c);
-  rangoConfirmado = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
-  rangoConfirmadoObj = { r1, r2, c1, c2 };
-
-  const campo = document.getElementById('rango-field');
-  campo.classList.add('filled');
-  document.getElementById('rango-field-text').value = rangoConfirmado;
-  document.getElementById('continuar-rango').disabled = false;
-
-  avanzarATitulo();
-});
-
-// Atrás (paso 2 -> paso 1): vuelve al paso de tipo de carga, conservando la opción elegida
+// ---- Event listeners para paso rango (ventana principal) ----
 document.getElementById('atras-rango').addEventListener('click', ()=>{
   limpiarSeleccionVisual();
   mostrarPasoFloat('tipo');
 });
 
-// Cancelar (paso 2): misma confirmación de siempre
 document.getElementById('cancel-rango').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
 
-// Continuar (paso 2): recorta la hoja al rango elegido y pide la fila de título
-function avanzarATitulo(){
-  if(!rangoConfirmadoObj) return;
-  tablaData = construirTablaData();
-  filaTituloIdx = 0; // por lo general el título está arriba de todo, se preselecciona
-  mergedColumns = [];
-  columnasMarcadasEliminar = new Set();
-  colsSeleccionadas = new Set();
-  modoGrilla = 'titulo';
-  document.getElementById('confirmar-titulo').disabled = false;
-  renderTablaFinal();
-  mostrarPasoFloat('titulo');
-  document.querySelector('.sheet-grid-wrap').scrollTop = 0;
-}
+document.getElementById('continuar-rango').addEventListener('click', avanzarAFinalDesdeRango);
 
-document.getElementById('continuar-rango').addEventListener('click', avanzarATitulo);
+// Al hacer click en el campo de título, abrir mini ventana para seleccionar
+document.getElementById('titulo-field').addEventListener('click', ()=>{
+  document.getElementById('float-file-name-titulo').textContent = archivoActual;
+  document.getElementById('titulo-field-picker-input').value = document.getElementById('titulo-field-input').value;
+  if(filaTituloRaw !== null) {
+    document.getElementById('titulo-field-picker').classList.add('filled');
+    document.getElementById('aplicar-titulo-picker').disabled = false;
+    pintarFilaTitulo();
+  } else {
+    document.getElementById('titulo-field-picker').classList.remove('filled');
+    document.getElementById('aplicar-titulo-picker').disabled = true;
+  }
+  mostrarPasoFloat('titulo-picker');
+});
 
-// Atrás (paso 4 -> paso 2): vuelve a la hoja completa para reelegir el rango
-document.getElementById('atras-titulo').addEventListener('click', ()=>{
-  modoGrilla = 'libre';
-  renderGrid();
+// Al hacer click en el campo de rango, abrir mini ventana para seleccionar
+document.getElementById('rango-field').addEventListener('click', ()=>{
+  document.getElementById('float-file-name-rango-picker').textContent = archivoActual;
+  document.getElementById('rango-field-picker-input').value = document.getElementById('rango-field-text').value;
+  if(selAnchor && selEnd) {
+    document.getElementById('rango-field-picker').classList.add('filled');
+    document.getElementById('aplicar-rango-picker').disabled = false;
+    pintarSeleccion();
+  } else {
+    document.getElementById('rango-field-picker').classList.remove('filled');
+    document.getElementById('aplicar-rango-picker').disabled = true;
+  }
+  mostrarPasoFloat('rango-picker');
+});
+
+// ---- Event listeners para mini ventana de título ----
+document.getElementById('aplicar-titulo-picker').addEventListener('click', ()=>{
+  const numero = parseInt(document.getElementById('titulo-field-picker-input').value.trim(), 10);
+  if(!numero || numero < 1){
+    alert('Elegí una fila de título válida.');
+    return;
+  }
+  filaTituloRaw = numero;
+  document.getElementById('titulo-field-input').value = numero;
+  document.getElementById('titulo-field').classList.add('filled');
+  limpiarSeleccionVisual();
+  actualizarBotonContinuarRango();
   mostrarPasoFloat('rango');
 });
 
-// Confirmar (paso 4): fija la fila de título y pasa a la topbar final
+document.getElementById('cancel-titulo-picker').addEventListener('click', ()=>{
+  limpiarSeleccionVisual();
+  mostrarPasoFloat('rango');
+});
+
+// ---- Event listeners para mini ventana de rango ----
+document.getElementById('aplicar-rango-picker').addEventListener('click', ()=>{
+  const textoRango = document.getElementById('rango-field-picker-input').value.trim();
+  const rango = parsearRangoEscrito(textoRango);
+  if(!rango){
+    alert('Escribí un rango válido. Ejemplo: A1:F50');
+    return;
+  }
+  if(rango.c2 >= GRID_COLS.length){
+    alert('Ese rango tiene columnas que no existen en esta hoja.');
+    return;
+  }
+  selAnchor = { r: rango.r1, c: rango.c1 };
+  selEnd = { r: rango.r2, c: rango.c2 };
+  document.getElementById('rango-field-text').value = textoRango;
+  document.getElementById('rango-field').classList.add('filled');
+  limpiarSeleccionVisual();
+  actualizarBotonContinuarRango();
+  mostrarPasoFloat('rango');
+});
+
+document.getElementById('cancel-rango-picker').addEventListener('click', ()=>{
+  limpiarSeleccionVisual();
+  mostrarPasoFloat('rango');
+});
+
+// Continuar (paso 2): recorta la hoja al rango elegido y usa la fila de título seleccionada
+function avanzarAFinalDesdeRango(){
+  const textoRango = document.getElementById('rango-field-text').value.trim();
+  const rango = parsearRangoEscrito(textoRango);
+  if(!rango){
+    alert('Escribí un rango válido antes de continuar. Ejemplo: A1:F50');
+    return;
+  }
+  if(rango.c2 >= GRID_COLS.length){
+    alert('Ese rango tiene columnas que no existen en esta hoja.');
+    return;
+  }
+  if(filaTituloRaw === null){
+    alert('Elegí la fila de título antes de continuar.');
+    return;
+  }
+
+  rangoConfirmadoObj = rango;
+  rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
+
+  tablaData = construirTablaData();
+
+  // Calcular el índice de la fila de título dentro de los datos
+  // Si el título está dentro del rango, usar su posición relativa
+  // Si está fuera, necesitamos leer esa fila específica de la hoja
+  if(filaTituloRaw >= rango.r1 && filaTituloRaw <= rango.r2){
+    filaTituloIdx = filaTituloRaw - rango.r1; // índice dentro de tablaData, ya recortada
+    nombresOriginales = [...tablaData[filaTituloIdx]];
+  } else {
+    // La fila de título está fuera del rango de datos, leerla directamente de la hoja
+    const hoja = workbookActual.Sheets[hojaActivaSeleccionada()];
+    const filaTitulos = [];
+    for(let c = 0; c < (rango.c2 - rango.c1 + 1); c++){
+      const cellRef = XLSX.utils.encode_cell({ r: filaTituloRaw - 1, c: (rango.c1 + c) });
+      const cell = hoja[cellRef];
+      filaTitulos.push(cell ? XLSX.utils.format_cell(cell) : '');
+    }
+    // Insertar la fila de títulos al inicio de tablaData
+    tablaData.unshift(filaTitulos);
+    filaTituloIdx = 0;
+    nombresOriginales = [...filaTitulos];
+  }
+
+  mergedColumns = [];
+  columnasMarcadasEliminar = new Set();
+  colsSeleccionadas = new Set();
+
+  modoGrilla = 'final';
+  floatWindow.classList.remove('open');
+  document.getElementById('float-backdrop').classList.remove('open');
+  document.getElementById('sheet-final-topbar').classList.add('open');
+  document.getElementById('nota-titulos-nuevos').classList.add('open');
+  actualizarBotonesColumnasTopbar();
+  renderTablaFinal();
+}
+
 // Los botones de unificar/sacar columnas solo tienen sentido en el flujo "Tipo tabla"
 function actualizarBotonesColumnasTopbar(){
   const mostrar = opcionCargaSeleccionada !== 'tag-hoja';
@@ -7316,42 +7572,33 @@ function actualizarBotonesColumnasTopbar(){
   document.getElementById('subir-basedatos').textContent = modoActualizarDoc ? 'Actualizar documento' : 'Subir a base de datos';
 }
 
-document.getElementById('confirmar-titulo').addEventListener('click', ()=>{
-  if(filaTituloIdx === null) return;
-  modoGrilla = 'final';
-  nombresOriginales = [...tablaData[filaTituloIdx]];
-  floatWindow.classList.remove('open');
-  document.getElementById('float-backdrop').classList.remove('open');
-  document.getElementById('sheet-final-topbar').classList.add('open');
-  document.getElementById('nota-titulos-nuevos').classList.add('open');
-  actualizarBotonesColumnasTopbar();
-  renderTablaFinal();
-});
-
 // Cancelar (topbar final): misma confirmación de siempre
 document.getElementById('cancel-final').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
 
-// Atrás (topbar final -> paso 4): vuelve a poder elegir otra fila de título
+// Atrás (topbar final -> paso rango): vuelve a poder elegir otro rango
 document.getElementById('atras-final').addEventListener('click', ()=>{
   document.getElementById('sheet-final-topbar').classList.remove('open');
   document.getElementById('nota-titulos-nuevos').classList.remove('open');
 
   if(opcionCargaSeleccionada === 'tag-hoja'){
-    modoGrilla = 'preview';
+    modoGrilla = 'celda-multi';
     if(!hojasSeleccionadasParaCarga.includes(hojaPrevisualizada)) hojaPrevisualizada = hojasSeleccionadasParaCarga[0];
     poblarSelectorHojaCampo();
     renderGridHoja(hojaPrevisualizada);
-    renderListaCampos();
-    poblarSelectorNombreCampo();
-    resetearCampoCelda();
+    renderCeldasYCamposList();
     mostrarPasoFloat('campo');
   } else {
-    modoGrilla = 'titulo';
-    renderTablaFinal();
-    document.getElementById('confirmar-titulo').disabled = (filaTituloIdx === null);
-    mostrarPasoFloat('titulo');
+    renderGrid();
+    limpiarSeleccionVisual();
+    // Restaurar el rango seleccionado visualmente
+    if(rangoConfirmadoObj){
+      selAnchor = { r: rangoConfirmadoObj.r1, c: rangoConfirmadoObj.c1 };
+      selEnd = { r: rangoConfirmadoObj.r2, c: rangoConfirmadoObj.c2 };
+      pintarSeleccion();
+    }
+    mostrarPasoFloat('rango');
   }
   floatWindow.classList.add('open');
 });
@@ -7629,59 +7876,194 @@ function volverAModoFinal(){
 // ---- Renombrar una columna individual (lápiz) ----
 function abrirRenombrarColumna(c){
   colRenombrando = c;
-  const original = nombresOriginales[c];
   const valorActual = tablaData[filaTituloIdx][c];
-  const sel = document.getElementById('select-renombrar-columna');
-  sel.innerHTML = `<option value="__original__">Usar nombre original (${original})</option>` +
-    COLUMNAS.map(n => `<option value="${n}">${n}</option>`).join('') +
-    '<option value="__nuevo__">+ Nuevo nombre...</option>';
-
-  document.getElementById('input-renombrar-nuevo').value = '';
-  document.getElementById('input-renombrar-nuevo').style.display = 'none';
-
-  if(valorActual === original){
-    sel.value = '__original__';
-  } else if(COLUMNAS.includes(valorActual)){
-    sel.value = valorActual;
-  } else {
-    // el nombre actual es un texto libre que se cargó a mano, no coincide con nada de la lista
-    sel.value = '__nuevo__';
-    document.getElementById('input-renombrar-nuevo').value = valorActual;
-    document.getElementById('input-renombrar-nuevo').style.display = 'block';
-  }
 
   document.getElementById('renombrar-col-letra').textContent = `(${XLSX.utils.encode_col(c)})`;
+
+  const input = document.getElementById('input-renombrar-autocomplete');
+  input.value = valorActual || '';
+  document.getElementById('confirmar-renombrar').disabled = !valorActual;
+  document.getElementById('autocomplete-dropdown-renombrar').style.display = 'none';
 
   document.getElementById('sheet-final-topbar').classList.remove('open');
   document.getElementById('nota-titulos-nuevos').classList.remove('open');
   mostrarPasoFloat('renombrar');
   floatWindow.classList.add('open');
+
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 100);
 }
 
-document.getElementById('select-renombrar-columna').addEventListener('change', ()=>{
-  const esNuevo = document.getElementById('select-renombrar-columna').value === '__nuevo__';
-  document.getElementById('input-renombrar-nuevo').style.display = esNuevo ? 'block' : 'none';
-  if(esNuevo) document.getElementById('input-renombrar-nuevo').focus();
+// Event listeners para renombrar columna con autocompletado
+let autocompleteRenombrarSelectedIndex = -1;
+
+document.getElementById('input-renombrar-autocomplete').addEventListener('input', (e)=>{
+  const texto = e.target.value.trim();
+  document.getElementById('confirmar-renombrar').disabled = !texto;
+  filtrarAutocompleteRenombrar(e.target.value);
+});
+
+document.getElementById('input-renombrar-autocomplete').addEventListener('keydown', (e)=>{
+  const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
+
+  if(e.key === 'ArrowDown'){
+    e.preventDefault();
+    if(dropdown.style.display === 'none'){
+      const input = document.getElementById('input-renombrar-autocomplete');
+      filtrarAutocompleteRenombrar(input.value, true);
+    } else {
+      navegarAutocompleteRenombrarConTeclas('down');
+    }
+  } else if(e.key === 'ArrowUp'){
+    e.preventDefault();
+    navegarAutocompleteRenombrarConTeclas('up');
+  } else if(e.key === 'Enter'){
+    e.preventDefault();
+    if(dropdown.style.display !== 'none' && autocompleteRenombrarSelectedIndex >= 0){
+      const opciones = dropdown.querySelectorAll('.autocomplete-option');
+      if(opciones[autocompleteRenombrarSelectedIndex]){
+        seleccionarOpcionAutocompleteRenombrar(opciones[autocompleteRenombrarSelectedIndex].dataset.value);
+      }
+    } else {
+      confirmarRenombrarColumna();
+    }
+  } else if(e.key === 'Escape'){
+    dropdown.style.display = 'none';
+    autocompleteRenombrarSelectedIndex = -1;
+  }
+});
+
+document.getElementById('btn-toggle-dropdown-renombrar').addEventListener('click', (e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
+  const input = document.getElementById('input-renombrar-autocomplete');
+
+  if(dropdown.style.display === 'block'){
+    dropdown.style.display = 'none';
+  } else {
+    filtrarAutocompleteRenombrar(input.value, true);
+  }
 });
 
 document.getElementById('cancel-renombrar').addEventListener('click', ()=>{
   colRenombrando = null;
+  document.getElementById('autocomplete-dropdown-renombrar').style.display = 'none';
+  autocompleteRenombrarSelectedIndex = -1;
   volverAModoFinal();
 });
 
 document.getElementById('confirmar-renombrar').addEventListener('click', ()=>{
-  if(colRenombrando === null) return;
-  const sel = document.getElementById('select-renombrar-columna').value;
-  let nuevoNombre;
-  if(sel === '__original__') nuevoNombre = nombresOriginales[colRenombrando];
-  else if(sel === '__nuevo__') nuevoNombre = document.getElementById('input-renombrar-nuevo').value.trim();
-  else nuevoNombre = sel;
+  confirmarRenombrarColumna();
+});
 
-  if(!nuevoNombre) return;
+function filtrarAutocompleteRenombrar(texto, mostrarTodos = false){
+  const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
+
+  const textoLower = texto.toLowerCase();
+  let opciones;
+
+  if(mostrarTodos){
+    opciones = COLUMNAS;
+  } else if(!texto.trim()){
+    dropdown.style.display = 'none';
+    autocompleteRenombrarSelectedIndex = -1;
+    return;
+  } else {
+    opciones = COLUMNAS.filter(col => col.toLowerCase().includes(textoLower));
+  }
+
+  let html = '';
+
+  // Mostrar opciones filtradas (máximo 10)
+  opciones.slice(0, 10).forEach(col => {
+    html += `<div class="autocomplete-option" data-value="${col}" style="padding:8px 12px; cursor:pointer; font-size:13px;">${col}</div>`;
+  });
+
+  // Opción "Crear nuevo"
+  if(texto.trim()){
+    const coincideExacto = COLUMNAS.some(col => col.toLowerCase() === textoLower);
+    if(!coincideExacto){
+      html += `<div class="autocomplete-option crear-nuevo" data-value="${texto}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto}"</div>`;
+    }
+  } else if(mostrarTodos){
+    html += `<div class="autocomplete-option crear-nuevo" data-value="" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear nuevo título</div>`;
+  }
+
+  if(html){
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+    autocompleteRenombrarSelectedIndex = -1;
+
+    dropdown.querySelectorAll('.autocomplete-option').forEach((opt, idx) => {
+      opt.addEventListener('mouseenter', () => {
+        dropdown.querySelectorAll('.autocomplete-option').forEach(o => o.style.background = '');
+        opt.style.background = 'var(--green-soft)';
+        autocompleteRenombrarSelectedIndex = idx;
+      });
+      opt.addEventListener('mouseleave', () => {
+        opt.style.background = '';
+      });
+      opt.addEventListener('click', () => seleccionarOpcionAutocompleteRenombrar(opt.dataset.value));
+    });
+  } else {
+    dropdown.style.display = 'none';
+    autocompleteRenombrarSelectedIndex = -1;
+  }
+}
+
+function seleccionarOpcionAutocompleteRenombrar(valor){
+  const input = document.getElementById('input-renombrar-autocomplete');
+  const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
+
+  if(valor){
+    input.value = valor;
+    document.getElementById('confirmar-renombrar').disabled = false;
+  } else {
+    input.focus();
+  }
+  dropdown.style.display = 'none';
+  autocompleteRenombrarSelectedIndex = -1;
+}
+
+function navegarAutocompleteRenombrarConTeclas(direccion){
+  const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
+  if(dropdown.style.display === 'none') return;
+
+  const opciones = dropdown.querySelectorAll('.autocomplete-option');
+  if(opciones.length === 0) return;
+
+  opciones.forEach(o => o.style.background = '');
+
+  if(direccion === 'down'){
+    autocompleteRenombrarSelectedIndex = Math.min(autocompleteRenombrarSelectedIndex + 1, opciones.length - 1);
+  } else if(direccion === 'up'){
+    autocompleteRenombrarSelectedIndex = Math.max(autocompleteRenombrarSelectedIndex - 1, 0);
+  }
+
+  if(autocompleteRenombrarSelectedIndex >= 0 && autocompleteRenombrarSelectedIndex < opciones.length){
+    opciones[autocompleteRenombrarSelectedIndex].style.background = 'var(--green-soft)';
+    opciones[autocompleteRenombrarSelectedIndex].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function confirmarRenombrarColumna(){
+  if(colRenombrando === null) return;
+
+  const nuevoNombre = document.getElementById('input-renombrar-autocomplete').value.trim();
+  if(!nuevoNombre){
+    alert('Escribí un nombre para la columna.');
+    return;
+  }
+
   tablaData[filaTituloIdx][colRenombrando] = nuevoNombre;
   colRenombrando = null;
+  document.getElementById('autocomplete-dropdown-renombrar').style.display = 'none';
+  autocompleteRenombrarSelectedIndex = -1;
   volverAModoFinal();
-});
+}
 
 // ---- "Un TAG, una hoja": paso 1 -> elegir qué hojas incluir, con navegación para previsualizarlas ----
 let hojaPrevisualizada = null;
@@ -7746,11 +8128,10 @@ document.getElementById('continuar-hojas').addEventListener('click', ()=>{
   renderGridHoja(hojaPrevisualizada);
 
   camposDefinidos = [];
-  renderListaCampos();
-  poblarSelectorNombreCampo();
-  document.getElementById('input-nombre-campo-nuevo').value = '';
-  document.getElementById('input-nombre-campo-nuevo').style.display = 'none';
-  resetearCampoCelda();
+  celdasSeleccionadas.clear();
+  celdaEditandoNombre = null;
+  renderCeldasYCamposList();
+  actualizarBotonConfirmarCeldas();
   mostrarPasoFloat('campo');
 });
 
@@ -7765,118 +8146,393 @@ document.getElementById('select-hoja-campo').addEventListener('change', (e)=>{
   renderGridHoja(hojaPrevisualizada);
 });
 
-// ---- "Un TAG, una hoja": paso 2 -> nombre del campo + celda con el valor, se pueden agregar varios ----
+// ---- "Un TAG, una hoja": paso 2 -> seleccionar celdas libremente, luego asignar nombres ----
 let hojasSeleccionadasParaCarga = [];
-let celdaConfirmada = null; // {r, c}
-let camposDefinidos = []; // [{ nombre, celda:{r,c} }]
+let celdasSeleccionadas = new Set(); // Set de strings "r,c" - celdas marcadas sin nombre aún
+let celdaEditandoNombre = null; // {r, c, key} - celda cuyo nombre se está editando ahora
+let camposDefinidos = []; // [{ nombre, celda:{r,c} }] - celdas con nombre confirmado
 
-function poblarSelectorNombreCampo(){
-  const sel = document.getElementById('select-nombre-campo');
-  const valorPrevio = sel.value;
-  sel.innerHTML = '<option value="">Elegí un nombre existente</option>' +
-    COLUMNAS.map(n => `<option value="${n}">${n}</option>`).join('') +
-    '<option value="__nuevo__">+ Nuevo nombre...</option>';
-  if([...sel.options].some(o => o.value === valorPrevio)) sel.value = valorPrevio;
+function abrirAsignarNombreCelda(r, c){
+  const key = `${r},${c}`;
+  celdaEditandoNombre = { r, c, key };
+
+  document.getElementById('nombre-celda-coord').textContent = letraColSegura(c) + r;
+
+  const input = document.getElementById('input-nombre-celda-autocomplete');
+  input.value = '';
+  document.getElementById('confirmar-nombre-celda').disabled = true;
+  document.getElementById('autocomplete-dropdown').style.display = 'none';
+
+  mostrarPasoFloat('nombre-celda');
+
+  setTimeout(() => input.focus(), 100);
 }
 
-function obtenerNombreCampo(){
-  const sel = document.getElementById('select-nombre-campo').value;
-  if(sel === '__nuevo__') return document.getElementById('input-nombre-campo-nuevo').value.trim();
-  return sel;
+let autocompleteSelectedIndex = -1;
+
+function filtrarAutocomplete(texto, mostrarTodos = false){
+  const dropdown = document.getElementById('autocomplete-dropdown');
+
+  const textoLower = texto.toLowerCase();
+  let opciones;
+
+  if(mostrarTodos){
+    // Mostrar todos los títulos existentes
+    opciones = COLUMNAS;
+  } else if(!texto.trim()){
+    dropdown.style.display = 'none';
+    autocompleteSelectedIndex = -1;
+    return;
+  } else {
+    // Filtrar por texto
+    opciones = COLUMNAS.filter(col => col.toLowerCase().includes(textoLower));
+  }
+
+  let html = '';
+
+  // Mostrar opciones filtradas (máximo 10)
+  opciones.slice(0, 10).forEach(col => {
+    html += `<div class="autocomplete-option" data-value="${col}" style="padding:8px 12px; cursor:pointer; font-size:13px;">${col}</div>`;
+  });
+
+  // Opción "Crear nuevo" si el texto no coincide exactamente con ninguna existente
+  if(texto.trim()){
+    const coincideExacto = COLUMNAS.some(col => col.toLowerCase() === textoLower);
+    if(!coincideExacto){
+      html += `<div class="autocomplete-option crear-nuevo" data-value="${texto}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto}"</div>`;
+    }
+  } else if(mostrarTodos){
+    // Si se abrió con la flecha y no hay texto, mostrar opción de crear
+    html += `<div class="autocomplete-option crear-nuevo" data-value="" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear nuevo título</div>`;
+  }
+
+  if(html){
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+    autocompleteSelectedIndex = -1;
+
+    // Event listeners para las opciones
+    dropdown.querySelectorAll('.autocomplete-option').forEach((opt, idx) => {
+      opt.addEventListener('mouseenter', () => {
+        dropdown.querySelectorAll('.autocomplete-option').forEach(o => o.style.background = '');
+        opt.style.background = 'var(--green-soft)';
+        autocompleteSelectedIndex = idx;
+      });
+      opt.addEventListener('mouseleave', () => {
+        opt.style.background = '';
+      });
+      opt.addEventListener('click', () => seleccionarOpcionAutocomplete(opt.dataset.value));
+    });
+  } else {
+    dropdown.style.display = 'none';
+    autocompleteSelectedIndex = -1;
+  }
 }
 
-function resetearCampoCelda(){
-  celdaConfirmada = null;
-  const campo = document.getElementById('celda-field');
-  campo.classList.remove('filled');
-  document.getElementById('celda-field-text').textContent = 'Click para elegir la celda';
-  validarFormularioCampo();
+function seleccionarOpcionAutocomplete(valor){
+  const input = document.getElementById('input-nombre-celda-autocomplete');
+  const dropdown = document.getElementById('autocomplete-dropdown');
+
+  if(valor){
+    input.value = valor;
+    document.getElementById('confirmar-nombre-celda').disabled = false;
+  } else {
+    // Opción "Crear nuevo título" - mantener el foco en el input
+    input.focus();
+  }
+  dropdown.style.display = 'none';
+  autocompleteSelectedIndex = -1;
 }
 
-function validarFormularioCampo(){
-  document.getElementById('confirmar-campo').disabled = camposDefinidos.length === 0;
+function navegarAutocompleteConTeclas(direccion){
+  const dropdown = document.getElementById('autocomplete-dropdown');
+  if(dropdown.style.display === 'none') return;
+
+  const opciones = dropdown.querySelectorAll('.autocomplete-option');
+  if(opciones.length === 0) return;
+
+  // Quitar highlight actual
+  opciones.forEach(o => o.style.background = '');
+
+  // Mover índice
+  if(direccion === 'down'){
+    autocompleteSelectedIndex = Math.min(autocompleteSelectedIndex + 1, opciones.length - 1);
+  } else if(direccion === 'up'){
+    autocompleteSelectedIndex = Math.max(autocompleteSelectedIndex - 1, 0);
+  }
+
+  // Highlight nueva opción
+  if(autocompleteSelectedIndex >= 0 && autocompleteSelectedIndex < opciones.length){
+    opciones[autocompleteSelectedIndex].style.background = 'var(--green-soft)';
+    opciones[autocompleteSelectedIndex].scrollIntoView({ block: 'nearest' });
+  }
 }
 
-function renderListaCampos(){
-  const cont = document.getElementById('campos-list');
-  cont.innerHTML = camposDefinidos.map((c, i) => `
-    <div class="campo-chip">
-      <span>${c.nombre} (${letraColSegura(c.celda.c)}${c.celda.r})</span>
-      <button class="quitar-campo" data-idx="${i}" title="Quitar">×</button>
-    </div>
-  `).join('');
-  cont.querySelectorAll('.quitar-campo').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      camposDefinidos.splice(Number(btn.dataset.idx), 1);
-      renderListaCampos();
-      validarFormularioCampo();
+function confirmarNombreCelda(){
+  if(!celdaEditandoNombre) return;
+
+  const nombre = document.getElementById('input-nombre-celda-autocomplete').value.trim();
+  if(!nombre){
+    alert('Escribí un nombre para el campo.');
+    return;
+  }
+
+  // Verificar si estamos editando un campo existente
+  const idxExistente = camposDefinidos.findIndex(c =>
+    c.celda.r === celdaEditandoNombre.r && c.celda.c === celdaEditandoNombre.c
+  );
+
+  // Verificar que no exista ya un campo con ese nombre (excepto si estamos editando el mismo)
+  const nombreDuplicado = camposDefinidos.some((c, idx) =>
+    c.nombre === nombre && idx !== idxExistente
+  );
+
+  if(nombreDuplicado){
+    alert(`Ya existe un campo con el nombre "${nombre}".`);
+    return;
+  }
+
+  if(idxExistente >= 0){
+    // Estamos editando: actualizar el nombre
+    camposDefinidos[idxExistente].nombre = nombre;
+  } else {
+    // Es nuevo: agregar a campos definidos
+    camposDefinidos.push({
+      nombre,
+      celda: { r: celdaEditandoNombre.r, c: celdaEditandoNombre.c }
+    });
+
+    // Marcar visualmente como confirmada
+    const td = document.querySelector(`td.cell[data-r="${celdaEditandoNombre.r}"][data-c="${celdaEditandoNombre.c}"]`);
+    if(td){
+      td.classList.remove('selected-pending');
+      td.classList.add('selected');
+    }
+  }
+
+  // Quitar de celdas seleccionadas si estaba ahí
+  celdasSeleccionadas.delete(celdaEditandoNombre.key);
+
+  celdaEditandoNombre = null;
+  document.getElementById('autocomplete-dropdown').style.display = 'none';
+
+  renderCeldasYCamposList();
+  actualizarBotonConfirmarCeldas();
+  mostrarPasoFloat('campo');
+}
+
+function renderCeldasYCamposList(){
+  const cont = document.getElementById('celdas-seleccionadas-list');
+
+  const totalItems = celdasSeleccionadas.size + camposDefinidos.length;
+  if(totalItems === 0){
+    cont.innerHTML = '<div style="color:var(--text-muted); font-size:13px; padding:8px;">Ninguna celda seleccionada</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Celdas sin nombre (pendientes)
+  const celdasPendientes = Array.from(celdasSeleccionadas).map(key => {
+    const [r, c] = key.split(',').map(Number);
+    return { r, c, key };
+  }).sort((a, b) => a.r - b.r || a.c - b.c);
+
+  celdasPendientes.forEach(celda => {
+    html += `
+      <div class="campo-chip campo-chip-pendiente" style="display:flex; align-items:center; gap:8px; opacity:0.6;">
+        <span style="font-style:italic; color:var(--text-muted); flex:1; font-size:13px;">(sin nombre)</span>
+        <span style="font-weight:600; color:var(--text-muted); min-width:50px;">${letraColSegura(celda.c)}${celda.r}</span>
+        <button class="quitar-celda-pendiente" data-key="${celda.key}" title="Quitar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px;">×</button>
+      </div>
+    `;
+  });
+
+  // Campos con nombre (confirmados)
+  camposDefinidos.forEach((campo, idx) => {
+    html += `
+      <div class="campo-chip" style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:1; font-size:13px; font-weight:500;">${campo.nombre}</span>
+        <span style="font-weight:600; color:var(--text-muted); min-width:50px;">${letraColSegura(campo.celda.c)}${campo.celda.r}</span>
+        <button class="editar-campo" data-idx="${idx}" title="Editar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0 4px;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:block;">
+            <path d="M11.333 2.00004C11.5081 1.82494 11.716 1.68605 11.9447 1.59129C12.1735 1.49653 12.4187 1.44775 12.6663 1.44775C12.914 1.44775 13.1592 1.49653 13.3879 1.59129C13.6167 1.68605 13.8246 1.82494 13.9997 2.00004C14.1748 2.17513 14.3137 2.383 14.4084 2.61178C14.5032 2.84055 14.552 3.08575 14.552 3.33337C14.552 3.58099 14.5032 3.82619 14.4084 4.05497C14.3137 4.28374 14.1748 4.49161 13.9997 4.66671L5.33301 13.3334L1.99967 14L2.66634 10.6667L11.333 2.00004Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="quitar-campo" data-idx="${idx}" title="Quitar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px;">×</button>
+      </div>
+    `;
+  });
+
+  cont.innerHTML = html;
+
+  // Event listeners para celdas pendientes
+  cont.querySelectorAll('.quitar-celda-pendiente').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      celdasSeleccionadas.delete(key);
+      const [r, c] = key.split(',').map(Number);
+      const td = document.querySelector(`td.cell[data-r="${r}"][data-c="${c}"]`);
+      if(td) td.classList.remove('selected-pending');
+      renderCeldasYCamposList();
+      actualizarBotonConfirmarCeldas();
     });
   });
+
+  // Event listeners para editar campos confirmados
+  cont.querySelectorAll('.editar-campo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const campo = camposDefinidos[idx];
+
+      // Abrir ventana de edición para esa celda
+      abrirAsignarNombreCelda(campo.celda.r, campo.celda.c);
+
+      // Pre-llenar el input con el nombre actual
+      setTimeout(() => {
+        const input = document.getElementById('input-nombre-celda-autocomplete');
+        input.value = campo.nombre;
+        document.getElementById('confirmar-nombre-celda').disabled = false;
+        input.select(); // Seleccionar el texto para facilitar edición
+      }, 100);
+    });
+  });
+
+  // Event listeners para quitar campos confirmados
+  cont.querySelectorAll('.quitar-campo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const campo = camposDefinidos[idx];
+
+      // Desmarcar celda
+      const td = document.querySelector(`td.cell[data-r="${campo.celda.r}"][data-c="${campo.celda.c}"]`);
+      if(td) td.classList.remove('selected');
+
+      // Quitar de la lista
+      camposDefinidos.splice(idx, 1);
+      renderCeldasYCamposList();
+      actualizarBotonConfirmarCeldas();
+    });
+  });
+}
+
+function actualizarBotonConfirmarCeldas(){
+  document.getElementById('confirmar-celdas').disabled = camposDefinidos.length === 0;
 }
 
 // letraCol depende de GRID_COLS de la hoja que se esté viendo; para los chips ya confirmados
 // usamos el mismo helper por si GRID_COLS cambió al navegar de hoja mientras tanto
 function letraColSegura(c){ return XLSX.utils.encode_col(c); }
 
-document.getElementById('select-nombre-campo').addEventListener('change', ()=>{
-  const esNuevo = document.getElementById('select-nombre-campo').value === '__nuevo__';
-  document.getElementById('input-nombre-campo-nuevo').style.display = esNuevo ? 'block' : 'none';
-  if(esNuevo) document.getElementById('input-nombre-campo-nuevo').focus();
-  validarFormularioCampo();
-});
-document.getElementById('input-nombre-campo-nuevo').addEventListener('input', validarFormularioCampo);
-
+// Event listeners para el paso de selección de celdas
 document.getElementById('cancel-campo').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
 
 document.getElementById('atras-campo').addEventListener('click', ()=>{
+  celdasSeleccionadas.clear();
+  celdaEditandoNombre = null;
+  camposDefinidos = [];
+  limpiarSeleccionVisual();
   renderListaHojas();
   mostrarPasoFloat('hojas');
 });
 
-// Al tocar la celda, se abre la mini-ventana de selección activa sobre la hoja que se está previsualizando
-document.getElementById('celda-field').addEventListener('click', ()=>{
-  celdaSeleccionActiva = null;
-  modoGrilla = 'celda-unica';
-  limpiarSeleccionVisual();
-  document.getElementById('celda-field-picker-text').textContent = 'Sin seleccionar';
-  document.getElementById('confirmar-celda-picker').disabled = true;
-  mostrarPasoFloat('celda-picker');
-});
-
-document.getElementById('cancel-celda-picker').addEventListener('click', ()=>{
-  modoGrilla = 'preview';
-  mostrarPasoFloat('campo');
-});
-
-document.getElementById('confirmar-celda-picker').addEventListener('click', ()=>{
-  if(!celdaSeleccionActiva) return;
-  celdaConfirmada = celdaSeleccionActiva;
-  modoGrilla = 'preview';
-  const campo = document.getElementById('celda-field');
-  campo.classList.add('filled');
-  document.getElementById('celda-field-text').textContent = `${letraCol(celdaConfirmada.c)}${celdaConfirmada.r}`;
-
-  // Agregar automáticamente el campo
-  const nombre = obtenerNombreCampo();
-  if(nombre && celdaConfirmada) {
-    camposDefinidos.push({ nombre, celda: { ...celdaConfirmada } });
-    renderListaCampos();
-
-    document.getElementById('select-nombre-campo').value = '';
-    document.getElementById('input-nombre-campo-nuevo').value = '';
-    document.getElementById('input-nombre-campo-nuevo').style.display = 'none';
-    resetearCampoCelda();
-    poblarSelectorNombreCampo();
+document.getElementById('confirmar-celdas').addEventListener('click', ()=>{
+  if(camposDefinidos.length === 0){
+    alert('Asigná nombres a las celdas seleccionadas antes de continuar.');
+    return;
   }
 
-  validarFormularioCampo();
+  limpiarSeleccionVisual();
+  continuarAlFinalDesdeTagHoja();
+});
+
+// Event listeners para el paso de asignar nombre
+document.getElementById('cancel-nombre-celda').addEventListener('click', ()=>{
+  // Al cancelar, desmarcar la celda pendiente
+  if(celdaEditandoNombre){
+    const td = document.querySelector(`td.cell[data-r="${celdaEditandoNombre.r}"][data-c="${celdaEditandoNombre.c}"]`);
+    if(td) td.classList.remove('selected-pending');
+    celdasSeleccionadas.delete(celdaEditandoNombre.key);
+  }
+  celdaEditandoNombre = null;
+  document.getElementById('autocomplete-dropdown').style.display = 'none';
+  renderCeldasYCamposList();
+  actualizarBotonConfirmarCeldas();
   mostrarPasoFloat('campo');
+});
+
+document.getElementById('confirmar-nombre-celda').addEventListener('click', ()=>{
+  confirmarNombreCelda();
+});
+
+// Input de autocompletado
+document.getElementById('input-nombre-celda-autocomplete').addEventListener('input', (e)=>{
+  const texto = e.target.value.trim();
+  document.getElementById('confirmar-nombre-celda').disabled = !texto;
+  filtrarAutocomplete(e.target.value);
+});
+
+document.getElementById('input-nombre-celda-autocomplete').addEventListener('keydown', (e)=>{
+  const dropdown = document.getElementById('autocomplete-dropdown');
+
+  if(e.key === 'ArrowDown'){
+    e.preventDefault();
+    if(dropdown.style.display === 'none'){
+      // Abrir dropdown si está cerrado
+      const input = document.getElementById('input-nombre-celda-autocomplete');
+      filtrarAutocomplete(input.value, true);
+    } else {
+      navegarAutocompleteConTeclas('down');
+    }
+  } else if(e.key === 'ArrowUp'){
+    e.preventDefault();
+    navegarAutocompleteConTeclas('up');
+  } else if(e.key === 'Enter'){
+    e.preventDefault();
+    if(dropdown.style.display !== 'none' && autocompleteSelectedIndex >= 0){
+      // Si hay una opción seleccionada, usarla
+      const opciones = dropdown.querySelectorAll('.autocomplete-option');
+      if(opciones[autocompleteSelectedIndex]){
+        seleccionarOpcionAutocomplete(opciones[autocompleteSelectedIndex].dataset.value);
+      }
+    } else {
+      // Si no hay dropdown o no hay selección, confirmar directamente
+      confirmarNombreCelda();
+    }
+  } else if(e.key === 'Escape'){
+    dropdown.style.display = 'none';
+    autocompleteSelectedIndex = -1;
+  }
+});
+
+// Botón de flecha para desplegar todos los títulos
+document.getElementById('btn-toggle-dropdown').addEventListener('click', (e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  const dropdown = document.getElementById('autocomplete-dropdown');
+  const input = document.getElementById('input-nombre-celda-autocomplete');
+
+  if(dropdown.style.display === 'block'){
+    dropdown.style.display = 'none';
+  } else {
+    filtrarAutocomplete(input.value, true);
+  }
+});
+
+// Cerrar dropdown al hacer click fuera
+document.addEventListener('click', (e)=>{
+  const input = document.getElementById('input-nombre-celda-autocomplete');
+  const dropdown = document.getElementById('autocomplete-dropdown');
+  const btn = document.getElementById('btn-toggle-dropdown');
+  if(!input.contains(e.target) && !dropdown.contains(e.target) && !btn.contains(e.target)){
+    dropdown.style.display = 'none';
+  }
 });
 
 // Continuar (paso campo): arma la tabla final leyendo todos los campos definidos en todas las hojas elegidas
-document.getElementById('confirmar-campo').addEventListener('click', ()=>{
+function continuarAlFinalDesdeTagHoja(){
   if(camposDefinidos.length === 0) return;
 
   tablaData = [camposDefinidos.map(c => c.nombre)];
@@ -7902,7 +8558,7 @@ document.getElementById('confirmar-campo').addEventListener('click', ()=>{
   document.getElementById('nota-titulos-nuevos').classList.add('open');
   actualizarBotonesColumnasTopbar();
   renderTablaFinal();
-});
+}
 
 // Subir a base de datos: agrega las columnas y filas nuevas a la tabla real de "Base de Datos"
 // (usa el mismo array COLUMNAS/FILAS que ya usa esa pestaña, no una lista separada)
