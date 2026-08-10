@@ -2614,24 +2614,33 @@
 
   <!-- Modal filtrar documentos: Tipo, Proyecto y Proveedor juntos, mismo formato que el resto -->
   <div class="overlay" id="overlay-filtro-docs">
-    <div class="modal" style="width:380px; max-height:85vh; overflow-y:auto;">
+    <div class="modal" style="width:300px;">
       <h3>Filtrar documentos</h3>
-
-      <label class="field-label" style="margin-top:0;">Tipo</label>
-      <input type="text" class="field-input" id="buscar-filtro-docs-tipo" placeholder="Buscar...">
-      <div class="hojas-list" id="lista-filtro-docs-tipo" style="max-height:130px;"></div>
-
-      <label class="field-label" style="margin-top:14px;">Número de proyecto</label>
-      <input type="text" class="field-input" id="buscar-filtro-docs-proyecto" placeholder="Buscar...">
-      <div class="hojas-list" id="lista-filtro-docs-proyecto" style="max-height:130px;"></div>
-
-      <label class="field-label" style="margin-top:14px;">Proveedor</label>
-      <input type="text" class="field-input" id="buscar-filtro-docs-proveedor" placeholder="Buscar...">
-      <div class="hojas-list" id="lista-filtro-docs-proveedor" style="max-height:130px;"></div>
-
-      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
-        <button class="btn" id="cancelar-filtro-docs">Cancelar</button>
-        <button class="btn btn-primary" id="aplicar-filtro-docs">Aplicar</button>
+      <div class="hojas-list">
+        <div class="seg-col-row" style="position:relative;">
+          <span class="seg-col-nombre" style="flex:1; font-weight:600;">Tipo</span>
+          <span class="th-filter" data-campo-doc="tipo" style="position:static;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </span>
+          <div class="filter-popup" id="popup-doc-tipo"></div>
+        </div>
+        <div class="seg-col-row" style="position:relative;">
+          <span class="seg-col-nombre" style="flex:1; font-weight:600;">Número de proyecto</span>
+          <span class="th-filter" data-campo-doc="proyecto" style="position:static;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </span>
+          <div class="filter-popup" id="popup-doc-proyecto"></div>
+        </div>
+        <div class="seg-col-row" style="position:relative;">
+          <span class="seg-col-nombre" style="flex:1; font-weight:600;">Proveedor</span>
+          <span class="th-filter" data-campo-doc="proveedor" style="position:static;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </span>
+          <div class="filter-popup" id="popup-doc-proveedor"></div>
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:14px; justify-content:flex-end;">
+        <button class="btn" id="cerrar-filtro-docs">Cerrar</button>
       </div>
     </div>
   </div>
@@ -5661,30 +5670,42 @@ function renderDocumentos(){
   });
 }
 
-// Sección de filtro reutilizable (mismo comportamiento que Base de Datos/Seguimiento:
-// buscador que desmarca lo que no coincide, "seleccionar todo" con estado parcial)
-function renderSeccionFiltroDocs(campo){
+// Popup de filtro para un campo de documento (tipo / proyecto / proveedor), con el mismo
+// mecanismo y comportamiento que el resto de los filtros de la app (Base de Datos/Seguimiento)
+function abrirFiltroDocCampo(campo){
+  cerrarFiltros();
+  filtroAbierto = `doc-${campo}`;
+  const popup = document.getElementById(`popup-doc-${campo}`);
   const valores = [...new Set(DOCUMENTOS_PROYECTO.map(d => valorOSinEspecificar(d[campo])))].sort();
   const seleccion = filtrosDocsProyecto[campo] || new Set(valores);
-  const cont = document.getElementById(`lista-filtro-docs-${campo}`);
+  const etiqueta = campo === 'proyecto' ? 'número de proyecto' : campo;
 
-  cont.innerHTML = `
-    <label class="filter-option">
-      <input type="checkbox" class="chk-todos-docs-campo">
-      <span>Seleccionar todo</span>
-    </label>
-    ${valores.map(v => `
-      <label class="filter-option" data-valor="${v.toLowerCase()}">
-        <input type="checkbox" class="chk-valor-docs-campo" value="${v}" ${seleccion.has(v) ? 'checked':''}>
-        <span>${v}</span>
+  popup.innerHTML = `
+    <div class="filter-popup-head">Filtrar ${etiqueta}</div>
+    <div class="filter-search" style="display:flex; gap:6px; align-items:center;">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
+      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
+    </div>
+    <div class="filter-list">
+      <label class="filter-option">
+        <input type="checkbox" class="chk-todos-popup">
+        <span>Seleccionar todo</span>
       </label>
-    `).join('')}
+      ${valores.map(v => `
+        <label class="filter-option" data-valor="${v.toLowerCase()}">
+          <input type="checkbox" class="chk-valor-popup" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <span>${v}</span>
+        </label>
+      `).join('')}
+    </div>
   `;
+  popup.classList.add('open');
+  popup.addEventListener('click', e => e.stopPropagation());
 
-  const chkTodos = cont.querySelector('.chk-todos-docs-campo');
-  const chksValor = () => [...cont.querySelectorAll('.chk-valor-docs-campo')];
+  const chkTodos = popup.querySelector('.chk-todos-popup');
+  const chksValor = () => [...popup.querySelectorAll('.chk-valor-popup')];
 
-  function actualizarEstado(){
+  function actualizarEstadoTodos(){
     const todos = chksValor();
     const marcados = todos.filter(c => c.checked);
     if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
@@ -5693,48 +5714,60 @@ function renderSeccionFiltroDocs(campo){
   }
 
   let eraParcial = false;
-  cont.querySelector('.filter-option').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
+  chkTodos.closest('label').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
   chkTodos.addEventListener('change', ()=>{
     if(eraParcial){
       chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
     } else {
       chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
     }
-    actualizarEstado();
+    actualizarEstadoTodos();
   });
-  chksValor().forEach(c => c.addEventListener('change', actualizarEstado));
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
 
-  const buscador = document.getElementById(`buscar-filtro-docs-${campo}`);
-  buscador.value = '';
-  buscador.oninput = (e)=>{
+  popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
     const q = e.target.value.trim().toLowerCase();
-    cont.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
+    popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
       const coincide = opt.dataset.valor.includes(q);
       opt.style.display = coincide ? 'flex' : 'none';
-      if(!coincide) opt.querySelector('input').checked = false;
+      if(!coincide) opt.querySelector('.chk-valor-popup').checked = false;
     });
-    actualizarEstado();
-  };
+    actualizarEstadoTodos();
+  });
 
-  actualizarEstado();
+  actualizarEstadoTodos();
+
+  popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
+    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    filtrosDocsProyecto[campo] = marcados.length === valores.length ? null : new Set(marcados);
+    cerrarFiltros();
+    document.querySelector(`[data-campo-doc="${campo}"]`).classList.toggle('active', !!filtrosDocsProyecto[campo]);
+    actualizarBotonesFiltroDocs();
+    renderDocumentos();
+    guardarPreferenciasProyecto();
+  });
 }
 
+document.querySelectorAll('[data-campo-doc]').forEach(el=>{
+  el.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const campo = el.dataset.campoDoc;
+    if(filtroAbierto === `doc-${campo}`){
+      cerrarFiltros();
+    } else {
+      abrirFiltroDocCampo(campo);
+    }
+  });
+});
+
 document.getElementById('btn-filtro-docs').addEventListener('click', ()=>{
-  ['tipo','proyecto','proveedor'].forEach(renderSeccionFiltroDocs);
+  ['tipo','proyecto','proveedor'].forEach(campo=>{
+    document.querySelector(`[data-campo-doc="${campo}"]`).classList.toggle('active', !!filtrosDocsProyecto[campo]);
+  });
   document.getElementById('overlay-filtro-docs').classList.add('open');
 });
-document.getElementById('cancelar-filtro-docs').addEventListener('click', ()=>{
-  document.getElementById('overlay-filtro-docs').classList.remove('open');
-});
-document.getElementById('aplicar-filtro-docs').addEventListener('click', ()=>{
-  ['tipo','proyecto','proveedor'].forEach(campo=>{
-    const valores = [...new Set(DOCUMENTOS_PROYECTO.map(d => valorOSinEspecificar(d[campo])))];
-    const marcados = [...document.querySelectorAll(`#lista-filtro-docs-${campo} .chk-valor-docs-campo`)].filter(c=>c.checked).map(c=>c.value);
-    filtrosDocsProyecto[campo] = marcados.length === valores.length ? null : new Set(marcados);
-  });
-  actualizarBotonesFiltroDocs();
-  renderDocumentos();
-  guardarPreferenciasProyecto();
+document.getElementById('cerrar-filtro-docs').addEventListener('click', ()=>{
+  cerrarFiltros();
   document.getElementById('overlay-filtro-docs').classList.remove('open');
 });
 
