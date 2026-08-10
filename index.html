@@ -206,15 +206,15 @@
   .tile-name{ font-size:15px; font-weight:600; line-height:1.35; }
   .tile-date{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
   .tile.new{
-    background:var(--green-soft);
-    border:1px dashed var(--green);
+    background:var(--card);
+    border:1px dashed var(--line);
     align-items:center;
     justify-content:center;
-    color:var(--green-dark);
+    color:var(--text-muted);
     font-size:14px;
     font-weight:600;
   }
-  .tile.new:hover{ background:#DBE7DA; box-shadow:none; }
+  .tile.new:hover{ background:var(--green-soft); border-color:var(--green); color:var(--green-dark); box-shadow:none; }
 
   /* ---- Vista proyecto ---- */
   .project-view{
@@ -283,7 +283,6 @@
   .doc-card{
     display:flex;
     align-items:center;
-    gap:14px;
     background:var(--card);
     border:1px solid var(--line);
     border-radius:8px;
@@ -291,51 +290,31 @@
   }
   .doc-card-clickable{ cursor:pointer; }
   .doc-card-clickable:hover{ border-color:var(--green); box-shadow:0 2px 8px rgba(43,42,37,0.06); }
-  .doc-card-icon{
-    width:34px; height:34px;
-    border-radius:6px;
-    background:var(--green-soft);
-    color:var(--green-dark);
-    display:flex; align-items:center; justify-content:center;
-    font-family:var(--font-mono);
-    font-size:9.5px;
-    font-weight:700;
-    flex-shrink:0;
-  }
   .doc-card-main{ flex:1; min-width:0; }
-  .doc-card-top{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:12px;
+  .doc-card-nombre-top{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text);
+    margin-bottom:4px;
   }
-  .doc-card-linea{
+  .doc-card-linea-tipo{
     display:flex;
     align-items:baseline;
     gap:6px;
     flex-wrap:wrap;
-    min-width:0;
-    font-size:13px;
+    font-size:12.5px;
     color:var(--text-muted);
   }
-  .doc-card-nombre{
-    font-size:13.5px;
-    font-weight:600;
-    color:var(--text);
-  }
   .doc-card-sep{ color:var(--text-dim); }
-  .doc-card-formato{
+  .doc-card-linea-detalle{
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    flex-wrap:wrap;
     font-family:var(--font-mono);
     font-size:11px;
     color:var(--text-dim);
-    margin-top:4px;
-  }
-  .doc-card-fecha{
-    font-family:var(--font-mono);
-    font-size:11px;
-    color:var(--text-dim);
-    flex-shrink:0;
-    white-space:nowrap;
+    margin-top:5px;
   }
 
   .seg-grid{
@@ -379,14 +358,14 @@
     align-items:center;
     justify-content:center;
     border-style:dashed;
-    border-color:var(--green);
-    background:var(--green-soft);
-    color:var(--green-dark);
+    border-color:var(--line);
+    background:var(--card);
+    color:var(--text-muted);
     font-weight:600;
     font-size:14px;
     min-height:130px;
   }
-  .seg-card-new:hover{ background:#DBE7DA; }
+  .seg-card-new:hover{ background:var(--green-soft); border-color:var(--green); color:var(--green-dark); }
 
   .seg-tabla-toolbar{
     display:flex;
@@ -1932,34 +1911,19 @@
     
     /* Cards de documentos */
     .doc-card {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
       padding: 12px;
     }
-    
-    .doc-card-icon {
-      width: 30px;
-      height: 30px;
-      font-size: 9px;
-    }
-    
-    .doc-card-top {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 4px;
-    }
-    
-    .doc-card-linea {
-      font-size: 12px;
-    }
-    
-    .doc-card-nombre {
+
+    .doc-card-nombre-top {
       font-size: 13px;
     }
-    
-    .doc-card-fecha {
-      font-size: 11px;
+
+    .doc-card-linea-tipo {
+      font-size: 12px;
+    }
+
+    .doc-card-linea-detalle {
+      font-size: 10.5px;
     }
     
     /* Modales */
@@ -2441,9 +2405,8 @@
         <button class="btn-tag" id="btn-agregar-tag">+ Agregar tag</button>
         <button class="btn-col" id="btn-modo-edicion" title="Mientras está apagado, tocar una celda solo la muestra; no deja editarla">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          <span id="btn-modo-edicion-texto">Editar: OFF</span>
+          <span id="btn-modo-edicion-texto">OFF</span>
         </button>
-        <button class="btn-col" id="btn-mostrar-columnas" style="display:none;">Mostrar columnas</button>
         <div style="flex:1;"></div>
         <button class="btn-col" id="btn-agregar-columna" title="Columnas">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
@@ -2452,9 +2415,8 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
         </button>
         <div class="filtro-doc-wrap">
-          <button class="btn-col" id="btn-filtro-documentos">
+          <button class="btn-col" id="btn-filtro-documentos" title="Filtrar por documento">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-            Documento
           </button>
           <div class="filter-popup" id="popup-filtro-documentos" style="left:auto; right:0;"></div>
         </div>
@@ -2476,28 +2438,12 @@
         <div class="docs-toolbar-left">
           <button class="btn-tag" id="btn-agregar-documento">+ Agregar documento</button>
           <button class="btn-col" id="btn-actualizar-documento">Actualizar documento</button>
-
-          <div class="filtro-doc-wrap">
-            <button class="btn-col" id="btn-filtro-doc-tipo">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-              Tipo
-            </button>
-            <div class="filter-popup" id="popup-filtro-doc-tipo"></div>
-          </div>
-          <div class="filtro-doc-wrap">
-            <button class="btn-col" id="btn-filtro-doc-proyecto">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-              Proyecto
-            </button>
-            <div class="filter-popup" id="popup-filtro-doc-proyecto"></div>
-          </div>
-          <div class="filtro-doc-wrap">
-            <button class="btn-col" id="btn-filtro-doc-proveedor">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-              Proveedor
-            </button>
-            <div class="filter-popup" id="popup-filtro-doc-proveedor"></div>
-          </div>
+          <button class="btn-col" id="btn-filtro-docs" title="Filtrar documentos">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </button>
+          <button class="btn-col" id="btn-ordenar-docs" title="Ordenar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+          </button>
         </div>
         <div class="docs-search">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -2562,7 +2508,9 @@
       <!-- Vista tabla de seguimiento -->
       <div id="seguimiento-tabla-vista" style="display:none;">
         <div class="seg-tabla-toolbar">
-          <button class="btn" id="seg-volver">← Volver</button>
+          <button class="btn" id="seg-volver" title="Volver a los seguimientos">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
           <div class="seg-tabla-titulo" id="seg-tabla-titulo"></div>
           <button class="lapiz-btn-inline" id="seg-renombrar-btn" title="Renombrar seguimiento">✎</button>
           <div style="flex:1;"></div>
@@ -2651,8 +2599,56 @@
       <div class="hojas-list" id="seg-columnas-gestionar-list" style="max-height:280px;"></div>
 
       <div class="modal-actions modal-actions-split" style="margin-top:16px;">
-        <button class="btn" id="cancel-gestionar-columnas-seg">Volver</button>
+        <button class="btn" id="cancel-gestionar-columnas-seg">Cancelar</button>
         <button class="btn btn-primary" id="aplicar-gestionar-columnas-seg">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal filtrar documentos: Tipo, Proyecto y Proveedor juntos, mismo formato que el resto -->
+  <div class="overlay" id="overlay-filtro-docs">
+    <div class="modal" style="width:380px; max-height:85vh; overflow-y:auto;">
+      <h3>Filtrar documentos</h3>
+
+      <label class="field-label" style="margin-top:0;">Tipo</label>
+      <input type="text" class="field-input" id="buscar-filtro-docs-tipo" placeholder="Buscar...">
+      <div class="hojas-list" id="lista-filtro-docs-tipo" style="max-height:130px;"></div>
+
+      <label class="field-label" style="margin-top:14px;">Número de proyecto</label>
+      <input type="text" class="field-input" id="buscar-filtro-docs-proyecto" placeholder="Buscar...">
+      <div class="hojas-list" id="lista-filtro-docs-proyecto" style="max-height:130px;"></div>
+
+      <label class="field-label" style="margin-top:14px;">Proveedor</label>
+      <input type="text" class="field-input" id="buscar-filtro-docs-proveedor" placeholder="Buscar...">
+      <div class="hojas-list" id="lista-filtro-docs-proveedor" style="max-height:130px;"></div>
+
+      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
+        <button class="btn" id="cancelar-filtro-docs">Cancelar</button>
+        <button class="btn btn-primary" id="aplicar-filtro-docs">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal ordenar documentos -->
+  <div class="overlay" id="overlay-ordenar-docs">
+    <div class="modal" style="width:320px;">
+      <h3>Ordenar documentos</h3>
+      <label class="field-label" style="margin-top:0;">Ordenar por</label>
+      <select class="field-select" id="select-ordenar-docs-campo">
+        <option value="nombre">Nombre</option>
+        <option value="fecha">Fecha</option>
+        <option value="tipo">Tipo</option>
+        <option value="proyecto">Número de proyecto</option>
+        <option value="proveedor">Proveedor</option>
+      </select>
+      <label class="field-label">Dirección</label>
+      <select class="field-select" id="select-ordenar-docs-dir">
+        <option value="asc">Ascendente</option>
+        <option value="desc">Descendente</option>
+      </select>
+      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
+        <button class="btn" id="cancelar-ordenar-docs">Cancelar</button>
+        <button class="btn btn-primary" id="aplicar-ordenar-docs">Aplicar</button>
       </div>
     </div>
   </div>
@@ -3798,7 +3794,8 @@ document.getElementById('btn-exportar-todo').addEventListener('click', ()=>{
 
 // ---- Mostrar columnas ocultas ----
 function actualizarBotonMostrarColumnas(){
-  document.getElementById('btn-mostrar-columnas').style.display = columnasOcultas.size > 0 ? 'flex' : 'none';
+  // El botón "Mostrar columnas" se sacó: mostrar/ocultar columnas ahora se maneja
+  // completo desde el panel de Columnas (el ícono del ojo en cada fila).
 }
 
 function renderColumnasOcultasList(){
@@ -3820,10 +3817,6 @@ function renderColumnasOcultasList(){
   });
 }
 
-document.getElementById('btn-mostrar-columnas').addEventListener('click', ()=>{
-  renderColumnasOcultasList();
-  document.getElementById('overlay-mostrar-columnas').classList.add('open');
-});
 document.getElementById('cerrar-mostrar-columnas').addEventListener('click', ()=>{
   document.getElementById('overlay-mostrar-columnas').classList.remove('open');
 });
@@ -4983,6 +4976,9 @@ document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>
     const incluida = seg.columnas.includes(col);
     return `
       <div class="seg-col-row" data-col-row="${col}">
+        <button type="button" class="col-icon-btn col-drag-handle" title="Mantené apretado y arrastrá para reordenar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>
+        </button>
         <span class="seg-col-nombre" style="flex:1;">${col}</span>
         <div class="col-acciones-grupo">
           <button type="button" class="col-icon-btn ${incluida ? '' : 'oculta'}" data-col="${col}" title="${incluida ? 'Ocultar columna' : 'Mostrar columna'}">
@@ -4992,6 +4988,13 @@ document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>
       </div>
     `;
   }).join('');
+
+  habilitarArrastreColumnas(cont, (nuevoOrdenAdicionales)=>{
+    // La principal (si está visible) siempre va primera; el resto sigue el orden que quedó
+    seg.columnas = seg.columnas.includes(colPrincipal)
+      ? [colPrincipal, ...nuevoOrdenAdicionales.filter(c => seg.columnas.includes(c))]
+      : nuevoOrdenAdicionales.filter(c => seg.columnas.includes(c));
+  });
 
   cont.querySelectorAll('[data-col]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -5638,21 +5641,20 @@ function renderDocumentos(){
   }
   cont.innerHTML = docs.map(doc => `
     <div class="doc-card doc-card-clickable" data-doc-idx="${DOCUMENTOS_PROYECTO.indexOf(doc)}">
-      <div class="doc-card-icon">XLS</div>
       <div class="doc-card-main">
-        <div class="doc-card-top">
-          <div class="doc-card-linea">
-            <span class="doc-card-nombre">${doc.nombre}</span>
-            <span class="doc-card-sep">|</span>
-            <span>${doc.tipo}</span>
-            <span class="doc-card-sep">|</span>
-            <span>${doc.proyecto || 'Sin especificar'}</span>
-            <span class="doc-card-sep">|</span>
-            <span>${doc.proveedor || 'Sin especificar'}</span>
-          </div>
-          <div class="doc-card-fecha">${doc.fecha}</div>
+        <div class="doc-card-nombre-top">${doc.nombre}</div>
+        <div class="doc-card-linea-tipo">
+          <span>${doc.tipo}</span>
+          <span class="doc-card-sep">|</span>
+          <span>${doc.proyecto || 'Sin especificar'}</span>
+          <span class="doc-card-sep">|</span>
+          <span>${doc.proveedor || 'Sin especificar'}</span>
         </div>
-        <div class="doc-card-formato">Formato: ${doc.tipoCarga} | ${doc.filas} fila${doc.filas===1 ? '' : 's'} | ${doc.columnas.length} título${doc.columnas.length===1 ? '' : 's'} extraído${doc.columnas.length===1 ? '' : 's'}</div>
+        <div class="doc-card-linea-detalle">
+          <span>${doc.fecha}</span>
+          <span class="doc-card-sep">|</span>
+          <span>Formato: ${doc.tipoCarga} | ${doc.filas} fila${doc.filas===1 ? '' : 's'} | ${doc.columnas.length} título${doc.columnas.length===1 ? '' : 's'} extraído${doc.columnas.length===1 ? '' : 's'}</span>
+        </div>
       </div>
     </div>
   `).join('');
@@ -5662,70 +5664,106 @@ function renderDocumentos(){
   });
 }
 
-// Popup de filtro para un campo de DOCUMENTOS_PROYECTO (tipo / proyecto / proveedor)
-function abrirFiltroDocs(campo, btnId, popupId){
-  cerrarFiltros();
-  const popup = document.getElementById(popupId);
+// Sección de filtro reutilizable (mismo comportamiento que Base de Datos/Seguimiento:
+// buscador que desmarca lo que no coincide, "seleccionar todo" con estado parcial)
+function renderSeccionFiltroDocs(campo){
   const valores = [...new Set(DOCUMENTOS_PROYECTO.map(d => valorOSinEspecificar(d[campo])))].sort();
   const seleccion = filtrosDocsProyecto[campo] || new Set(valores);
+  const cont = document.getElementById(`lista-filtro-docs-${campo}`);
 
-  popup.innerHTML = `
-    <div class="filter-popup-head">Filtrar por ${campo === 'proyecto' ? 'número de proyecto' : campo}</div>
-    <div class="filter-search" style="display:flex; gap:6px; align-items:center; padding:7px 8px; border-bottom:1px solid var(--line);">
-      <button class="btn-mini primary" id="apply-${campo}" style="width:100%;">Aplicar</button>
-    </div>
-    <div class="filter-list">
-      <label class="filter-option">
-        <input type="checkbox" id="chk-todos-${campo}">
-        <span>Seleccionar todo</span>
+  cont.innerHTML = `
+    <label class="filter-option">
+      <input type="checkbox" class="chk-todos-docs-campo">
+      <span>Seleccionar todo</span>
+    </label>
+    ${valores.map(v => `
+      <label class="filter-option" data-valor="${v.toLowerCase()}">
+        <input type="checkbox" class="chk-valor-docs-campo" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+        <span>${v}</span>
       </label>
-      ${valores.map(v => `
-        <label class="filter-option">
-          <input type="checkbox" class="chk-valor-${campo}" value="${v}" ${seleccion.has(v) ? 'checked':''}>
-          <span>${v}</span>
-        </label>
-      `).join('')}
-    </div>
+    `).join('')}
   `;
-  popup.classList.add('open');
-  popup.addEventListener('click', e => e.stopPropagation());
 
-  const chkTodos = popup.querySelector(`#chk-todos-${campo}`);
-  const chksValor = () => [...popup.querySelectorAll(`.chk-valor-${campo}`)];
-  chkTodos.checked = seleccion.size === valores.length;
-  chkTodos.addEventListener('change', ()=> chksValor().forEach(c => c.checked = chkTodos.checked));
-  chksValor().forEach(c => c.addEventListener('change', ()=>{
-    chkTodos.checked = chksValor().every(x => x.checked);
-  }));
+  const chkTodos = cont.querySelector('.chk-todos-docs-campo');
+  const chksValor = () => [...cont.querySelectorAll('.chk-valor-docs-campo')];
 
-  popup.querySelector(`#apply-${campo}`).addEventListener('click', ()=>{
-    const marcadas = chksValor().filter(c=>c.checked).map(c=>c.value);
-    filtrosDocsProyecto[campo] = marcadas.length === valores.length ? null : new Set(marcadas);
-    popup.classList.remove('open');
-    popup.innerHTML = '';
-    actualizarBotonesFiltroDocs();
-    renderDocumentos();
-    guardarPreferenciasProyecto();
+  function actualizarEstado(){
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+
+  let eraParcial = false;
+  cont.querySelector('.filter-option').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
+  chkTodos.addEventListener('change', ()=>{
+    if(eraParcial){
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
+    } else {
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
+    }
+    actualizarEstado();
   });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstado));
+
+  const buscador = document.getElementById(`buscar-filtro-docs-${campo}`);
+  buscador.value = '';
+  buscador.oninput = (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    cont.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+      if(!coincide) opt.querySelector('input').checked = false;
+    });
+    actualizarEstado();
+  };
+
+  actualizarEstado();
 }
+
+document.getElementById('btn-filtro-docs').addEventListener('click', ()=>{
+  ['tipo','proyecto','proveedor'].forEach(renderSeccionFiltroDocs);
+  document.getElementById('overlay-filtro-docs').classList.add('open');
+});
+document.getElementById('cancelar-filtro-docs').addEventListener('click', ()=>{
+  document.getElementById('overlay-filtro-docs').classList.remove('open');
+});
+document.getElementById('aplicar-filtro-docs').addEventListener('click', ()=>{
+  ['tipo','proyecto','proveedor'].forEach(campo=>{
+    const valores = [...new Set(DOCUMENTOS_PROYECTO.map(d => valorOSinEspecificar(d[campo])))];
+    const marcados = [...document.querySelectorAll(`#lista-filtro-docs-${campo} .chk-valor-docs-campo`)].filter(c=>c.checked).map(c=>c.value);
+    filtrosDocsProyecto[campo] = marcados.length === valores.length ? null : new Set(marcados);
+  });
+  actualizarBotonesFiltroDocs();
+  renderDocumentos();
+  guardarPreferenciasProyecto();
+  document.getElementById('overlay-filtro-docs').classList.remove('open');
+});
 
 function actualizarBotonesFiltroDocs(){
-  document.getElementById('btn-filtro-doc-tipo').classList.toggle('btn-filtro-activo', !!filtrosDocsProyecto.tipo);
-  document.getElementById('btn-filtro-doc-proyecto').classList.toggle('btn-filtro-activo', !!filtrosDocsProyecto.proyecto);
-  document.getElementById('btn-filtro-doc-proveedor').classList.toggle('btn-filtro-activo', !!filtrosDocsProyecto.proveedor);
+  const activo = !!(filtrosDocsProyecto.tipo || filtrosDocsProyecto.proyecto || filtrosDocsProyecto.proveedor);
+  document.getElementById('btn-filtro-docs').classList.toggle('btn-filtro-activo', activo);
 }
 
-document.getElementById('btn-filtro-doc-tipo').addEventListener('click', (e)=>{
-  e.stopPropagation();
-  abrirFiltroDocs('tipo', 'btn-filtro-doc-tipo', 'popup-filtro-doc-tipo');
+// ---- Ordenar documentos ----
+document.getElementById('btn-ordenar-docs').addEventListener('click', ()=>{
+  document.getElementById('overlay-ordenar-docs').classList.add('open');
 });
-document.getElementById('btn-filtro-doc-proyecto').addEventListener('click', (e)=>{
-  e.stopPropagation();
-  abrirFiltroDocs('proyecto', 'btn-filtro-doc-proyecto', 'popup-filtro-doc-proyecto');
+document.getElementById('cancelar-ordenar-docs').addEventListener('click', ()=>{
+  document.getElementById('overlay-ordenar-docs').classList.remove('open');
 });
-document.getElementById('btn-filtro-doc-proveedor').addEventListener('click', (e)=>{
-  e.stopPropagation();
-  abrirFiltroDocs('proveedor', 'btn-filtro-doc-proveedor', 'popup-filtro-doc-proveedor');
+document.getElementById('aplicar-ordenar-docs').addEventListener('click', ()=>{
+  const campo = document.getElementById('select-ordenar-docs-campo').value;
+  const dir = document.getElementById('select-ordenar-docs-dir').value;
+  DOCUMENTOS_PROYECTO.sort((a,b)=>{
+    const va = (a[campo] ?? '').toString();
+    const vb = (b[campo] ?? '').toString();
+    const cmp = va.localeCompare(vb, 'es', { numeric:true, sensitivity:'base' });
+    return dir === 'desc' ? -cmp : cmp;
+  });
+  document.getElementById('overlay-ordenar-docs').classList.remove('open');
+  renderDocumentos();
 });
 
 // ---- Filtro por documento de origen ----
@@ -6053,7 +6091,7 @@ const overlayAgregarColumna = document.getElementById('overlay-agregar-columna')
 document.getElementById('btn-modo-edicion').addEventListener('click', ()=>{
   modoEdicionBaseDeDatos = !modoEdicionBaseDeDatos;
   document.getElementById('btn-modo-edicion').classList.toggle('activo', modoEdicionBaseDeDatos);
-  document.getElementById('btn-modo-edicion-texto').textContent = modoEdicionBaseDeDatos ? 'Editar: ON' : 'Editar: OFF';
+  document.getElementById('btn-modo-edicion-texto').textContent = modoEdicionBaseDeDatos ? 'ON' : 'OFF';
 });
 
 // Agrega una columna nueva a la base (usado desde el panel de Columnas)
@@ -6183,7 +6221,7 @@ function iconoOjoSvg(oculta){
 // Arrastrar y soltar para reordenar columnas, agarrando el ícono "≡" de cada fila.
 // Usa Pointer Events (no HTML5 drag-and-drop, que anda mal en el celular) y un clon
 // "fantasma" que sigue al dedo/mouse en tiempo real, como el reordenamiento de Notion.
-function habilitarArrastreColumnasBD(cont){
+function habilitarArrastreColumnas(cont, onSoltar){
   cont.querySelectorAll('.col-drag-handle').forEach(handle=>{
     handle.addEventListener('pointerdown', (e)=>{
       e.preventDefault();
@@ -6227,10 +6265,8 @@ function habilitarArrastreColumnasBD(cont){
         ghost.remove();
 
         // El orden real se lee directo del DOM, tal como quedó tras arrastrar
-        const nuevoOrdenGestionable = [...cont.querySelectorAll('.seg-col-row')].map(f => f.dataset.colRow);
-        COLUMNAS = ['TAG', ...nuevoOrdenGestionable];
-        guardarOrdenColumnas();
-        renderTabla();
+        const nuevoOrden = [...cont.querySelectorAll('.seg-col-row')].map(f => f.dataset.colRow);
+        onSoltar(nuevoOrden);
       }
 
       document.addEventListener('pointermove', mover);
@@ -6267,7 +6303,11 @@ function renderListaColumnasBD(){
     `;
   }).join('');
 
-  habilitarArrastreColumnasBD(cont);
+  habilitarArrastreColumnas(cont, (nuevoOrden)=>{
+    COLUMNAS = ['TAG', ...nuevoOrden];
+    guardarOrdenColumnas();
+    renderTabla();
+  });
 
   cont.querySelectorAll('[data-accion="ojo"]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -8315,7 +8355,7 @@ dataTables.forEach(table => {
   table.addEventListener('wheel', (e) => {
     if(e.ctrlKey || e.metaKey){
       e.preventDefault();
-      const delta = e.deltaY > 0 ? -3 : 3;
+      const delta = e.deltaY > 0 ? -5 : 5;
       if(!wheelZoomPendiente){
         wheelZoomPendiente = true;
         requestAnimationFrame(()=>{
@@ -8362,8 +8402,8 @@ dataTables.forEach(table => {
 });
 
 // Botones de zoom
-zoomInBtn.addEventListener('click', () => applyZoom(zoomLevel + 10));
-zoomOutBtn.addEventListener('click', () => applyZoom(zoomLevel - 10));
+zoomInBtn.addEventListener('click', () => applyZoom(zoomLevel + 5));
+zoomOutBtn.addEventListener('click', () => applyZoom(zoomLevel - 5));
 zoomResetBtn.addEventListener('click', () => applyZoom(100));
 
 // Input manual: se aplica al confirmar (Enter o al salir del campo), no en cada tecla,
