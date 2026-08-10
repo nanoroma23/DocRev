@@ -69,6 +69,12 @@
   }
   .crumb:hover{ background:var(--card); color:var(--text); }
   .crumb svg{ opacity:0.6; }
+  .crumb.seg-tabla-titulo-crumb{
+    display:flex;
+    font-size:14px;
+    font-weight:600;
+    color:var(--text);
+  }
 
   .tabs{
     display:none;
@@ -571,7 +577,6 @@
     width:100%;
     border-collapse:collapse;
     table-layout:auto;
-    transition:zoom 0.12s ease;
   }
   table.datatable thead th{
     text-align:left;
@@ -2508,11 +2513,10 @@
       <!-- Vista tabla de seguimiento -->
       <div id="seguimiento-tabla-vista" style="display:none;">
         <div class="seg-tabla-toolbar">
-          <button class="btn" id="seg-volver" title="Volver a los seguimientos">
+          <div class="crumb seg-tabla-titulo-crumb" id="seg-tabla-titulo-crumb" title="Volver a los seguimientos">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div class="seg-tabla-titulo" id="seg-tabla-titulo"></div>
-          <button class="lapiz-btn-inline" id="seg-renombrar-btn" title="Renombrar seguimiento">✎</button>
+            <span id="seg-tabla-titulo"></span>
+          </div>
           <div style="flex:1;"></div>
           <button class="btn-col" id="seg-graficos" title="Gráficos adicionales">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="4" width="4" height="17"/><rect x="17" y="14" width="4" height="7"/></svg>
@@ -2529,6 +2533,7 @@
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transform:rotate(-90deg);"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <div class="menu-dropdown" id="seg-mas-dropdown">
+              <div class="menu-item" id="seg-renombrar-btn">Renombrar</div>
               <div class="menu-item" id="seg-exportar">Exportar</div>
               <div class="menu-item" id="seg-importar">Importar</div>
               <div class="menu-item danger" id="seg-eliminar">Eliminar</div>
@@ -3245,6 +3250,19 @@
       <div class="modal-actions modal-actions-split">
         <button class="btn" id="cancel-agregar-columna">Cancelar</button>
         <button class="btn btn-primary" id="confirm-agregar-columna">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal renombrar seguimiento -->
+  <div class="overlay" id="overlay-rename-seguimiento">
+    <div class="modal">
+      <h3>Renombrar seguimiento</h3>
+      <p>Ingresá el nuevo nombre del seguimiento.</p>
+      <input type="text" id="input-rename-seguimiento">
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-rename-seguimiento">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-rename-seguimiento">Guardar</button>
       </div>
     </div>
   </div>
@@ -4510,7 +4528,7 @@ async function abrirTablaSeguimiento(id){
   renderTablaSeguimiento();
 }
 
-document.getElementById('seg-volver').addEventListener('click', abrirVistaSeguimientos);
+document.getElementById('seg-tabla-titulo-crumb').addEventListener('click', abrirVistaSeguimientos);
 
 // Menú "Más" (Exportar / Importar / Eliminar)
 document.getElementById('seg-mas-btn').addEventListener('click', (e)=>{
@@ -4528,35 +4546,20 @@ document.getElementById('seg-graficos').addEventListener('click', ()=>{
 
 document.getElementById('seg-renombrar-btn').addEventListener('click', ()=>{
   const seg = seguimientoActivo;
-  const cont = document.getElementById('seg-tabla-titulo');
-  const valorActual = seg.titulo;
-
-  cont.innerHTML = `<input type="text" class="field-input" id="input-renombrar-seg" style="width:240px; padding:5px 8px; font-size:14px; font-weight:600;">`;
-  const input = document.getElementById('input-renombrar-seg');
-  input.value = valorActual;
-  input.focus();
-  input.select();
-
-  let guardado = false;
-  function guardar(){
-    if(guardado) return;
-    guardado = true;
-    const nuevo = input.value.trim() || valorActual;
-    seg.titulo = nuevo;
-    cont.textContent = nuevo;
-    guardarSeguimientoEnSupabase(seg);
-  }
-  function cancelar(){
-    if(guardado) return;
-    guardado = true;
-    cont.textContent = valorActual;
-  }
-
-  input.addEventListener('blur', guardar);
-  input.addEventListener('keydown', (e)=>{
-    if(e.key === 'Enter') input.blur();
-    if(e.key === 'Escape'){ input.removeEventListener('blur', guardar); cancelar(); }
-  });
+  document.getElementById('input-rename-seguimiento').value = seg.titulo;
+  document.getElementById('overlay-rename-seguimiento').classList.add('open');
+});
+document.getElementById('cancel-rename-seguimiento').addEventListener('click', ()=>{
+  document.getElementById('overlay-rename-seguimiento').classList.remove('open');
+});
+document.getElementById('confirm-rename-seguimiento').addEventListener('click', async ()=>{
+  const seg = seguimientoActivo;
+  const nuevoNombre = document.getElementById('input-rename-seguimiento').value.trim();
+  if(!nuevoNombre) return;
+  seg.titulo = nuevoNombre;
+  document.getElementById('seg-tabla-titulo').textContent = nuevoNombre;
+  document.getElementById('overlay-rename-seguimiento').classList.remove('open');
+  await guardarSeguimientoEnSupabase(seg);
 });
 
 function valoresUnicosSeguimiento(seg, col){
@@ -4970,7 +4973,11 @@ document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>
   // El resto de las columnas de la base, con el mismo formato de íconos que Base de Datos
   // (acá solo se puede mostrar/ocultar, no renombrar ni eliminar)
   const cont = document.getElementById('seg-columnas-gestionar-list');
-  const columnasAdicionales = COLUMNAS.filter(c => c !== colPrincipal);
+  // Las que ya están en el seguimiento van primero, respetando el orden que quedó guardado;
+  // el resto de las columnas de la base (todavía no agregadas) van después, para poder sumarlas
+  const columnasIncluidas = seg.columnas.filter(c => c !== colPrincipal);
+  const columnasNoIncluidas = COLUMNAS.filter(c => c !== colPrincipal && !seg.columnas.includes(c));
+  const columnasAdicionales = [...columnasIncluidas, ...columnasNoIncluidas];
 
   cont.innerHTML = columnasAdicionales.map(col => {
     const incluida = seg.columnas.includes(col);
@@ -5653,7 +5660,7 @@ function renderDocumentos(){
         <div class="doc-card-linea-detalle">
           <span>${doc.fecha}</span>
           <span class="doc-card-sep">|</span>
-          <span>Formato: ${doc.tipoCarga} | ${doc.filas} fila${doc.filas===1 ? '' : 's'} | ${doc.columnas.length} título${doc.columnas.length===1 ? '' : 's'} extraído${doc.columnas.length===1 ? '' : 's'}</span>
+          <span>Formato: ${doc.tipoCarga} | ${doc.filas} fila${doc.filas===1 ? '' : 's'} | ${doc.columnas.length} título${doc.columnas.length===1 ? '' : 's'}</span>
         </div>
       </div>
     </div>
@@ -8351,18 +8358,11 @@ function showZoomControl(){
 
 // Ctrl/Cmd + Rueda del mouse
 dataTables.forEach(table => {
-  let wheelZoomPendiente = false;
   table.addEventListener('wheel', (e) => {
     if(e.ctrlKey || e.metaKey){
       e.preventDefault();
       const delta = e.deltaY > 0 ? -5 : 5;
-      if(!wheelZoomPendiente){
-        wheelZoomPendiente = true;
-        requestAnimationFrame(()=>{
-          applyZoom(zoomLevel + delta);
-          wheelZoomPendiente = false;
-        });
-      }
+      applyZoom(zoomLevel + delta);
     }
   }, { passive: false });
 });
