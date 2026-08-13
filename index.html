@@ -3197,6 +3197,21 @@
   </div>
 
   <!-- Modal exportar -->
+  <!-- Modal exportar seguimiento -->
+  <div class="overlay" id="overlay-exportar-seguimiento">
+    <div class="modal" style="width:340px;">
+      <h3>Exportar</h3>
+      <p>¿Qué querés exportar a Excel?</p>
+      <div class="columna-opciones-acciones">
+        <button class="btn-accion-columna" id="btn-exportar-seg-vista">Vista actual (con los filtros y el orden de ahora)</button>
+        <button class="btn-accion-columna" id="btn-exportar-seg-todo">Todo el seguimiento (sin los filtros de vista)</button>
+      </div>
+      <div class="modal-actions" style="margin-top:14px;">
+        <button class="btn" id="cancel-exportar-seguimiento">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay-exportar">
     <div class="modal" style="width:340px;">
       <h3>Exportar</h3>
@@ -5335,18 +5350,17 @@ document.getElementById('confirmar-eliminar-seguimiento').addEventListener('clic
 });
 
 // ---- Exportar / Importar un seguimiento ----
-document.getElementById('seg-exportar').addEventListener('click', ()=>{
-  const seg = seguimientoActivo;
-  if(!seg) return;
-  const filas = filasDeSeguimientoVista(seg);
+function descargarSeguimientoComoExcel(seg, filas, nombreArchivo){
   const datos = filas.map(f=>{
     const obj = {};
     seg.columnas.forEach(c => obj[c] = f[c] ?? '');
     obj['Estado'] = seg.estados[f.TAG] || 'VER';
     obj['Comentarios'] = seg.comentarios[f.TAG] || '';
+    const fechaMod = (seg.fechasModificacion || {})[f.TAG] || '';
+    obj['Última modificación'] = fechaMod ? new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
     return obj;
   });
-  const hoja = XLSX.utils.json_to_sheet(datos, { header: [...seg.columnas, 'Estado', 'Comentarios'] });
+  const hoja = XLSX.utils.json_to_sheet(datos, { header: [...seg.columnas, 'Estado', 'Comentarios', 'Última modificación'] });
 
   // Aplicar colores a las celdas de Estado
   const estadoColIndex = seg.columnas.length; // Índice de la columna Estado
@@ -5369,7 +5383,26 @@ document.getElementById('seg-exportar').addEventListener('click', ()=>{
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, hoja, seg.titulo.slice(0,28) || 'Seguimiento');
-  XLSX.writeFile(wb, `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}.xlsx`, { cellStyles: true });
+  XLSX.writeFile(wb, nombreArchivo, { cellStyles: true });
+}
+
+document.getElementById('seg-exportar').addEventListener('click', ()=>{
+  document.getElementById('overlay-exportar-seguimiento').classList.add('open');
+});
+document.getElementById('cancel-exportar-seguimiento').addEventListener('click', ()=>{
+  document.getElementById('overlay-exportar-seguimiento').classList.remove('open');
+});
+document.getElementById('btn-exportar-seg-vista').addEventListener('click', ()=>{
+  const seg = seguimientoActivo;
+  if(!seg) return;
+  descargarSeguimientoComoExcel(seg, filasDeSeguimientoVista(seg), `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}_vista.xlsx`);
+  document.getElementById('overlay-exportar-seguimiento').classList.remove('open');
+});
+document.getElementById('btn-exportar-seg-todo').addEventListener('click', ()=>{
+  const seg = seguimientoActivo;
+  if(!seg) return;
+  descargarSeguimientoComoExcel(seg, filasDeSeguimiento(seg), `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}_completo.xlsx`);
+  document.getElementById('overlay-exportar-seguimiento').classList.remove('open');
 });
 
 document.getElementById('seg-importar').addEventListener('click', ()=>{
@@ -5387,11 +5420,25 @@ document.getElementById('seg-importar-input').addEventListener('change', ()=>{
       const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
       const hoja = wb.Sheets[wb.SheetNames[0]];
       const filasImportadas = XLSX.utils.sheet_to_json(hoja);
+      seg.fechasModificacion = seg.fechasModificacion || {};
       filasImportadas.forEach(fila=>{
         const tag = fila['TAG'] ?? fila['Tag'] ?? fila['tag'];
         if(!tag) return;
         if(fila['Estado']) seg.estados[tag] = fila['Estado'];
         if(fila['Comentarios'] !== undefined) seg.comentarios[tag] = String(fila['Comentarios']);
+        const fechaTexto = fila['Última modificación'];
+        if(fechaTexto){
+          // Excel puede traer la fecha como texto (dd/mm/yyyy) o como número de serie de fecha
+          let fechaParseada = null;
+          if(typeof fechaTexto === 'number'){
+            fechaParseada = XLSX.SSF.parse_date_code(fechaTexto);
+            if(fechaParseada) fechaParseada = new Date(fechaParseada.y, fechaParseada.m - 1, fechaParseada.d);
+          } else {
+            const partes = String(fechaTexto).split('/');
+            if(partes.length === 3) fechaParseada = new Date(+partes[2], +partes[1] - 1, +partes[0]);
+          }
+          if(fechaParseada && !isNaN(fechaParseada)) seg.fechasModificacion[tag] = fechaParseada.toISOString();
+        }
       });
       renderTablaSeguimiento();
       guardarSeguimientoEnSupabase(seg);
