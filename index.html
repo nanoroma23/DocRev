@@ -476,6 +476,7 @@
   .col-acciones-grupo{ display:flex; align-items:center; gap:12px; }
   .col-icon-btn-grande{
     width:36px;
+    height:auto;
     align-self:stretch;
     border:1px solid var(--line);
   }
@@ -3174,7 +3175,7 @@
   <div class="overlay" id="overlay-conflicto-celda">
     <div class="modal" style="width:400px;">
       <label class="field-label" style="margin-top:0;">Valor actual</label>
-      <div id="valor-actual-row" style="display:flex; align-items:center; gap:8px;">
+      <div id="valor-actual-row" style="display:flex; align-items:stretch; gap:8px; padding:9px 10px; box-sizing:border-box;">
         <div id="valor-actual-texto" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font-size:13px; min-height:18px;"></div>
         <button type="button" class="col-icon-btn col-icon-btn-grande" id="btn-lapiz-valor-actual" title="Editar valor">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -3297,6 +3298,46 @@
   </div>
 
   <!-- Modal detalle de instrumento -->
+  <!-- Modal renombrar TAG -->
+  <div class="overlay" id="overlay-renombrar-tag">
+    <div class="modal">
+      <h3>Modificar nombre de TAG</h3>
+      <p>Ingresá el nuevo TAG. Se actualiza en toda la base de datos.</p>
+      <input type="text" id="input-renombrar-tag">
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-renombrar-tag">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-renombrar-tag">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal eliminar TAG -->
+  <div class="overlay" id="overlay-eliminar-tag">
+    <div class="modal">
+      <h3>Eliminar TAG</h3>
+      <p id="eliminar-tag-texto">Vas a eliminar este instrumento de la base de datos. Esta acción no se puede deshacer.</p>
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-eliminar-tag">Cancelar</button>
+        <button class="btn btn-danger" id="confirm-eliminar-tag">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal agregar TAG repetido distinto -->
+  <div class="overlay" id="overlay-agregar-tag-distinto">
+    <div class="modal">
+      <h3>Agregar como TAG nuevo</h3>
+      <p>Esta fila tiene valores distintos. Ingresá un nuevo TAG para agregarla a la base de datos.</p>
+      <label class="field-label">Nuevo TAG</label>
+      <input type="text" class="field-input" id="input-nuevo-tag-distinto" placeholder="Ej: TAG-001-A">
+      <div id="preview-datos-distintos" style="margin-top:12px; padding:10px; background:var(--green-soft); border-radius:6px; font-size:12px;"></div>
+      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
+        <button class="btn" id="cancel-agregar-tag-distinto">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-agregar-tag-distinto">Agregar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay-detalle-instrumento">
     <div class="modal" style="width:360px;">
       <h3 id="detalle-instrumento-titulo">Detalle</h3>
@@ -4142,6 +4183,7 @@ async function cargarSeguimientos(proyectoId){
     ordenVista: row.orden_vista || [],
     estados: row.estados || {},
     comentarios: row.comentarios || {},
+    fechasModificacion: row.fechas_modificacion || {},
   }));
   if(tabActiva === 'seguimiento' && vista === 'project') abrirVistaSeguimientos();
 }
@@ -4589,6 +4631,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     orden_vista: [],
     estados: {},
     comentarios: {},
+    fechas_modificacion: {},
   }).select().single();
 
   btn.disabled = false;
@@ -4611,6 +4654,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     ordenVista: [],
     estados: {},
     comentarios: {},
+    fechasModificacion: {},
   });
 
   // Volver a la vista de tarjetas
@@ -4819,8 +4863,9 @@ function renderTablaSeguimiento(){
   }).join('');
 
   // Columna Comentarios (al final)
+  const anchoComentarios = seguimientoColumnasAnchos['__COMENTARIOS__'] ? `style="width:${seguimientoColumnasAnchos['__COMENTARIOS__']}px; min-width:${seguimientoColumnasAnchos['__COMENTARIOS__']}px;"` : '';
   html += `
-    <th>
+    <th data-seg-col="__COMENTARIOS__" ${anchoComentarios}>
       <div class="th-inner">
         <span>Comentarios</span>
         <span class="th-filter ${seg.filtrosVista['__COMENTARIOS__'] ? 'active':''}" data-seg-tabla-filtro="__COMENTARIOS__">
@@ -4829,6 +4874,11 @@ function renderTablaSeguimiento(){
       </div>
       <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__COMENTARIOS__"></div>
+    </th>
+    <th style="width:110px; min-width:110px;">
+      <div class="th-inner">
+        <span>Última modif.</span>
+      </div>
     </th>`;
 
   thead.innerHTML = html;
@@ -4893,7 +4943,7 @@ function renderTablaSeguimiento(){
       e.stopPropagation();
       th = handle.closest('th');
       columna = th.dataset.segCol;
-      if(!columna) return; // Skip para columnas Estado y Comentarios
+      if(!columna) return; // Skip para columnas sin data-seg-col (ej: Última modif.)
       startX = e.pageX;
       startWidth = th.offsetWidth;
 
@@ -4921,7 +4971,7 @@ function renderTablaSeguimiento(){
 
   const tbody = document.getElementById('seg-tbody');
   if(filas.length === 0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="${seg.columnas.length+3}">Ningún instrumento coincide con este seguimiento y estos filtros.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="${seg.columnas.length+4}">Ningún instrumento coincide con este seguimiento y estos filtros.</td></tr>`;
     return;
   }
 
@@ -4930,6 +4980,8 @@ function renderTablaSeguimiento(){
     const estado = seg.estados[valorKey] || 'VER';
     const comentario = seg.comentarios[valorKey] || '';
     const estadoClass = estado === 'OK' ? 'estado-ok' : estado === 'NO OK' ? 'estado-no-ok' : 'estado-ver';
+    const fechaMod = seg.fechasModificacion[valorKey] || '';
+    const fechaFormateada = fechaMod ? new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
 
     // Columna número
     let rowHtml = `<td class="col-num col-key">${i+1}</td>`;
@@ -4952,11 +5004,14 @@ function renderTablaSeguimiento(){
     // Columnas secundarias
     rowHtml += columnasSecundarias.map(c => `<td class="col-tag">${f[c] ?? ''}</td>`).join('');
 
-    // Comentarios (al final)
+    // Comentarios
     rowHtml += `
       <td>
         <input type="text" class="field-input seg-comentario-input" data-key="${valorKey}" value="${comentario}" style="padding:4px 6px; font-size:12px;">
       </td>`;
+
+    // Última modificación
+    rowHtml += `<td style="font-size:11.5px; color:var(--text-muted); text-align:center;">${fechaFormateada}</td>`;
 
     return `<tr>${rowHtml}</tr>`;
   }).join('');
@@ -4964,17 +5019,23 @@ function renderTablaSeguimiento(){
   tbody.querySelectorAll('.seg-estado-select').forEach(sel=>{
     sel.addEventListener('change', ()=>{
       seg.estados[sel.dataset.key] = sel.value;
+      if(!seg.fechasModificacion) seg.fechasModificacion = {};
+      seg.fechasModificacion[sel.dataset.key] = new Date().toISOString();
       // Actualizar clase según el nuevo estado
       sel.classList.remove('estado-ok', 'estado-no-ok', 'estado-ver');
       if(sel.value === 'OK') sel.classList.add('estado-ok');
       else if(sel.value === 'NO OK') sel.classList.add('estado-no-ok');
       else sel.classList.add('estado-ver');
+      renderTablaSeguimiento();
       guardarSeguimientoEnSupabase(seg);
     });
   });
   tbody.querySelectorAll('.seg-comentario-input').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       seg.comentarios[inp.dataset.key] = inp.value;
+      if(!seg.fechasModificacion) seg.fechasModificacion = {};
+      seg.fechasModificacion[inp.dataset.key] = new Date().toISOString();
+      renderTablaSeguimiento();
       guardarSeguimientoEnSupabase(seg);
     });
   });
@@ -4989,6 +5050,7 @@ async function guardarSeguimientoEnSupabase(seg){
     columna_principal: seg.columnaPrincipal || (seg.columnas && seg.columnas[0]) || null,
     estados: seg.estados || {},
     comentarios: seg.comentarios || {},
+    fechas_modificacion: seg.fechasModificacion || {},
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
     orden_vista: seg.ordenVista || [],
   }).eq('id', seg.__id);
@@ -6471,7 +6533,9 @@ function activarEdicionValorActual(){
   const valorActual = conflictoFilaActual[conflictoColActual] ?? '';
   const row = document.getElementById('valor-actual-row');
   row.innerHTML = `
-    <input type="text" class="field-input" id="input-valor-actual-edit" value="${String(valorActual).replace(/"/g, '&quot;')}" style="flex:1;">
+    <div style="flex:1; display:flex; align-self:stretch;">
+      <input type="text" class="field-input" id="input-valor-actual-edit" value="${String(valorActual).replace(/"/g, '&quot;')}" style="height:100%; width:100%; box-sizing:border-box; padding:0 8px;">
+    </div>
     <button type="button" class="col-icon-btn col-icon-btn-grande danger" id="cancelar-valor-actual" title="Cancelar">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
@@ -6556,34 +6620,315 @@ function abrirDetalleInstrumento(fila){
   document.getElementById('detalle-instrumento-titulo').textContent = fila.TAG || 'Detalle';
   const cont = document.getElementById('detalle-campos');
 
-  // Mostrar advertencia de duplicados si existe
-  let advertenciaDuplicados = '';
+  // TAG repetido dentro de un mismo documento: desplegable con el detalle de cada ocurrencia
+  let bloqueDuplicados = '';
   if(fila.__duplicados && Object.keys(fila.__duplicados).length > 0){
-    const advertencias = Object.entries(fila.__duplicados).map(([doc, info]) => {
-      if(info.identicos){
-        return `⚠️ En <b>${doc}</b> este TAG aparece <b>${info.cantidad} veces</b> con el mismo contenido (filas idénticas)`;
-      } else {
-        return `⚠️ En <b>${doc}</b> este TAG aparece <b>${info.cantidad} veces</b> con <b>contenido diferente</b>`;
-      }
-    }).join('<br>');
-    advertenciaDuplicados = `
-      <div style="background:#FFF3CD; border:1px solid #FFC107; border-radius:6px; padding:12px; margin-bottom:16px;">
-        <div style="font-weight:600; color:#856404; margin-bottom:8px;">⚠️ TAG Duplicado</div>
-        <div style="font-size:12.5px; color:#856404; line-height:1.5;">${advertencias}</div>
+    const resumen = Object.entries(fila.__duplicados).map(([doc, info]) => {
+      const ocurrencias = info.ocurrencias || [];
+      // Agrupar por igualdad de valores
+      const grupos = [];
+      const procesados = new Set();
+
+      ocurrencias.forEach((o, i) => {
+        if(procesados.has(i)) return;
+        const jsonO = JSON.stringify(o);
+        const iguales = [];
+        ocurrencias.forEach((x, j) => {
+          if(JSON.stringify(x) === jsonO) {
+            iguales.push(j);
+            procesados.add(j);
+          }
+        });
+        grupos.push({ datos: o, indices: iguales });
+      });
+
+      const cantidadIguales = grupos.filter(g => g.indices.length > 1).reduce((sum, g) => sum + g.indices.length, 0);
+      const cantidadDistintas = grupos.length > 1 ? ocurrencias.length - cantidadIguales : 0;
+
+      return { doc, total: ocurrencias.length, cantidadIguales, cantidadDistintas, grupos, info };
+    });
+
+    bloqueDuplicados = `
+      <div class="tag-duplicado-aviso" id="tag-duplicado-aviso" style="border:1px solid #FFC107; border-radius:6px; margin-bottom:16px; overflow:hidden;">
+        <div id="tag-duplicado-toggle" style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:#FFF3CD; cursor:pointer;">
+          <span style="flex:1; font-weight:600; color:#856404; font-size:13px;">TAG repetido en el mismo documento</span>
+          <svg id="tag-duplicado-flecha" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2.4" style="transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="tag-duplicado-detalle" style="display:none; padding:10px 12px; font-size:12.5px; color:#856404;">
+          ${resumen.map(({ doc, total, cantidadIguales, cantidadDistintas, grupos, info }) => {
+            return `
+              <div style="margin-bottom:14px;" data-doc="${doc}">
+                <div style="font-weight:600; margin-bottom:8px; font-size:13px;">${doc}</div>
+                <div style="display:flex; gap:16px; margin-bottom:8px; font-size:12px;">
+                  <div><span style="font-weight:600;">${cantidadIguales}</span> repetido${cantidadIguales !== 1 ? 's' : ''} igual${cantidadIguales !== 1 ? 'es' : ''}</div>
+                  <div><span style="font-weight:600;">${cantidadDistintas}</span> repetido${cantidadDistintas !== 1 ? 's' : ''} distinto${cantidadDistintas !== 1 ? 's' : ''}</div>
+                </div>
+                ${grupos.map((grupo, gIdx) => {
+                  const esDistinto = grupo.indices.length === 1 && grupos.length > 1;
+                  const campos = Object.entries(grupo.datos).filter(([c])=>c!=='TAG').map(([c,v])=>`${c}: ${v||'(vacío)'}`).join(', ');
+                  const label = grupo.indices.length > 1
+                    ? `${grupo.indices.length} veces iguales (filas ${grupo.indices.map(i=>i+1).join(', ')})`
+                    : `Fila ${grupo.indices[0]+1} (distinta)`;
+
+                  return `
+                    <div style="padding:6px 0 6px 10px; border-left:2px solid ${esDistinto ? '#FF6B35' : '#FFC107'}; margin-bottom:4px; background:${esDistinto ? 'rgba(255,107,53,0.08)' : 'transparent'};">
+                      <div style="font-weight:600; margin-bottom:2px; color:${esDistinto ? '#C44808' : '#664d03'};">${label}</div>
+                      <div style="color:#856404;">${campos}</div>
+                      ${esDistinto ? `<button class="btn-mini btn-agregar-distinto" style="margin-top:6px; background:#FF6B35; color:white; border-color:#FF6B35;" data-doc="${doc}" data-grupo-idx="${gIdx}">Agregar como TAG nuevo</button>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
       </div>
     `;
   }
 
-  cont.innerHTML = advertenciaDuplicados + COLUMNAS.map(col => `
+  cont.innerHTML = bloqueDuplicados + COLUMNAS.map(col => `
     <div class="detalle-campo">
       <div class="detalle-label">${col}</div>
       <div class="detalle-valor">${fila[col] ?? '—'}</div>
     </div>
-  `).join('');
+  `).join('') + `
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn" id="btn-modificar-nombre-tag" style="flex:1;">Modificar nombre</button>
+      <button class="btn btn-danger" id="btn-eliminar-tag" style="flex:1;">Eliminar tag</button>
+    </div>
+  `;
+
+  const toggle = document.getElementById('tag-duplicado-toggle');
+  if(toggle){
+    toggle.addEventListener('click', ()=>{
+      const detalle = document.getElementById('tag-duplicado-detalle');
+      const abierto = detalle.style.display !== 'none';
+      detalle.style.display = abierto ? 'none' : 'block';
+      document.getElementById('tag-duplicado-flecha').style.transform = abierto ? '' : 'rotate(180deg)';
+    });
+  }
+
+  // Event delegation para botones de agregar TAG distinto
+  cont.querySelectorAll('.btn-agregar-distinto').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const doc = btn.dataset.doc;
+      const grupoIdx = parseInt(btn.dataset.grupoIdx);
+      agregarFilaDistinta(doc, grupoIdx, fila);
+    });
+  });
+
+  document.getElementById('btn-modificar-nombre-tag').addEventListener('click', ()=>{
+    document.getElementById('overlay-detalle-instrumento').classList.remove('open');
+    abrirModalRenombrarTag(fila);
+  });
+  document.getElementById('btn-eliminar-tag').addEventListener('click', ()=>{
+    document.getElementById('overlay-detalle-instrumento').classList.remove('open');
+    abrirModalEliminarTag(fila);
+  });
+
   document.getElementById('overlay-detalle-instrumento').classList.add('open');
 }
 document.getElementById('cerrar-detalle-instrumento').addEventListener('click', ()=>{
   document.getElementById('overlay-detalle-instrumento').classList.remove('open');
+});
+
+// ---- Agregar TAG repetido distinto ----
+let filaDistintaActual = null;
+let docDistintoActual = null;
+let datosDistintosActuales = null;
+
+function agregarFilaDistinta(doc, grupoIdx, filaActual){
+  if(!filaActual || !filaActual.__duplicados || !filaActual.__duplicados[doc]) return;
+
+  docDistintoActual = doc;
+  const info = filaActual.__duplicados[doc];
+  const ocurrencias = info.ocurrencias || [];
+
+  // Reconstruir grupos para encontrar el correcto
+  const grupos = [];
+  const procesados = new Set();
+  ocurrencias.forEach((o, i) => {
+    if(procesados.has(i)) return;
+    const jsonO = JSON.stringify(o);
+    const iguales = [];
+    ocurrencias.forEach((x, j) => {
+      if(JSON.stringify(x) === jsonO) {
+        iguales.push(j);
+        procesados.add(j);
+      }
+    });
+    grupos.push({ datos: o, indices: iguales });
+  });
+
+  const grupo = grupos[grupoIdx];
+  if(!grupo) return;
+
+  filaDistintaActual = filaActual;
+  datosDistintosActuales = grupo.datos;
+
+  document.getElementById('input-nuevo-tag-distinto').value = '';
+  const preview = Object.entries(grupo.datos).filter(([c])=>c!=='TAG').map(([c,v])=>`<b>${c}:</b> ${v||'(vacío)'}`).join('<br>');
+  document.getElementById('preview-datos-distintos').innerHTML = preview;
+  document.getElementById('overlay-agregar-tag-distinto').classList.add('open');
+  document.getElementById('input-nuevo-tag-distinto').focus();
+}
+
+document.getElementById('cancel-agregar-tag-distinto').addEventListener('click', ()=>{
+  document.getElementById('overlay-agregar-tag-distinto').classList.remove('open');
+});
+
+document.getElementById('confirm-agregar-tag-distinto').addEventListener('click', async ()=>{
+  const nuevoTag = document.getElementById('input-nuevo-tag-distinto').value.trim();
+  if(!nuevoTag){
+    alert('Ingresá un TAG válido');
+    return;
+  }
+
+  // Verificar que no exista ya
+  if(FILAS.find(f => f.TAG === nuevoTag)){
+    alert('Este TAG ya existe en la base de datos');
+    return;
+  }
+
+  const btn = document.getElementById('confirm-agregar-tag-distinto');
+  btn.disabled = true;
+  btn.textContent = 'Agregando...';
+
+  // Crear nueva fila con los datos distintos
+  const nuevaFila = {
+    TAG: nuevoTag,
+    __documentos: new Set([docDistintoActual]),
+    __historial: {},
+    __conflictos: new Set(),
+    __resueltos: new Set(),
+    __comentarios: {},
+    __duplicados: {},
+  };
+
+  // Copiar los datos del grupo distinto
+  const datosParaGuardar = {};
+  Object.entries(datosDistintosActuales).forEach(([col, valor]) => {
+    if(col !== 'TAG') {
+      nuevaFila[col] = valor;
+      datosParaGuardar[col] = valor;
+      if(!nuevaFila.__historial[col]) nuevaFila.__historial[col] = {};
+      nuevaFila.__historial[col][docDistintoActual] = valor;
+    }
+  });
+
+  // Insertar en Supabase
+  const { data, error } = await supabaseClient.from('instrumentos').insert({
+    proyecto_id: proyectoActivo.id,
+    tag: nuevoTag,
+    datos: datosParaGuardar,
+    documentos: [docDistintoActual],
+    historial: nuevaFila.__historial,
+    conflictos: [],
+    resueltos: [],
+    comentarios_celda: {},
+    duplicados: {},
+  }).select().single();
+
+  btn.disabled = false;
+  btn.textContent = 'Agregar';
+
+  if(error){
+    console.error('Error al agregar TAG distinto:', error);
+    alert('No se pudo agregar el TAG. Revisá la consola para más detalle.');
+    return;
+  }
+
+  nuevaFila.__id = data.id;
+  FILAS.push(nuevaFila);
+
+  // Remover esta ocurrencia de los duplicados de la fila original
+  if(filaDistintaActual.__duplicados[docDistintoActual]){
+    const info = filaDistintaActual.__duplicados[docDistintoActual];
+    const ocurrencias = info.ocurrencias || [];
+    const jsonDistinto = JSON.stringify(datosDistintosActuales);
+    const nuevasOcurrencias = ocurrencias.filter(o => JSON.stringify(o) !== jsonDistinto);
+
+    if(nuevasOcurrencias.length > 0){
+      filaDistintaActual.__duplicados[docDistintoActual].ocurrencias = nuevasOcurrencias;
+      filaDistintaActual.__duplicados[docDistintoActual].cantidad = nuevasOcurrencias.length;
+    } else {
+      delete filaDistintaActual.__duplicados[docDistintoActual];
+    }
+
+    if(Object.keys(filaDistintaActual.__duplicados).length === 0){
+      filaDistintaActual.__duplicados = {};
+    }
+
+    await guardarFilaEnSupabase(filaDistintaActual);
+  }
+
+  document.getElementById('overlay-agregar-tag-distinto').classList.remove('open');
+  document.getElementById('overlay-detalle-instrumento').classList.remove('open');
+  renderTabla();
+});
+
+// ---- Modificar nombre de TAG ----
+let tagARenombrar = null;
+function abrirModalRenombrarTag(fila){
+  tagARenombrar = fila;
+  document.getElementById('input-renombrar-tag').value = fila.TAG || '';
+  document.getElementById('overlay-renombrar-tag').classList.add('open');
+}
+document.getElementById('cancel-renombrar-tag').addEventListener('click', ()=>{
+  document.getElementById('overlay-renombrar-tag').classList.remove('open');
+});
+document.getElementById('confirm-renombrar-tag').addEventListener('click', async ()=>{
+  const nuevoTag = document.getElementById('input-renombrar-tag').value.trim().toUpperCase();
+  if(!nuevoTag || !tagARenombrar) return;
+  if(nuevoTag === tagARenombrar.TAG){
+    document.getElementById('overlay-renombrar-tag').classList.remove('open');
+    return;
+  }
+  if(FILAS.some(f => f !== tagARenombrar && f.TAG === nuevoTag)){
+    alert('Ya existe un instrumento con ese TAG.');
+    return;
+  }
+  const btn = document.getElementById('confirm-renombrar-tag');
+  btn.disabled = true;
+  const { error } = await supabaseClient.from('instrumentos').update({ tag: nuevoTag }).eq('id', tagARenombrar.__id);
+  btn.disabled = false;
+  if(error){
+    console.error('Error al renombrar el TAG:', error);
+    alert('No se pudo renombrar el TAG. Revisá la consola para más detalle.');
+    return;
+  }
+  tagARenombrar.TAG = nuevoTag;
+  tagARenombrar = null;
+  document.getElementById('overlay-renombrar-tag').classList.remove('open');
+  renderTabla();
+});
+
+// ---- Eliminar TAG ----
+let tagAEliminar = null;
+function abrirModalEliminarTag(fila){
+  tagAEliminar = fila;
+  document.getElementById('eliminar-tag-texto').textContent =
+    `Vas a eliminar el TAG "${fila.TAG}" de la base de datos. Esta acción no se puede deshacer.`;
+  document.getElementById('overlay-eliminar-tag').classList.add('open');
+}
+document.getElementById('cancel-eliminar-tag').addEventListener('click', ()=>{
+  document.getElementById('overlay-eliminar-tag').classList.remove('open');
+});
+document.getElementById('confirm-eliminar-tag').addEventListener('click', async ()=>{
+  if(!tagAEliminar) return;
+  const btn = document.getElementById('confirm-eliminar-tag');
+  btn.disabled = true;
+  const { error } = await supabaseClient.from('instrumentos').delete().eq('id', tagAEliminar.__id);
+  btn.disabled = false;
+  if(error){
+    console.error('Error al eliminar el TAG:', error);
+    alert('No se pudo eliminar el TAG. Revisá la consola para más detalle.');
+    return;
+  }
+  FILAS = FILAS.filter(f => f !== tagAEliminar);
+  tagAEliminar = null;
+  document.getElementById('overlay-eliminar-tag').classList.remove('open');
+  renderTabla();
 });
 
 document.getElementById('input-agregar-tag').addEventListener('keydown', (e)=>{
@@ -6731,8 +7076,10 @@ function restaurarFilaAgregarColumnaBD(){
 
 function mostrarFilaEditableAgregarColumnaBD(){
   document.getElementById('fila-agregar-columna-bd').innerHTML = `
-    <div style="display:flex; gap:6px; align-items:stretch;">
-      <input type="text" class="field-input" id="input-nueva-columna-bd" placeholder="Nombre de la columna nueva" style="flex:1;">
+    <div style="display:flex; gap:6px; align-items:stretch; padding:9px 10px; box-sizing:border-box;">
+      <div style="flex:1; display:flex; align-self:stretch;">
+        <input type="text" class="field-input" id="input-nueva-columna-bd" placeholder="Nombre de la columna nueva" style="height:100%; width:100%; box-sizing:border-box; padding:0 8px;">
+      </div>
       <button type="button" class="col-icon-btn col-icon-btn-grande danger" id="btn-cancelar-nueva-columna-bd" title="Cancelar">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -6894,8 +7241,12 @@ function renderListaColumnasBD(){
   cont.querySelectorAll('[data-accion="lapiz"]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const col = btn.dataset.col;
+      const fila = btn.closest('.seg-col-row');
+      const grupoAcciones = fila.querySelector('.col-acciones-grupo');
       const span = document.getElementById(`nombre-col-${btn.dataset.idx}`);
       const original = col;
+
+      const grupoAccionesOriginal = grupoAcciones.innerHTML;
       span.style.alignSelf = 'stretch';
       span.style.display = 'flex';
       span.innerHTML = `<input type="text" class="field-input" value="${original}" style="height:100%; box-sizing:border-box; padding:0 8px; font-size:12.5px; width:100%;">`;
@@ -6903,7 +7254,26 @@ function renderListaColumnasBD(){
       input.focus();
       input.select();
 
+      // Mientras se edita, el ojo/lápiz/tacho se reemplazan por cruz/tilde
+      grupoAcciones.style.alignSelf = 'stretch';
+      grupoAcciones.innerHTML = `
+        <button type="button" class="col-icon-btn col-icon-btn-grande danger" id="cancelar-renombrar-col" title="Cancelar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <button type="button" class="col-icon-btn col-icon-btn-grande" id="confirmar-renombrar-col" title="Confirmar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      `;
+
       let resuelto = false;
+      function restaurarFila(){
+        span.style.alignSelf = '';
+        span.style.display = '';
+        span.textContent = original;
+        grupoAcciones.style.alignSelf = '';
+        grupoAcciones.innerHTML = grupoAccionesOriginal;
+        renderListaColumnasBD();
+      }
       async function confirmar(){
         if(resuelto) return;
         resuelto = true;
@@ -6914,11 +7284,17 @@ function renderListaColumnasBD(){
         }
         renderListaColumnasBD();
       }
+      function cancelar(){
+        if(resuelto) return;
+        resuelto = true;
+        restaurarFila();
+      }
       input.addEventListener('keydown', (e)=>{
         if(e.key === 'Enter') confirmar();
-        if(e.key === 'Escape'){ resuelto = true; renderListaColumnasBD(); }
+        if(e.key === 'Escape') cancelar();
       });
-      input.addEventListener('blur', confirmar);
+      document.getElementById('confirmar-renombrar-col').addEventListener('click', confirmar);
+      document.getElementById('cancelar-renombrar-col').addEventListener('click', cancelar);
     });
   });
 
@@ -9265,14 +9641,12 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
     }
   });
 
-  // Analizar duplicados: ¿son idénticos o diferentes?
-  const tagsDuplicados = {}; // { TAG: { identicos: boolean, documento: string } }
+  // Analizar duplicados: se guarda cada ocurrencia completa (no solo un sí/no), porque puede
+  // haber una mezcla — algunas repeticiones idénticas entre sí y otras con datos distintos
+  const tagsDuplicados = {}; // { TAG: { documento, cantidad, ocurrencias: [datosFila, ...] } }
   Object.entries(tagsPorDocumento).forEach(([tag, filas])=>{
     if(filas.length > 1){
-      // Verificar si todas las filas son idénticas
-      const primera = JSON.stringify(filas[0]);
-      const identicos = filas.every(f => JSON.stringify(f) === primera);
-      tagsDuplicados[tag] = { identicos, documento: archivoActual, cantidad: filas.length };
+      tagsDuplicados[tag] = { documento: archivoActual, cantidad: filas.length, ocurrencias: filas };
     }
   });
 
