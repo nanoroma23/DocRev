@@ -775,6 +775,11 @@
     background:#D4ECF5 !important;
     border-bottom:2px solid #4A9CC4 !important;
   }
+  span.titulo-columna-nueva{
+    background:#D4ECF5;
+    border:1px solid #4A9CC4;
+    display:inline-block;
+  }
   .nota-titulos-nuevos{
     display:none;
     align-items:center;
@@ -2805,7 +2810,7 @@
       </div>
       <div class="sft-right">
         <button class="btn" id="atras-final">Atrás</button>
-        <button class="btn btn-primary" id="subir-basedatos">Subir a base de datos</button>
+        <button class="btn btn-primary" id="subir-basedatos">Subir</button>
       </div>
     </div>
     <div class="sheet-grid-wrap">
@@ -3039,13 +3044,55 @@
   </div>
 
   <!-- Modal actualizar documento: elegir cuál -->
+  <!-- Actualizar documento (base -> documento): paso 1, filtrar qué TAGs corresponden a este documento -->
+  <div class="overlay" id="overlay-filtro-tags-actualizar">
+    <div class="modal" style="width:360px;">
+      <h3>¿Qué TAGs corresponden a este documento?</h3>
+      <p>Vienen tildados los que ya estaban en el documento. Sumá o sacá según haga falta (ej: filtrá solo los transmisores de presión).</p>
+      <input type="text" class="field-input" id="buscar-tags-actualizar" placeholder="Buscar TAG...">
+      <div class="hojas-list" id="lista-tags-actualizar" style="max-height:320px; margin-top:8px;"></div>
+      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
+        <button class="btn" id="cancel-filtro-tags-actualizar">Cancelar</button>
+        <button class="btn btn-primary" id="confirmar-filtro-tags-actualizar">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actualizar documento: paso 2 (solo si hace falta), remapear columnas que ya no existen -->
+  <div class="overlay" id="overlay-remapeo-columnas-actualizar">
+    <div class="modal" style="width:380px;">
+      <h3>Algunas columnas cambiaron</h3>
+      <p>Estas columnas del documento ya no existen tal cual en la base (se renombraron o se eliminaron). Elegí a qué columna corresponden ahora, o dejalas afuera.</p>
+      <div id="lista-remapeo-columnas-actualizar" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
+        <button class="btn" id="cancel-remapeo-columnas-actualizar">Cancelar</button>
+        <button class="btn btn-primary" id="confirmar-remapeo-columnas-actualizar">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actualizar documento: paso 3, comparación y las dos formas de generar el archivo -->
+  <div class="overlay" id="overlay-comparacion-actualizar">
+    <div class="modal" style="width:520px; max-height:85vh; overflow-y:auto;">
+      <h3>Esto va a cambiar</h3>
+      <p id="resumen-comparacion-actualizar" style="margin-bottom:10px;"></p>
+      <div id="tabla-comparacion-actualizar"></div>
+      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
+        <button class="btn" id="cancel-comparacion-actualizar">Cancelar</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" id="generar-blanco-actualizar">Tabla blanca (celeste = cambió)</button>
+          <button class="btn btn-primary" id="generar-formato-actualizar">Con formato original</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay-elegir-documento-actualizar">
     <div class="modal" style="width:380px;">
       <h3>Elegí el documento</h3>
       <div class="hojas-list" id="lista-documentos-actualizar"></div>
-      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
+      <div class="modal-actions" style="margin-top:14px; justify-content:flex-end;">
         <button class="btn" id="atras-elegir-documento-actualizar">Atrás</button>
-        <button class="btn btn-primary" id="continuar-elegir-documento-actualizar" disabled>Continuar</button>
       </div>
     </div>
   </div>
@@ -3091,6 +3138,7 @@
 
       <div class="detalle-doc-acciones-principales">
         <button class="btn btn-block" id="btn-abrir-documento">Abrir documento</button>
+        <button class="btn btn-block" id="btn-actualizar-desde-detalle">Actualizar documento</button>
         <button class="btn btn-block" id="btn-extraer-tabla">Extraer datos</button>
       </div>
 
@@ -3124,16 +3172,25 @@
 
   <!-- Modal editar celda -->
   <div class="overlay" id="overlay-conflicto-celda">
-    <div class="modal" style="width:380px;">
-      <label class="field-label" style="margin-top:0;">Valor</label>
-      <input type="text" class="field-input" id="input-valor-celda">
+    <div class="modal" style="width:400px;">
+      <label class="field-label" style="margin-top:0;">Valor actual</label>
+      <div id="valor-actual-row" style="display:flex; align-items:center; gap:8px;">
+        <div id="valor-actual-texto" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font-size:13px; min-height:18px;"></div>
+        <button type="button" class="col-icon-btn col-icon-btn-grande" id="btn-lapiz-valor-actual" title="Editar valor">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+      </div>
 
-      <label class="field-label" style="margin-top:10px;">Comentario (opcional)</label>
+      <div id="valores-documentos-bloque" style="display:none; margin-top:14px;">
+        <label class="field-label" style="margin-top:0;">Valores en documentos</label>
+        <div id="valores-documentos-lista" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+
+      <label class="field-label" style="margin-top:14px;">Comentario (opcional)</label>
       <textarea class="field-input" id="input-comentario-celda" rows="2" placeholder="Ej: confirmado según revisión de planos, rev. C"></textarea>
 
-      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-        <button class="btn" id="cerrar-conflicto-celda">Cancelar</button>
-        <button class="btn btn-primary" id="confirmar-conflicto-celda">Guardar</button>
+      <div class="modal-actions" style="margin-top:14px; justify-content:flex-end;">
+        <button class="btn" id="cerrar-conflicto-celda">Cerrar</button>
       </div>
     </div>
   </div>
@@ -3346,6 +3403,20 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 });
 
 let COLUMNAS = ["TAG"];
+
+// Compara nombres de columna ignorando mayúsculas/minúsculas y tildes, para que "P&ID",
+// "p&id" y "P&Id" (o "Título" y "titulo") se reconozcan como la misma columna en cualquier
+// comparación — tanto al cargar un documento nuevo como al actualizar uno existente.
+function normalizarNombreColumna(s){
+  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+// Devuelve el nombre EXACTO tal como está guardado en COLUMNAS si hay una coincidencia
+// (ignorando mayúsculas/tildes), o null si no existe ninguna columna así.
+function buscarColumnaExistente(nombre){
+  const norm = normalizarNombreColumna(nombre);
+  if(!norm) return null;
+  return COLUMNAS.find(c => normalizarNombreColumna(c) === norm) || null;
+}
 let FILAS = [];
 let FILTROS = {}; // { columna: Set(valoresPermitidos) | null }
 let filtroAbierto = null;
@@ -3709,8 +3780,8 @@ document.getElementById('confirmar-columna-opciones').addEventListener('click', 
       return;
     }
 
-    // Verificar que no exista otra columna con ese nombre
-    if(COLUMNAS.includes(nuevoNombre)){
+    // Verificar que no exista otra columna con ese nombre (sin importar mayúsculas/tildes)
+    if(buscarColumnaExistente(nuevoNombre)){
       alert('Ya existe una columna con ese nombre');
       return;
     }
@@ -3806,6 +3877,7 @@ document.getElementById('confirmar-eliminar-columna').addEventListener('click', 
   const resultados = await Promise.all(filasAfectadas.map(f => guardarFilaEnSupabase(f)));
   const fallidas = resultados.filter(r => !r.ok).length;
   if(fallidas) console.error(`${fallidas} fila(s) no se pudieron actualizar en Supabase tras eliminar la columna.`);
+  await quitarColumnaDeExtracciones(nombreEliminado);
 
   btn.disabled = false;
   columnaMenuActual = null;
@@ -3813,6 +3885,30 @@ document.getElementById('confirmar-eliminar-columna').addEventListener('click', 
   renderTabla();
   if(document.getElementById('overlay-columnas-bd').classList.contains('open')) renderListaColumnasBD();
 });
+
+// Saca del mapeo guardado de cada documento las entradas que apuntaban a una columna que
+// ya no existe (mismo motivo que en el renombrado: si no, "Actualizar documento" se rompería)
+async function quitarColumnaDeExtracciones(nombreEliminado){
+  const docsAfectados = [];
+  DOCUMENTOS_PROYECTO.forEach(doc=>{
+    let cambio = false;
+    (doc.extracciones || []).forEach(ext=>{
+      if(ext.tipo === 'rango' && Array.isArray(ext.mapaColumnas)){
+        const originalLen = ext.mapaColumnas.length;
+        ext.mapaColumnas = ext.mapaColumnas.filter(m => m.columna !== nombreEliminado);
+        if(ext.mapaColumnas.length !== originalLen) cambio = true;
+      }
+    });
+    if(cambio) docsAfectados.push(doc);
+  });
+  if(!docsAfectados.length) return;
+
+  const resultados = await Promise.all(docsAfectados.map(doc =>
+    supabaseClient.from('documentos').update({ extracciones: doc.extracciones }).eq('id', doc.__id)
+  ));
+  const fallidas = resultados.filter(r => r.error).length;
+  if(fallidas) console.error(`${fallidas} documento(s) no se pudieron actualizar en Supabase tras eliminar la columna.`);
+}
 
 // ---- Exportar a Excel ----
 document.getElementById('btn-exportar').addEventListener('click', ()=>{
@@ -5356,8 +5452,11 @@ function abrirDetalleDocumento(idx){
     renderCampoDetalleDoc(campo, fila);
   });
   const hayArchivo = !!(doc.workbook || doc.archivo_path);
+  const hayMapeoGuardado = (doc.extracciones || []).some(e => e.tipo === 'rango' && e.mapaColumnas);
   document.getElementById('btn-abrir-documento').disabled = !hayArchivo;
   document.getElementById('btn-extraer-tabla').disabled = !hayArchivo;
+  document.getElementById('btn-actualizar-desde-detalle').disabled = !(hayArchivo && hayMapeoGuardado);
+  document.getElementById('btn-actualizar-desde-detalle').title = hayMapeoGuardado ? '' : 'Este documento se subió antes de esta función y no tiene guardado el mapeo necesario';
   document.getElementById('overlay-detalle-documento').classList.add('open');
 }
 
@@ -5550,7 +5649,7 @@ document.getElementById('continuar-actualizar-documento').addEventListener('clic
 function abrirListaDocumentosParaActualizar(){
   docElegidoParaActualizar = null;
   const cont = document.getElementById('lista-documentos-actualizar');
-  const disponibles = DOCUMENTOS_PROYECTO.filter(d => d.workbook);
+  const disponibles = DOCUMENTOS_PROYECTO.filter(d => d.workbook || d.archivo_path);
 
   if(disponibles.length === 0){
     cont.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-dim); font-size:12.5px;">No hay documentos con archivo disponible para reabrir.</div>`;
@@ -5562,24 +5661,305 @@ function abrirListaDocumentosParaActualizar(){
     `).join('');
     cont.querySelectorAll('.hoja-row').forEach(row=>{
       row.addEventListener('click', ()=>{
-        cont.querySelectorAll('.hoja-row').forEach(r => r.classList.remove('hoja-activa'));
-        row.classList.add('hoja-activa');
         docElegidoParaActualizar = Number(row.dataset.docIdx);
-        document.getElementById('continuar-elegir-documento-actualizar').disabled = false;
+        document.getElementById('overlay-elegir-documento-actualizar').classList.remove('open');
+        iniciarActualizacionDesdeBase(docElegidoParaActualizar);
       });
     });
   }
-  document.getElementById('continuar-elegir-documento-actualizar').disabled = true;
   document.getElementById('overlay-elegir-documento-actualizar').classList.add('open');
 }
 document.getElementById('atras-elegir-documento-actualizar').addEventListener('click', ()=>{
   document.getElementById('overlay-elegir-documento-actualizar').classList.remove('open');
   document.getElementById('overlay-actualizar-documento').classList.add('open');
 });
-document.getElementById('continuar-elegir-documento-actualizar').addEventListener('click', ()=>{
-  if(docElegidoParaActualizar === null) return;
-  document.getElementById('overlay-elegir-documento-actualizar').classList.remove('open');
-  iniciarExtraccionDesdeDocumento(docElegidoParaActualizar); // mismo flujo que "+ Extraer tabla"
+
+// ================================================================
+// Actualizar documento: base de datos -> documento original
+// (dirección inversa a "Extraer datos": acá la base manda, se pisa el documento)
+// ================================================================
+let actualizacionDoc = null;
+let actualizacionExtraccion = null;
+let actualizacionWorkbook = null;
+let actualizacionTagsOriginales = []; // [{tag, filaHoja}] en el orden real del documento
+let actualizacionTagsFiltrados = new Set();
+let actualizacionOrdenFinal = [];
+let actualizacionMapaColumnas = [];
+let actualizacionCambios = []; // [{tag, columna, valorDocumento, valorBase, tipo:'cambio'|'nuevo'|'eliminado'}]
+
+async function iniciarActualizacionDesdeBase(idx){
+  const doc = DOCUMENTOS_PROYECTO[idx];
+  const ext = (doc.extracciones || []).slice().reverse().find(e => e.tipo === 'rango' && e.mapaColumnas);
+  if(!ext){
+    alert('Este documento no tiene guardado el mapeo de columnas necesario (se subió antes de esta función, o es del tipo "un TAG, una hoja"). No se puede actualizar automáticamente — probá con "Extraer datos" en su lugar.');
+    return;
+  }
+  const mapaTag = ext.mapaColumnas.find(m => m.columna === 'TAG');
+  if(!mapaTag){
+    alert('No se encontró la columna TAG en el mapeo guardado de este documento.');
+    return;
+  }
+
+  document.getElementById('overlay-detalle-documento').classList.remove('open');
+  const workbook = await obtenerWorkbookDelDocumento(doc);
+  if(!workbook){
+    alert('No se pudo abrir el archivo original de este documento.');
+    return;
+  }
+
+  actualizacionDoc = doc;
+  actualizacionExtraccion = ext;
+  actualizacionWorkbook = workbook;
+  actualizacionMapaColumnas = ext.mapaColumnas.map(m => ({...m}));
+
+  const hoja = workbook.Sheets[ext.hoja];
+  actualizacionTagsOriginales = [];
+  for(let r = ext.r1; r <= ext.r2; r++){
+    if(r === ext.filaTituloRaw) continue; // saltar la fila de título si cae dentro del rango de datos
+    const cellRef = XLSX.utils.encode_cell({ r: r - 1, c: ext.c1 + mapaTag.posicion });
+    const cell = hoja[cellRef];
+    const valor = cell ? XLSX.utils.format_cell(cell).trim().toUpperCase() : '';
+    if(valor) actualizacionTagsOriginales.push({ tag: valor, filaHoja: r });
+  }
+
+  abrirFiltroTagsActualizar();
+}
+
+// ---- Paso 1: filtrar qué TAGs de la base corresponden a este documento ----
+function abrirFiltroTagsActualizar(){
+  const yaEnDocumento = new Set(actualizacionTagsOriginales.map(t => t.tag));
+  const cont = document.getElementById('lista-tags-actualizar');
+  const tagsBase = [...new Set(FILAS.map(f => f.TAG).filter(Boolean))].sort();
+
+  cont.innerHTML = `
+    <label class="filter-option">
+      <input type="checkbox" class="chk-todos-tags-actualizar">
+      <span>Seleccionar todo</span>
+    </label>
+    ${tagsBase.map(tag => `
+      <label class="filter-option" data-valor="${tag.toLowerCase()}">
+        <input type="checkbox" class="chk-tag-actualizar" value="${tag}" ${yaEnDocumento.has(tag) ? 'checked' : ''}>
+        <span>${tag}</span>
+      </label>
+    `).join('')}
+  `;
+
+  const chkTodos = cont.querySelector('.chk-todos-tags-actualizar');
+  const chksValor = () => [...cont.querySelectorAll('.chk-tag-actualizar')];
+  function actualizarEstadoTodos(){
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+  let eraParcial = false;
+  chkTodos.closest('label').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
+  chkTodos.addEventListener('change', ()=>{
+    if(eraParcial){
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
+    } else {
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
+    }
+    actualizarEstadoTodos();
+  });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
+  actualizarEstadoTodos();
+
+  document.getElementById('buscar-tags-actualizar').value = '';
+  document.getElementById('buscar-tags-actualizar').oninput = (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    cont.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+    });
+  };
+
+  document.getElementById('overlay-filtro-tags-actualizar').classList.add('open');
+}
+document.getElementById('cancel-filtro-tags-actualizar').addEventListener('click', ()=>{
+  document.getElementById('overlay-filtro-tags-actualizar').classList.remove('open');
+});
+document.getElementById('confirmar-filtro-tags-actualizar').addEventListener('click', ()=>{
+  const marcados = [...document.querySelectorAll('.chk-tag-actualizar:checked')].map(c => c.value);
+  actualizacionTagsFiltrados = new Set(marcados);
+
+  // Los que ya estaban en el documento y siguen filtrados van primero, en su orden original;
+  // los que se suman nuevos (filtrados pero no estaban) van al final
+  const enDocumentoYFiltrados = actualizacionTagsOriginales.filter(t => actualizacionTagsFiltrados.has(t.tag));
+  const nuevosTags = marcados.filter(tag => !actualizacionTagsOriginales.some(t => t.tag === tag));
+  actualizacionOrdenFinal = [...enDocumentoYFiltrados.map(t => t.tag), ...nuevosTags];
+
+  document.getElementById('overlay-filtro-tags-actualizar').classList.remove('open');
+  verificarMapeoColumnasActualizar();
+});
+
+// ---- Paso 2 (solo si hace falta): columnas del mapeo que ya no existen en la base ----
+function verificarMapeoColumnasActualizar(){
+  // Si hay coincidencia (aunque sea con distinta mayúscula/tilde), usamos el nombre EXACTO
+  // actual — si no, más adelante "filaBase[columna]" no encontraría el dato por el casing distinto
+  actualizacionMapaColumnas.forEach(m=>{
+    if(m.columna === 'TAG') return;
+    const existente = buscarColumnaExistente(m.columna);
+    if(existente) m.columna = existente;
+  });
+  const faltantes = actualizacionMapaColumnas.filter(m => m.columna !== 'TAG' && !buscarColumnaExistente(m.columna));
+  if(faltantes.length){
+    abrirRemapeoColumnasActualizar(faltantes);
+  } else {
+    abrirComparacionActualizar();
+  }
+}
+function abrirRemapeoColumnasActualizar(faltantes){
+  const cont = document.getElementById('lista-remapeo-columnas-actualizar');
+  cont.innerHTML = faltantes.map(m => {
+    const idx = actualizacionMapaColumnas.indexOf(m);
+    return `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="titulo-columna-nueva" style="flex:1; padding:6px 8px; border-radius:4px; font-size:13px;">${m.columna}</span>
+        <span>→</span>
+        <select class="field-select" data-idx-mapa="${idx}" style="flex:1;">
+          <option value="">No incluir</option>
+          ${COLUMNAS.filter(c=>c!=='TAG').map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('overlay-remapeo-columnas-actualizar').classList.add('open');
+}
+document.getElementById('cancel-remapeo-columnas-actualizar').addEventListener('click', ()=>{
+  document.getElementById('overlay-remapeo-columnas-actualizar').classList.remove('open');
+});
+document.getElementById('confirmar-remapeo-columnas-actualizar').addEventListener('click', ()=>{
+  document.querySelectorAll('#lista-remapeo-columnas-actualizar [data-idx-mapa]').forEach(sel=>{
+    const idx = Number(sel.dataset.idxMapa);
+    actualizacionMapaColumnas[idx].columna = sel.value || null;
+  });
+  actualizacionMapaColumnas = actualizacionMapaColumnas.filter(m => m.columna);
+  document.getElementById('overlay-remapeo-columnas-actualizar').classList.remove('open');
+  abrirComparacionActualizar();
+});
+
+// ---- Paso 3: arma la lista de cambios y muestra la comparación ----
+function valorCeldaOriginalActualizar(filaHoja, posicionCol){
+  if(filaHoja === undefined || filaHoja === null) return '';
+  const hoja = actualizacionWorkbook.Sheets[actualizacionExtraccion.hoja];
+  const cellRef = XLSX.utils.encode_cell({ r: filaHoja - 1, c: actualizacionExtraccion.c1 + posicionCol });
+  const cell = hoja[cellRef];
+  return cell ? XLSX.utils.format_cell(cell).trim() : '';
+}
+
+function abrirComparacionActualizar(){
+  const columnasFinal = actualizacionMapaColumnas.filter(m => m.columna !== 'TAG');
+  actualizacionCambios = [];
+
+  actualizacionOrdenFinal.forEach(tag=>{
+    const original = actualizacionTagsOriginales.find(t => t.tag === tag);
+    const filaBase = FILAS.find(f => f.TAG === tag);
+    if(!original){
+      actualizacionCambios.push({ tag, columna: null, valorDocumento: null, valorBase: null, tipo: 'nuevo' });
+      return;
+    }
+    columnasFinal.forEach(m=>{
+      const valorDocumento = valorCeldaOriginalActualizar(original.filaHoja, m.posicion);
+      const valorBase = (filaBase && filaBase[m.columna]) || '';
+      if(valorDocumento !== valorBase){
+        actualizacionCambios.push({ tag, columna: m.columna, valorDocumento, valorBase, tipo: 'cambio' });
+      }
+    });
+  });
+  actualizacionTagsOriginales.forEach(({tag})=>{
+    if(!actualizacionTagsFiltrados.has(tag)){
+      actualizacionCambios.push({ tag, columna: null, valorDocumento: null, valorBase: null, tipo: 'eliminado' });
+    }
+  });
+
+  const nuevos = actualizacionCambios.filter(c => c.tipo === 'nuevo').length;
+  const eliminados = actualizacionCambios.filter(c => c.tipo === 'eliminado').length;
+  const cambios = actualizacionCambios.filter(c => c.tipo === 'cambio').length;
+  document.getElementById('resumen-comparacion-actualizar').textContent =
+    `${cambios} valor(es) cambiado(s), ${nuevos} TAG(s) nuevo(s), ${eliminados} TAG(s) que se sacan.`;
+
+  const filasTabla = actualizacionCambios.map(c=>{
+    if(c.tipo === 'nuevo') return `<tr><td>${c.tag}</td><td colspan="3" style="color:var(--green-dark);">TAG nuevo (se agrega)</td></tr>`;
+    if(c.tipo === 'eliminado') return `<tr><td>${c.tag}</td><td colspan="3" style="color:var(--red);">Ya no está en el filtro (se saca)</td></tr>`;
+    return `<tr><td>${c.tag}</td><td>${c.columna}</td><td>${c.valorDocumento || '(vacío)'}</td><td style="font-weight:600;">${c.valorBase || '(vacío)'}</td></tr>`;
+  }).join('');
+  document.getElementById('tabla-comparacion-actualizar').innerHTML = `
+    <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+      <thead><tr style="text-align:left; border-bottom:1px solid var(--line);">
+        <th style="padding:5px;">TAG</th><th style="padding:5px;">Columna</th><th style="padding:5px;">Documento</th><th style="padding:5px;">Base (nuevo)</th>
+      </tr></thead>
+      <tbody>${filasTabla || '<tr><td colspan="4" style="padding:10px; color:var(--text-dim);">No hay cambios.</td></tr>'}</tbody>
+    </table>
+  `;
+
+  document.getElementById('overlay-comparacion-actualizar').classList.add('open');
+}
+document.getElementById('cancel-comparacion-actualizar').addEventListener('click', ()=>{
+  document.getElementById('overlay-comparacion-actualizar').classList.remove('open');
+});
+
+// ---- Salida A: tabla blanca de cero, con lo que cambió pintado en celeste ----
+document.getElementById('generar-blanco-actualizar').addEventListener('click', ()=>{
+  const columnasFinal = actualizacionMapaColumnas.filter(m => m.columna !== 'TAG').map(m => m.columna);
+  const encabezado = ['TAG', ...columnasFinal];
+  const filas = actualizacionOrdenFinal.map(tag=>{
+    const filaBase = FILAS.find(f => f.TAG === tag);
+    return [tag, ...columnasFinal.map(col => (filaBase && filaBase[col]) || '')];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas]);
+  actualizacionOrdenFinal.forEach((tag, rIdx)=>{
+    const esNuevo = !actualizacionTagsOriginales.some(t => t.tag === tag);
+    columnasFinal.forEach((col, cIdx)=>{
+      const cambio = esNuevo || actualizacionCambios.some(c => c.tag === tag && c.columna === col && c.tipo === 'cambio');
+      if(cambio){
+        const cellRef = XLSX.utils.encode_cell({ r: rIdx + 1, c: cIdx + 1 });
+        if(!ws[cellRef]) ws[cellRef] = { t:'s', v:'' };
+        ws[cellRef].s = { fill: { patternType:'solid', fgColor: { rgb:'D4ECF5' } } };
+      }
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Actualizado');
+  const nombreBase = actualizacionDoc.nombre.replace(/\.[^.]+$/, '');
+  XLSX.writeFile(wb, `actualizado_${nombreBase}.xlsx`, { cellStyles: true });
+});
+
+// ---- Salida B: copia del archivo original, pisando solo los valores que cambiaron
+// (no inserta ni saca filas: los TAGs nuevos/eliminados no se reflejan acá, solo en la tabla blanca) ----
+document.getElementById('generar-formato-actualizar').addEventListener('click', ()=>{
+  const buffer = XLSX.write(actualizacionWorkbook, { type:'array', bookType:'xlsx', cellStyles:true });
+  const wbCopia = XLSX.read(buffer, { type:'array', cellStyles:true });
+  const hoja = wbCopia.Sheets[actualizacionExtraccion.hoja];
+
+  actualizacionTagsOriginales.forEach(({ tag, filaHoja })=>{
+    if(!actualizacionTagsFiltrados.has(tag)) return;
+    const filaBase = FILAS.find(f => f.TAG === tag);
+    if(!filaBase) return;
+
+    actualizacionMapaColumnas.forEach(m=>{
+      if(m.columna === 'TAG') return;
+      const valorBase = filaBase[m.columna] || '';
+      const valorDocumento = valorCeldaOriginalActualizar(filaHoja, m.posicion);
+      if(valorBase === valorDocumento) return;
+
+      const cellRef = XLSX.utils.encode_cell({ r: filaHoja - 1, c: actualizacionExtraccion.c1 + m.posicion });
+      if(!hoja[cellRef]) hoja[cellRef] = {};
+      hoja[cellRef].v = valorBase;
+      hoja[cellRef].t = 's';
+      delete hoja[cellRef].w; // texto formateado cacheado, que ya quedó desactualizado
+      // Pintar en celeste, sumando el color al estilo que ya tenía la celda (sin pisar
+      // fuente, bordes, etc.)
+      hoja[cellRef].s = hoja[cellRef].s || {};
+      hoja[cellRef].s.fill = { patternType: 'solid', fgColor: { rgb: 'D4ECF5' } };
+    });
+  });
+
+  const nombreBase = actualizacionDoc.nombre.replace(/\.[^.]+$/, '');
+  XLSX.writeFile(wbCopia, `actualizado_formato_${nombreBase}.xlsx`, { cellStyles: true });
 });
 
 async function iniciarExtraccionDesdeDocumento(idx){
@@ -5609,6 +5989,10 @@ async function iniciarExtraccionDesdeDocumento(idx){
   abrirHojaFullscreen(); // dibuja la hoja y abre la ventana de "tipo de carga"
 }
 document.getElementById('btn-extraer-tabla').addEventListener('click', ()=>{ modoActualizarDoc = false; iniciarExtraccionDesdeDocumento(docDetalleIdx); });
+document.getElementById('btn-actualizar-desde-detalle').addEventListener('click', ()=>{
+  document.getElementById('overlay-detalle-documento').classList.remove('open');
+  iniciarActualizacionDesdeBase(docDetalleIdx);
+});
 
 async function abrirVisorDocumento(){
   const doc = DOCUMENTOS_PROYECTO[docDetalleIdx];
@@ -6010,32 +6394,110 @@ function abrirEditarCelda(fila, col){
   conflictoFilaActual = fila;
   conflictoColActual = col;
 
-  document.getElementById('input-valor-celda').value = fila[col] ?? '';
+  mostrarValorActualComoTexto(fila[col] ?? '');
   document.getElementById('input-comentario-celda').value = '';
-
-  // Modo solo lectura: mientras "Editar base de datos" esté apagado, se puede ver la celda pero no tocarla
-  document.getElementById('input-valor-celda').readOnly = !modoEdicionBaseDeDatos;
   document.getElementById('input-comentario-celda').readOnly = !modoEdicionBaseDeDatos;
-  document.getElementById('confirmar-conflicto-celda').style.display = modoEdicionBaseDeDatos ? '' : 'none';
+  document.getElementById('btn-lapiz-valor-actual').style.display = modoEdicionBaseDeDatos ? '' : 'none';
+
+  // Agrupado por VALOR (no por documento): cada valor distinto que aparece en algún
+  // documento es una fila; se despliega para ver cuáles documentos lo tienen, con un botón
+  // para copiar esa lista
+  const historialCol = (fila.__historial && fila.__historial[col]) || {};
+  const bloque = document.getElementById('valores-documentos-bloque');
+  const entradas = Object.entries(historialCol).filter(([, valor]) => valor);
+  if(entradas.length){
+    bloque.style.display = 'block';
+    const grupos = {}; // valor -> [documentos]
+    entradas.forEach(([origen, valor])=>{
+      grupos[valor] = grupos[valor] || [];
+      grupos[valor].push(origen);
+    });
+    document.getElementById('valores-documentos-lista').innerHTML = Object.entries(grupos).map(([valor, docs], i) => `
+      <div class="valor-doc-grupo">
+        <div class="valor-doc-fila" data-toggle-idx="${i}" style="display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; cursor:pointer;">
+          <span style="flex:1; font-size:13px; font-weight:600;">${valor}</span>
+          <span style="font-size:11px; color:var(--text-dim);">${docs.length} documento${docs.length===1?'':'s'}</span>
+          <svg class="valor-doc-flecha" data-idx="${i}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="valor-doc-expandido" id="valor-doc-expandido-${i}" style="display:none; padding:8px 9px; border:1px solid var(--line); border-top:none; border-radius:0 0 6px 6px; background:var(--bg);">
+          <div style="display:flex; flex-direction:column; gap:3px; margin-bottom:8px;">
+            ${docs.map(d => `<div style="font-size:12px; color:var(--text-muted);">${d}</div>`).join('')}
+          </div>
+          <button type="button" class="btn-mini" data-copiar-idx="${i}">Copiar lista</button>
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('valores-documentos-lista').querySelectorAll('[data-toggle-idx]').forEach(fila_=>{
+      fila_.addEventListener('click', ()=>{
+        const idx = fila_.dataset.toggleIdx;
+        const expandido = document.getElementById(`valor-doc-expandido-${idx}`);
+        const abierto = expandido.style.display !== 'none';
+        expandido.style.display = abierto ? 'none' : 'block';
+        fila_.querySelector('.valor-doc-flecha').style.transform = abierto ? '' : 'rotate(180deg)';
+      });
+    });
+    document.getElementById('valores-documentos-lista').querySelectorAll('[data-copiar-idx]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const idx = btn.dataset.copiarIdx;
+        const docs = grupos[Object.keys(grupos)[idx]];
+        navigator.clipboard.writeText(docs.join('\n'));
+        btn.textContent = 'Copiado ✓';
+        setTimeout(()=>{ btn.textContent = 'Copiar lista'; }, 1500);
+      });
+    });
+  } else {
+    bloque.style.display = 'none';
+  }
 
   document.getElementById('overlay-conflicto-celda').classList.add('open');
-  document.getElementById('input-valor-celda').focus();
 }
 
-document.getElementById('cerrar-conflicto-celda').addEventListener('click', ()=>{
-  document.getElementById('overlay-conflicto-celda').classList.remove('open');
-});
-// Tocar afuera de la ventana (el fondo, no el contenido) la cierra sin necesidad de Cancelar
-document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)=>{
-  if(e.target.id === 'overlay-conflicto-celda') e.currentTarget.classList.remove('open');
-});
+// Muestra el valor actual como texto simple (con el lápiz al lado)
+function mostrarValorActualComoTexto(valor){
+  document.getElementById('valor-actual-row').innerHTML = `
+    <div id="valor-actual-texto" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font-size:13px; min-height:18px;"></div>
+    <button type="button" class="col-icon-btn col-icon-btn-grande" id="btn-lapiz-valor-actual" title="Editar valor">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    </button>
+  `;
+  document.getElementById('valor-actual-texto').textContent = valor || '(vacío)';
+  document.getElementById('btn-lapiz-valor-actual').addEventListener('click', activarEdicionValorActual);
+}
 
-document.getElementById('confirmar-conflicto-celda').addEventListener('click', ()=>{
+function activarEdicionValorActual(){
   if(!modoEdicionBaseDeDatos) return;
-  if(!conflictoFilaActual || !conflictoColActual) return;
+  const valorActual = conflictoFilaActual[conflictoColActual] ?? '';
+  const row = document.getElementById('valor-actual-row');
+  row.innerHTML = `
+    <input type="text" class="field-input" id="input-valor-actual-edit" value="${String(valorActual).replace(/"/g, '&quot;')}" style="flex:1;">
+    <button type="button" class="col-icon-btn col-icon-btn-grande danger" id="cancelar-valor-actual" title="Cancelar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <button type="button" class="col-icon-btn col-icon-btn-grande" id="confirmar-valor-actual" title="Confirmar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
+    </button>
+  `;
+  const input = document.getElementById('input-valor-actual-edit');
+  input.focus();
+  input.select();
+
+  document.getElementById('cancelar-valor-actual').addEventListener('click', ()=>{
+    mostrarValorActualComoTexto(conflictoFilaActual[conflictoColActual] ?? '');
+  });
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('confirmar-valor-actual').click();
+    if(e.key === 'Escape') mostrarValorActualComoTexto(conflictoFilaActual[conflictoColActual] ?? '');
+  });
+  document.getElementById('confirmar-valor-actual').addEventListener('click', ()=>{
+    guardarValorCeldaActual(input.value.trim());
+  });
+}
+
+function guardarValorCeldaActual(valorNuevo){
   const fila = conflictoFilaActual;
   const col = conflictoColActual;
-  const valorNuevo = document.getElementById('input-valor-celda').value.trim();
 
   fila.__conflictos = fila.__conflictos || new Set();
   fila.__resueltos = fila.__resueltos || new Set();
@@ -6053,6 +6515,10 @@ document.getElementById('confirmar-conflicto-celda').addEventListener('click', (
   if(!coincideConDocumento && valorNuevo){
     fila.__historial[col]['Creado en la base de datos'] = valorNuevo;
   }
+
+  // La fila ahora tiene un dato puesto a mano: que no dependa solo de un documento para existir
+  fila.__documentos = fila.__documentos || new Set();
+  fila.__documentos.add('Creado en la base de datos');
 
   if(estabaEnConflicto){
     // el conflicto (rojo) queda resuelto: pasa a azul, sea cual sea el valor elegido
@@ -6072,9 +6538,17 @@ document.getElementById('confirmar-conflicto-celda').addEventListener('click', (
     };
   }
 
-  document.getElementById('overlay-conflicto-celda').classList.remove('open');
   renderTabla();
   guardarFilaEnSupabase(fila);
+  abrirEditarCelda(fila, col); // refresca el modal con el nuevo valor y estado
+}
+
+document.getElementById('cerrar-conflicto-celda').addEventListener('click', ()=>{
+  document.getElementById('overlay-conflicto-celda').classList.remove('open');
+});
+// Tocar afuera de la ventana (el fondo, no el contenido) la cierra sin necesidad de Cancelar
+document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)=>{
+  if(e.target.id === 'overlay-conflicto-celda') e.currentTarget.classList.remove('open');
 });
 
 // ---- Detalle de instrumento: se abre al tocar la celda de TAG, campos uno debajo del otro ----
@@ -6138,6 +6612,7 @@ document.getElementById('confirm-agregar-tag').addEventListener('click', async (
     proyecto_id: proyectoActivo.id,
     tag: valor,
     datos: {},
+    documentos: ['Creado en la base de datos'],
   }).select().single();
 
   btn.disabled = false;
@@ -6161,7 +6636,7 @@ document.getElementById('btn-modo-edicion').addEventListener('click', ()=>{
 
 // Agrega una columna nueva a la base (usado desde el panel de Columnas)
 async function agregarColumnaBD(nombre){
-  if(!nombre || COLUMNAS.includes(nombre)) return false;
+  if(!nombre || buscarColumnaExistente(nombre)) return false;
   const { error } = await supabaseClient.from('columnas').upsert({
     proyecto_id: proyectoActivo.id,
     nombre,
@@ -6179,7 +6654,8 @@ async function agregarColumnaBD(nombre){
 // Renombra una columna: valida, actualiza todo en memoria, y persiste (incluye Supabase)
 async function renombrarColumnaCompleta(nombreViejo, nuevoNombre){
   if(!nuevoNombre || nuevoNombre === nombreViejo) return false;
-  if(COLUMNAS.includes(nuevoNombre)){
+  const existente = buscarColumnaExistente(nuevoNombre);
+  if(existente && existente !== nombreViejo){
     alert('Ya existe una columna con ese nombre');
     return false;
   }
@@ -6203,7 +6679,33 @@ async function renombrarColumnaCompleta(nombreViejo, nuevoNombre){
   }
 
   await renombrarColumna(proyectoActivo.id, nombreViejo, nuevoNombre);
+  await renombrarColumnaEnExtracciones(nombreViejo, nuevoNombre);
   return true;
+}
+
+// Actualiza el nombre de la columna dentro del mapeo guardado de cada documento
+// (el que usa "Actualizar documento" para saber en qué celda está cada dato). Si esto no se
+// hiciera, después de un renombrado ese mapeo quedaría apuntando a un nombre que ya no existe.
+async function renombrarColumnaEnExtracciones(nombreViejo, nuevoNombre){
+  const docsAfectados = [];
+  DOCUMENTOS_PROYECTO.forEach(doc=>{
+    let cambio = false;
+    (doc.extracciones || []).forEach(ext=>{
+      if(ext.tipo === 'rango' && Array.isArray(ext.mapaColumnas)){
+        ext.mapaColumnas.forEach(m=>{
+          if(m.columna === nombreViejo){ m.columna = nuevoNombre; cambio = true; }
+        });
+      }
+    });
+    if(cambio) docsAfectados.push(doc);
+  });
+  if(!docsAfectados.length) return;
+
+  const resultados = await Promise.all(docsAfectados.map(doc =>
+    supabaseClient.from('documentos').update({ extracciones: doc.extracciones }).eq('id', doc.__id)
+  ));
+  const fallidas = resultados.filter(r => r.error).length;
+  if(fallidas) console.error(`${fallidas} documento(s) no se pudieron actualizar en Supabase tras el renombrado de columna.`);
 }
 
 // ---- Panel consolidado de Columnas: agregar, reordenar, ocultar/mostrar, renombrar, eliminar ----
@@ -6229,7 +6731,7 @@ function restaurarFilaAgregarColumnaBD(){
 
 function mostrarFilaEditableAgregarColumnaBD(){
   document.getElementById('fila-agregar-columna-bd').innerHTML = `
-    <div style="display:flex; gap:6px; align-items:center;">
+    <div style="display:flex; gap:6px; align-items:stretch;">
       <input type="text" class="field-input" id="input-nueva-columna-bd" placeholder="Nombre de la columna nueva" style="flex:1;">
       <button type="button" class="col-icon-btn col-icon-btn-grande danger" id="btn-cancelar-nueva-columna-bd" title="Cancelar">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -6394,7 +6896,9 @@ function renderListaColumnasBD(){
       const col = btn.dataset.col;
       const span = document.getElementById(`nombre-col-${btn.dataset.idx}`);
       const original = col;
-      span.innerHTML = `<input type="text" class="field-input" value="${original}" style="padding:3px 6px; font-size:12.5px; width:100%;">`;
+      span.style.alignSelf = 'stretch';
+      span.style.display = 'flex';
+      span.innerHTML = `<input type="text" class="field-input" value="${original}" style="height:100%; box-sizing:border-box; padding:0 8px; font-size:12.5px; width:100%;">`;
       const input = span.querySelector('input');
       input.focus();
       input.select();
@@ -7400,7 +7904,7 @@ function renderTablaFinal(){
       const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
 
       // Solo mostrar títulos celestes en la pantalla final donde se ponen nombres
-      if(esTitulo && valor && !COLUMNAS.includes(valor) && modoGrilla === 'final') cls.push('titulo-columna-nueva');
+      if(esTitulo && valor && !buscarColumnaExistente(valor) && modoGrilla === 'final') cls.push('titulo-columna-nueva');
 
       let valorMostrado = valor;
       if(celdasDiferentesActualizar.has(`${r}-${c}`)){
@@ -7569,7 +8073,7 @@ function actualizarBotonesColumnasTopbar(){
   document.getElementById('btn-unificar-columnas').style.display = mostrar ? 'flex' : 'none';
   document.getElementById('btn-sacar-columnas').style.display = mostrar ? 'flex' : 'none';
   document.getElementById('btn-sacar-columnas').textContent = modoActualizarDoc ? 'Actualizar columna' : 'Sacar columnas';
-  document.getElementById('subir-basedatos').textContent = modoActualizarDoc ? 'Actualizar documento' : 'Subir a base de datos';
+  document.getElementById('subir-basedatos').textContent = modoActualizarDoc ? 'Actualizar documento' : 'Subir';
 }
 
 // Cancelar (topbar final): misma confirmación de siempre
@@ -8573,7 +9077,10 @@ document.getElementById('subir-basedatos').addEventListener('click', ()=>{
   const filaNombres = (filaTituloIdx !== null && tablaData[filaTituloIdx]) ? tablaData[filaTituloIdx] : [];
   // Las columnas marcadas con "Sacar columnas" (rojo) o sin nombre no se suben
   colsIdxASubir = filaNombres.map((n, idx) => idx).filter(idx => !columnasMarcadasEliminar.has(idx) && filaNombres[idx]);
-  nombresASubir = colsIdxASubir.map(idx => filaNombres[idx]);
+  nombresASubir = colsIdxASubir.map(idx => {
+    const nombreTipeado = filaNombres[idx];
+    return buscarColumnaExistente(nombreTipeado) || nombreTipeado;
+  });
   const cont = document.getElementById('columnas-subida-list');
   cont.innerHTML = nombresASubir.map(n=>{
     const esNueva = !COLUMNAS.includes(n);
@@ -8666,7 +9173,7 @@ function fusionarFilaConDocumento(filaExistente, datosNuevos, documento){
   Object.keys(datosNuevos).forEach(col=>{
     if(col === 'TAG') return; // el TAG es el que ya coincidió, no hace falta compararlo
     const valorNuevo = datosNuevos[col];
-    if(!valorNuevo) return;
+    if(valorNuevo === '' || valorNuevo === null || valorNuevo === undefined) return;
 
     filaExistente.__historial[col] = filaExistente.__historial[col] || {};
 
@@ -8675,13 +9182,14 @@ function fusionarFilaConDocumento(filaExistente, datosNuevos, documento){
     // Si la celda ya tenía un valor pero nunca quedó registrado en el historial
     // (se cargó a mano, sin venir de ningún documento), se deja constancia de eso
     // para que la comparación lo muestre en vez de dejarlo sin explicar.
-    if(valorActual && Object.keys(filaExistente.__historial[col]).length === 0){
+    const hayValorActual = valorActual !== '' && valorActual !== null && valorActual !== undefined;
+    if(hayValorActual && Object.keys(filaExistente.__historial[col]).length === 0){
       filaExistente.__historial[col]['Creado en la base de datos'] = valorActual;
     }
 
     filaExistente.__historial[col][documento] = valorNuevo;
 
-    if(!valorActual){
+    if(valorActual === '' || valorActual === null || valorActual === undefined){
       // primera vez que se ve un valor para esta celda: se toma como oficial, sin conflicto
       filaExistente[col] = valorNuevo;
       return;
@@ -8703,7 +9211,18 @@ function construirRegistroExtraccion(){
     );
     return { tipo: 'celdas', celdas };
   }
-  return { tipo: 'rango', hoja: hojaActivaSeleccionada(), ...rangoConfirmadoObj };
+  // Guardamos también la fila de título real (esté dentro o fuera del rango) y el mapeo
+  // posición-dentro-del-rango → nombre de columna en la base, para poder reconstruir más
+  // adelante exactamente qué celda del archivo original corresponde a cada dato
+  // (lo usa "Actualizar documento" para pisar solo lo que cambió, sin volver a preguntar nada).
+  const mapaColumnas = colsIdxASubir.map((idx, i) => ({ posicion: idx, columna: nombresASubir[i] }));
+  return {
+    tipo: 'rango',
+    hoja: hojaActivaSeleccionada(),
+    ...rangoConfirmadoObj,
+    filaTituloRaw,
+    mapaColumnas,
+  };
 }
 
 document.getElementById('confirmar-subir-bd').addEventListener('click', async ()=>{
@@ -8723,7 +9242,12 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
   }
 
   // Detectar TAGs duplicados en el documento
-  const nombresCol = (filaTituloIdx !== null && tablaData[filaTituloIdx]) ? tablaData[filaTituloIdx] : [];
+  // Importante: el destino de cada dato tiene que ser el nombre FINAL confirmado en la pantalla
+  // anterior (nombresASubir) — no el texto crudo tal como estaba escrito en la hoja, porque
+  // puede haber sido renombrado o normalizado (mayúsculas/tildes) para calzar con una columna
+  // ya existente. Si no, el dato se guarda con una clave que nadie lee.
+  const nombreFinalPorIdx = {};
+  colsIdxASubir.forEach((idx, i) => { nombreFinalPorIdx[idx] = nombresASubir[i]; });
   const tagsPorDocumento = {}; // { TAG: [fila1, fila2, ...] }
 
   tablaData.forEach((fila, r)=>{
@@ -8731,8 +9255,8 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
     const datosFila = {};
     colsIdxASubir.forEach(idx=>{
       let valor = fila[idx];
-      if(nombresCol[idx] === 'TAG' && typeof valor === 'string') valor = valor.trim().toUpperCase();
-      datosFila[nombresCol[idx]] = valor;
+      if(nombreFinalPorIdx[idx] === 'TAG' && typeof valor === 'string') valor = valor.trim().toUpperCase();
+      datosFila[nombreFinalPorIdx[idx]] = valor;
     });
     const tagValor = datosFila['TAG'];
     if(tagValor){
@@ -8766,8 +9290,8 @@ document.getElementById('confirmar-subir-bd').addEventListener('click', async ()
     let tieneAlgo = false;
     colsIdxASubir.forEach(idx=>{
       let valor = fila[idx];
-      if(nombresCol[idx] === 'TAG' && typeof valor === 'string') valor = valor.trim().toUpperCase();
-      datosFila[nombresCol[idx]] = valor;
+      if(nombreFinalPorIdx[idx] === 'TAG' && typeof valor === 'string') valor = valor.trim().toUpperCase();
+      datosFila[nombreFinalPorIdx[idx]] = valor;
       if(valor) tieneAlgo = true;
     });
     if(!tieneAlgo) return;
