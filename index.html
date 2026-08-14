@@ -2463,10 +2463,9 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
         </button>
         <div class="filtro-doc-wrap">
-          <button class="btn-col" id="btn-filtro-documentos" title="Filtrar por documento">
+          <button class="btn-col" id="btn-otros-filtros" title="Otros filtros">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </button>
-          <div class="filter-popup" id="popup-filtro-documentos" style="left:auto; right:0;"></div>
         </div>
         <button class="btn-col" id="btn-exportar" title="Exportar">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
@@ -3238,6 +3237,41 @@
     </div>
   </div>
 
+  <!-- Modal Otros filtros -->
+  <div class="overlay" id="overlay-otros-filtros">
+    <div class="modal" style="width:420px; max-height:85vh; overflow-y:auto;">
+      <h3>Otros filtros</h3>
+
+      <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px;">
+        <input type="checkbox" id="chk-solo-conflictos-global">
+        <span style="color:var(--red); font-weight:600;">Solo celdas con conflicto</span>
+      </label>
+
+      <label class="field-label" style="margin-top:16px;">Otros criterios</label>
+      <div class="seg-col-row" style="position:relative; border:1px solid var(--line); border-radius:6px; padding:9px 10px;">
+        <span class="seg-col-nombre" style="flex:1; font-weight:600;">Documento</span>
+        <span class="th-filter" id="btn-doc-otros-filtros">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+        </span>
+        <div class="filter-popup" id="popup-doc-otros-filtros"></div>
+      </div>
+
+      <label class="field-label" style="margin-top:16px;">Comparador de documentos</label>
+      <p style="margin-top:0;">Elegí dos documentos y mostramos los TAGs que difieren entre ellos.</p>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <select class="field-select" id="comparar-doc-a"></select>
+        <span style="color:var(--text-dim);">vs</span>
+        <select class="field-select" id="comparar-doc-b"></select>
+      </div>
+      <div id="resultado-comparar-documentos" style="margin-top:10px;"></div>
+
+      <div class="modal-actions" style="margin-top:16px; justify-content:flex-end;">
+        <button class="btn" id="cancelar-otros-filtros">Cerrar</button>
+        <button class="btn btn-primary" id="aplicar-otros-filtros">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay-exportar">
     <div class="modal" style="width:340px;">
       <h3>Exportar</h3>
@@ -3556,6 +3590,13 @@ let filtroAbierto = null;
 let columnasOcultas = new Set();
 let columnasAnchos = {}; // { columna: ancho en px }
 let filtroDocumentos = null; // null = todos, o Set con las claves de documento tildadas ('__sin_documento__' incluida)
+let filtroGlobalSoloConflictos = false; // true = solo mostrar filas con alguna celda roja, azul o amarilla
+function pasaFiltroGlobalConflicto(fila){
+  if(!filtroGlobalSoloConflictos) return true;
+  const tieneRojoOAzul = (fila.__conflictos && fila.__conflictos.size > 0) || (fila.__resueltos && fila.__resueltos.size > 0);
+  const tieneAmarillo = fila.__duplicados && Object.keys(fila.__duplicados).length > 0;
+  return !!(tieneRojoOAzul || tieneAmarillo);
+}
 
 // ---- Conversión entre filas de Supabase (tabla "instrumentos") y el formato que usa la app ----
 function filaDesdeSupabase(row){
@@ -3793,6 +3834,7 @@ function valoresUnicos(col){
 function filasFiltradas(){
   return FILAS.filter(fila => {
     if(!pasaFiltroDocumento(fila)) return false;
+    if(!pasaFiltroGlobalConflicto(fila)) return false;
     return COLUMNAS.every(col => {
       const permitidos = FILTROS[col];
       if(!permitidos) return true;
@@ -4122,6 +4164,10 @@ function abrirFiltro(col){
         <input type="checkbox" class="chk-todos-popup" ${seleccion.size===valores.length ? 'checked':''}>
         <span>Seleccionar todo</span>
       </label>
+      <label class="filter-option" style="border-bottom:1px solid var(--line);">
+        <input type="checkbox" class="chk-solo-conflicto-popup">
+        <span style="color:var(--red);">Solo con conflicto</span>
+      </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
           <input type="checkbox" class="chk-valor" value="${v}" ${seleccion.has(v) ? 'checked':''}>
@@ -4161,6 +4207,24 @@ function abrirFiltro(col){
     actualizarEstadoTodos();
   });
   popup.querySelectorAll('.chk-valor').forEach(c => c.addEventListener('change', actualizarEstadoTodos));
+
+  // "Solo con conflicto": marca solo los valores que tienen alguna fila en conflicto en esta
+  // columna, y desmarca el resto — mismo criterio que el buscador
+  popup.querySelector('.chk-solo-conflicto-popup').addEventListener('change', (e)=>{
+    if(e.target.checked){
+      const valoresConConflicto = new Set(
+        FILAS.filter(f=>{
+          const rojoOAzul = (f.__conflictos && f.__conflictos.has(col)) || (f.__resueltos && f.__resueltos.has(col));
+          const amarillo = col === 'TAG' && f.__duplicados && Object.keys(f.__duplicados).length > 0;
+          return rojoOAzul || amarillo;
+        }).map(f => (f[col] ?? '').toString())
+      );
+      chksValor().forEach(c => { c.checked = valoresConConflicto.has(c.value); });
+    } else {
+      chksValor().forEach(c => { c.checked = true; });
+    }
+    actualizarEstadoTodos();
+  });
 
   // Buscador interno: filtra las opciones visibles y marca solo lo que coincide,
   // desmarcando el resto (resetea la selección al buscar)
@@ -6593,13 +6657,14 @@ document.getElementById('aplicar-ordenar-docs').addEventListener('click', ()=>{
 
 // ---- Filtro por documento de origen ----
 function actualizarBadgeFiltroDocumentos(){
-  document.getElementById('btn-filtro-documentos').classList.toggle('btn-filtro-activo', !!filtroDocumentos);
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos));
 }
 
-function abrirFiltroDocumentos(){
+// ---- Modal "Otros filtros": conflictos globales, filtrar por documento, comparador ----
+function abrirFiltroDocOtrosFiltros(){
   cerrarFiltros();
   filtroAbierto = 'doc-origen';
-  const popup = document.getElementById('popup-filtro-documentos');
+  const popup = document.getElementById('popup-doc-otros-filtros');
   const valores = [...new Set(FILAS.flatMap(documentosDeFila))];
   const seleccion = filtroDocumentos || new Set(valores);
 
@@ -6664,14 +6729,77 @@ function abrirFiltroDocumentos(){
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     filtroDocumentos = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
-    document.getElementById('btn-filtro-documentos').classList.toggle('btn-filtro-activo', !!filtroDocumentos);
+    document.getElementById('btn-doc-otros-filtros').classList.toggle('active', !!filtroDocumentos);
+    actualizarBadgeFiltroDocumentos();
     renderTabla();
   });
 }
-document.getElementById('btn-filtro-documentos').addEventListener('click', (e)=>{
+document.getElementById('btn-doc-otros-filtros').addEventListener('click', (e)=>{
   e.stopPropagation();
   if(filtroAbierto === 'doc-origen'){ cerrarFiltros(); return; }
-  abrirFiltroDocumentos();
+  abrirFiltroDocOtrosFiltros();
+});
+
+function poblarComparadorDocumentos(){
+  const nombres = DOCUMENTOS_PROYECTO.map(d => d.nombre);
+  const opciones = `<option value="">Seleccionar</option>` + nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  document.getElementById('comparar-doc-a').innerHTML = opciones;
+  document.getElementById('comparar-doc-b').innerHTML = opciones;
+  actualizarComparadorDocumentos();
+}
+
+// Compara solo presencia: qué TAGs tiene uno de los documentos y el otro no (y viceversa).
+// Se dispara solo al elegir/cambiar cualquiera de los dos documentos, sin botón aparte.
+function actualizarComparadorDocumentos(){
+  const docA = document.getElementById('comparar-doc-a').value;
+  const docB = document.getElementById('comparar-doc-b').value;
+  const cont = document.getElementById('resultado-comparar-documentos');
+  if(!docA || !docB || docA === docB){
+    cont.innerHTML = '<p style="color:var(--text-dim); font-size:12px; margin:6px 0 0;">Elegí dos documentos distintos.</p>';
+    return;
+  }
+
+  const soloA = [], soloB = [];
+  FILAS.forEach(fila=>{
+    const enA = fila.__documentos && fila.__documentos.has(docA);
+    const enB = fila.__documentos && fila.__documentos.has(docB);
+    if(enA && !enB) soloA.push(fila.TAG);
+    if(enB && !enA) soloB.push(fila.TAG);
+  });
+
+  const filas = Math.max(soloA.length, soloB.length);
+  let filasHtml = '';
+  for(let i = 0; i < filas; i++){
+    filasHtml += `<tr><td style="padding:4px 8px; border-top:1px solid var(--line);">${soloA[i] || ''}</td><td style="padding:4px 8px; border-top:1px solid var(--line);">${soloB[i] || ''}</td></tr>`;
+  }
+
+  cont.innerHTML = `
+    <table style="width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;">
+      <thead><tr>
+        <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line);">Solo en "${docA}" (${soloA.length})</th>
+        <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line);">Solo en "${docB}" (${soloB.length})</th>
+      </tr></thead>
+      <tbody>${filasHtml || '<tr><td colspan="2" style="padding:8px; color:var(--text-dim);">No hay diferencias de presencia entre los dos.</td></tr>'}</tbody>
+    </table>
+  `;
+}
+document.getElementById('comparar-doc-a').addEventListener('change', actualizarComparadorDocumentos);
+document.getElementById('comparar-doc-b').addEventListener('change', actualizarComparadorDocumentos);
+
+document.getElementById('btn-otros-filtros').addEventListener('click', ()=>{
+  document.getElementById('chk-solo-conflictos-global').checked = filtroGlobalSoloConflictos;
+  document.getElementById('btn-doc-otros-filtros').classList.toggle('active', !!filtroDocumentos);
+  poblarComparadorDocumentos();
+  document.getElementById('overlay-otros-filtros').classList.add('open');
+});
+document.getElementById('cancelar-otros-filtros').addEventListener('click', ()=>{
+  document.getElementById('overlay-otros-filtros').classList.remove('open');
+});
+document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
+  filtroGlobalSoloConflictos = document.getElementById('chk-solo-conflictos-global').checked;
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroDocumentos));
+  document.getElementById('overlay-otros-filtros').classList.remove('open');
+  renderTabla();
 });
 
 // ---- Ordenar (varios niveles, tipo Excel) ----
