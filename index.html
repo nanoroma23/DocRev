@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DocRev</title>
+<title>DocRev v0.0.162</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1025,6 +1025,8 @@
   #overlay-confirmar-nueva-columna{ z-index:110; }
   #overlay-filtro-seguimiento-col{ z-index:110; }
   #overlay-eliminar-seguimiento{ z-index:110; }
+  #overlay-detalle-duplicados{ z-index:120; }
+  #overlay-agregar-tag-distinto{ z-index:130; }
   .modal{
     background:var(--card);
     border:1px solid var(--line);
@@ -1071,6 +1073,19 @@
     background:var(--green);
     border-color:var(--green);
     color:#fff;
+  }
+  .btn-mas-detalle:hover{
+    background:#FFF3CD !important;
+    border-color:#856404 !important;
+    color:#664d03 !important;
+  }
+  #editar-tag-nombre:hover{
+    opacity:1 !important;
+  }
+  #cerrar-detalle-instrumento:hover{
+    color:var(--text) !important;
+    background:var(--card);
+    border-radius:4px;
   }
   .btn{
     font-family:var(--font-ui);
@@ -2423,6 +2438,7 @@
       <button class="menu-btn" id="menu-btn"><span></span><span></span><span></span></button>
       <div class="menu-dropdown" id="menu-dropdown">
         <div class="menu-item" id="menu-rename">Renombrar proyecto</div>
+        <div class="menu-item" id="menu-backup">Copia de seguridad</div>
         <div class="menu-divider"></div>
         <div class="menu-item danger" id="menu-delete">Eliminar proyecto</div>
       </div>
@@ -2503,9 +2519,15 @@
             <div class="seg-crear-seccion">
               <h3 class="seg-crear-seccion-titulo">1. Columna principal</h3>
               <p class="seg-crear-seccion-desc">Elegí qué columna querés seguir (aparecerá fija a la izquierda)</p>
-              <select class="field-select" id="seg-columna-principal">
-                <option value="">Seleccionar columna...</option>
-              </select>
+              <div style="display:flex; align-items:center; gap:8px; position:relative;">
+                <select class="field-select" id="seg-columna-principal" style="flex:1;">
+                  <option value="">Seleccionar columna...</option>
+                </select>
+                <button type="button" class="seg-col-filtro-btn" id="seg-principal-filtro-btn" title="Filtrar valores" style="display:none;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+                </button>
+                <div class="filter-popup" id="popup-seg-col-principal"></div>
+              </div>
             </div>
 
             <div class="seg-crear-seccion">
@@ -3113,7 +3135,12 @@
   <!-- Modal detalle de documento -->
   <div class="overlay" id="overlay-detalle-documento">
     <div class="modal" style="width:380px;">
-      <h3 id="detalle-doc-nombre">Documento.xlsx</h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 id="detalle-doc-nombre" style="margin:0; flex:1; word-break:break-word;">Documento.xlsx</h3>
+        <button id="cerrar-detalle-documento" style="background:none; border:none; cursor:pointer; padding:4px; color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
 
       <div class="detalle-doc-campo">
         <div class="detalle-doc-campo-label">Tipo de documento</div>
@@ -3143,9 +3170,8 @@
         <button class="btn btn-block" id="btn-extraer-tabla">Extraer datos</button>
       </div>
 
-      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-        <button class="btn btn-primary" id="cerrar-detalle-documento">Cerrar</button>
-        <button class="btn btn-danger" id="btn-eliminar-documento">Eliminar</button>
+      <div style="margin-top:14px;">
+        <button class="btn btn-danger" id="btn-eliminar-documento" style="width:100%;">Eliminar documento</button>
       </div>
     </div>
   </div>
@@ -3341,24 +3367,44 @@
   <!-- Modal agregar TAG repetido distinto -->
   <div class="overlay" id="overlay-agregar-tag-distinto">
     <div class="modal">
-      <h3>Agregar como TAG nuevo</h3>
-      <p>Esta fila tiene valores distintos. Ingresá un nuevo TAG para agregarla a la base de datos.</p>
+      <h3>Crear TAG nuevo</h3>
+      <p>Esta fila tiene valores distintos. Ingresá un nuevo TAG para agregarla como instrumento independiente.</p>
       <label class="field-label">Nuevo TAG</label>
       <input type="text" class="field-input" id="input-nuevo-tag-distinto" placeholder="Ej: TAG-001-A">
       <div id="preview-datos-distintos" style="margin-top:12px; padding:10px; background:var(--green-soft); border-radius:6px; font-size:12px;"></div>
       <div class="modal-actions modal-actions-split" style="margin-top:14px;">
         <button class="btn" id="cancel-agregar-tag-distinto">Cancelar</button>
-        <button class="btn btn-primary" id="confirm-agregar-tag-distinto">Agregar</button>
+        <button class="btn btn-primary" id="confirm-agregar-tag-distinto">Crear</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal detalle completo de duplicados -->
+  <div class="overlay" id="overlay-detalle-duplicados">
+    <div class="modal" style="width:600px; max-width:90vw;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Detalle completo de duplicados</h3>
+        <button id="cerrar-detalle-duplicados" style="background:none; border:none; cursor:pointer; padding:4px; color:var(--text-muted); display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="modal-detalle-duplicados-contenido"></div>
     </div>
   </div>
 
   <div class="overlay" id="overlay-detalle-instrumento">
     <div class="modal" style="width:360px;">
-      <h3 id="detalle-instrumento-titulo">Detalle</h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div class="detalle-doc-campo-valor-row" id="detalle-instrumento-titulo" style="flex:1; margin:0;">Detalle</div>
+        <button id="cerrar-detalle-instrumento" style="background:none; border:none; cursor:pointer; padding:4px; color:var(--text-muted); display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="detalle-duplicados-fijo"></div>
       <div class="detalle-campos" id="detalle-campos"></div>
-      <div class="modal-actions" style="margin-top:14px;">
-        <button class="btn btn-primary" id="cerrar-detalle-instrumento">Cerrar</button>
+      <div style="padding:12px 0 0; margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+        <button class="btn" id="btn-modificar-nombre-tag" style="width:100%;">Modificar nombre</button>
+        <button class="btn btn-danger" id="btn-eliminar-tag" style="width:100%;">Eliminar TAG</button>
       </div>
     </div>
   </div>
@@ -3437,6 +3483,37 @@
         <button class="btn" id="cancel-delete">Cancelar</button>
         <button class="btn btn-danger" id="confirm-delete">Eliminar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal copia de seguridad -->
+  <div class="overlay" id="overlay-backup">
+    <div class="modal" style="width:400px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="margin:0;">Copia de seguridad</h3>
+        <button class="btn" id="close-backup" style="width:32px; height:32px; padding:0; font-size:20px; line-height:1;">×</button>
+      </div>
+      <p style="margin-bottom:20px;">Elegí una opción para gestionar tu copia de seguridad.</p>
+
+      <div class="columna-opciones-acciones">
+        <button class="btn-accion-columna" id="btn-crear-backup">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Crear una copia de seguridad
+        </button>
+        <button class="btn-accion-columna" id="btn-importar-backup">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Importar copia de seguridad
+        </button>
+      </div>
+      <input type="file" id="input-importar-backup" accept=".json" style="display:none;">
     </div>
   </div>
 
@@ -4120,6 +4197,58 @@ function cerrarFiltros(){
 }
 document.addEventListener('click', cerrarFiltros);
 
+function generarHtmlDuplicados(fila){
+  if(!fila.__duplicados || Object.keys(fila.__duplicados).length === 0) return '';
+
+  const resumen = Object.entries(fila.__duplicados).map(([doc, info]) => {
+    const ocurrencias = info.ocurrencias || [];
+    const grupos = [];
+    const procesados = new Set();
+
+    ocurrencias.forEach((o, i) => {
+      if(procesados.has(i)) return;
+      const jsonO = JSON.stringify(o);
+      const iguales = [];
+      ocurrencias.forEach((x, j) => {
+        if(JSON.stringify(x) === jsonO) {
+          iguales.push(j);
+          procesados.add(j);
+        }
+      });
+      grupos.push({ datos: o, indices: iguales });
+    });
+
+    const cantidadIguales = grupos.filter(g => g.indices.length > 1).reduce((sum, g) => sum + g.indices.length, 0);
+    const cantidadDistintas = grupos.length > 1 ? ocurrencias.length - cantidadIguales : 0;
+
+    return { doc, total: ocurrencias.length, cantidadIguales, cantidadDistintas, grupos, info };
+  });
+
+  let html = `<div style="padding:12px;">`;
+
+  resumen.forEach(({ doc, total, cantidadIguales, cantidadDistintas, grupos, info }) => {
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-weight:600; margin-bottom:8px; font-size:13px;">${doc}</div>
+            <div style="display:flex; gap:16px; font-size:12px; color:#856404;">
+              <div><span style="font-weight:600;">${cantidadIguales}</span> repetido${cantidadIguales !== 1 ? 's' : ''} igual${cantidadIguales !== 1 ? 'es' : ''}</div>
+              <div><span style="font-weight:600;">${cantidadDistintas}</span> repetido${cantidadDistintas !== 1 ? 's' : ''} distinto${cantidadDistintas !== 1 ? 's' : ''}</div>
+            </div>
+          </div>
+          <button class="btn-mas-detalle-tabla" data-tag="${fila.TAG}" data-doc="${doc}" style="padding:4px 10px; font-size:11px; font-weight:600; color:#856404; background:white; border:1px solid #FFC107; border-radius:5px; cursor:pointer; white-space:nowrap; line-height:1.3; text-align:center;">
+            Más<br>detalle
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  return html;
+}
+
 function renderTabla(){
   renderHead();
   actualizarBadgeFiltroDocumentos();
@@ -4162,6 +4291,7 @@ function renderTabla(){
       const valorEscapado = String(valor).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
     }).join('');
+
     return `<tr data-fila-idx="${i}"><td class="col-num col-key">${i+1}</td>${celdas}</tr>`;
   }).join('');
 
@@ -4359,13 +4489,24 @@ function abrirModalCrearSeguimiento(){
 
   selectPrincipal.addEventListener('change', (e) => {
     columnaPrincipalSeguimiento = e.target.value || null;
+    actualizarFiltroPrincipal();
     actualizarColumnasDisponibles();
     actualizarPreviewSeguimiento();
     actualizarBotonCrear();
   });
 
+  // Event listener para el botón de filtro de la columna principal
+  const btnFiltroPrincipal = document.getElementById('seg-principal-filtro-btn');
+  btnFiltroPrincipal.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(columnaPrincipalSeguimiento){
+      abrirFiltroSeguimientoCol(columnaPrincipalSeguimiento, btnFiltroPrincipal, true, false, true);
+    }
+  });
+
   actualizarColumnasDisponibles();
   actualizarPreviewSeguimiento();
+  actualizarFiltroPrincipal();
   document.getElementById('confirm-crear-seguimiento-nuevo').disabled = true;
 }
 
@@ -4488,18 +4629,36 @@ function actualizarBotonCrear(){
   boton.disabled = !columnaPrincipalSeguimiento;
 }
 
+function actualizarFiltroPrincipal(){
+  const btnFiltroPrincipal = document.getElementById('seg-principal-filtro-btn');
+  if(columnaPrincipalSeguimiento){
+    btnFiltroPrincipal.style.display = 'flex';
+    // Actualizar estado activo del botón según si hay filtro aplicado
+    if(filtrosSeguimientoTemp[columnaPrincipalSeguimiento]){
+      btnFiltroPrincipal.classList.add('active');
+    } else {
+      btnFiltroPrincipal.classList.remove('active');
+    }
+  } else {
+    btnFiltroPrincipal.style.display = 'none';
+    btnFiltroPrincipal.classList.remove('active');
+  }
+}
+
 document.getElementById('seg-crear-volver').addEventListener('click', abrirVistaSeguimientos);
 document.getElementById('cancel-crear-seguimiento-nuevo').addEventListener('click', abrirVistaSeguimientos);
 
 // Filtro opcional de valores para una columna puntual, mientras se arma el seguimiento
 let filtroSeguimientoColActivo = null;
 
-function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPreview = false){
+function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPreview = false, esColPrincipal = false){
   // Cerrar cualquier filtro abierto
   document.querySelectorAll('.filter-popup.open').forEach(p => p.classList.remove('open'));
 
   let popupId;
-  if(esPreview){
+  if(esColPrincipal){
+    popupId = 'popup-seg-col-principal';
+  } else if(esPreview){
     popupId = 'popup-seg-preview-' + col.replace(/[^a-zA-Z0-9]/g, '_');
   } else {
     const suffix = esNuevaVista ? '-nuevo-' : '-';
@@ -4563,6 +4722,7 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
 function aplicarFiltroSeguimientoCol(col){
   // Buscar el popup (puede estar en varios lugares)
   const posiblesIds = [
+    'popup-seg-col-principal',
     'popup-seg-col-nuevo-' + col.replace(/[^a-zA-Z0-9]/g, '_'),
     'popup-seg-preview-' + col.replace(/[^a-zA-Z0-9]/g, '_'),
     'popup-seg-col-' + col.replace(/[^a-zA-Z0-9]/g, '_')
@@ -4598,6 +4758,7 @@ function aplicarFiltroSeguimientoCol(col){
   if(document.getElementById('seguimiento-crear-vista').style.display === 'block'){
     actualizarColumnasDisponibles();
     actualizarPreviewSeguimiento();
+    actualizarFiltroPrincipal();
   }
 }
 
@@ -4771,6 +4932,24 @@ function valoresUnicosSeguimiento(seg, col){
     return Object.entries(seg.filtrosVista).every(([c, permitidos])=>{
       if(c === col) return true;
       if(!permitidos) return true;
+
+      // Manejar filtros especiales
+      if(c === '__ESTADO__'){
+        const estado = seg.estados[fila.TAG] || 'VER';
+        return permitidos.has(estado);
+      }
+      if(c === '__COMENTARIOS__'){
+        const comentario = seg.comentarios[fila.TAG] || '';
+        if(permitidos.has('(sin comentarios)')) return !comentario;
+        return permitidos.has(comentario);
+      }
+      if(c === '__FECHA__'){
+        const fechaMod = (seg.fechasModificacion || {})[fila.TAG];
+        if(!fechaMod) return permitidos.has('(sin fecha)');
+        const fechaFormateada = new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+        return permitidos.has(fechaFormateada);
+      }
+
       return permitidos.has((fila[c] ?? '').toString());
     });
   });
@@ -4786,7 +4965,7 @@ function filasDeSeguimientoVista(seg){
     return Object.entries(seg.filtrosVista).every(([col, permitidos])=>{
       if(!permitidos) return true;
 
-      // Filtros especiales para Estado y Comentarios
+      // Filtros especiales para Estado, Comentarios y Fecha
       if(col === '__ESTADO__'){
         const estado = seg.estados[fila.TAG] || 'VER';
         return permitidos.has(estado);
@@ -4795,6 +4974,12 @@ function filasDeSeguimientoVista(seg){
         const comentario = seg.comentarios[fila.TAG] || '';
         if(permitidos.has('(sin comentarios)')) return !comentario;
         return permitidos.has(comentario);
+      }
+      if(col === '__FECHA__'){
+        const fechaMod = (seg.fechasModificacion || {})[fila.TAG];
+        if(!fechaMod) return permitidos.has('(sin fecha)');
+        const fechaFormateada = new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+        return permitidos.has(fechaFormateada);
       }
 
       return permitidos.has((fila[col] ?? '').toString());
@@ -4890,10 +5075,15 @@ function renderTablaSeguimiento(){
       <div class="resize-handle"></div>
       <div class="filter-popup" id="seg-popup-__COMENTARIOS__"></div>
     </th>
-    <th style="width:110px; min-width:110px;">
+    <th data-seg-col="__FECHA__" style="width:110px; min-width:110px;">
       <div class="th-inner">
         <span>Última modif.</span>
+        <span class="th-filter ${seg.filtrosVista['__FECHA__'] ? 'active':''}" data-seg-tabla-filtro="__FECHA__">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+        </span>
       </div>
+      <div class="resize-handle"></div>
+      <div class="filter-popup" id="seg-popup-__FECHA__"></div>
     </th>`;
 
   thead.innerHTML = html;
@@ -5083,13 +5273,77 @@ function abrirFiltroSeguimientoTabla(col){
   if(col === '__ESTADO__'){
     valores = ['VER', 'OK', 'NO OK'];
   } else if(col === '__COMENTARIOS__'){
-    // Valores únicos de comentarios existentes
-    const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
-    const filas = filasDeSeguimientoVista(seg);
+    // Valores únicos de comentarios existentes - aplicar OTROS filtros excepto comentarios
+    const filas = filasDeSeguimiento(seg).filter(fila => {
+      return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
+        if(c === '__COMENTARIOS__') return true; // Excluir el filtro de la misma columna
+        if(!permitidos) return true;
+
+        if(c === '__ESTADO__'){
+          const estado = seg.estados[fila.TAG] || 'VER';
+          return permitidos.has(estado);
+        }
+        if(c === '__FECHA__'){
+          const fechaMod = (seg.fechasModificacion || {})[fila.TAG];
+          if(!fechaMod) return permitidos.has('(sin fecha)');
+          const fechaFormateada = new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+          return permitidos.has(fechaFormateada);
+        }
+        return permitidos.has((fila[c] ?? '').toString());
+      });
+    });
     valores = [...new Set(filas.map(f => seg.comentarios[f.TAG] || ''))].filter(v => v).sort();
     if(valores.length === 0) valores = ['(sin comentarios)'];
+  } else if(col === '__FECHA__'){
+    // Valores únicos de fechas - aplicar OTROS filtros excepto fecha
+    const filas = filasDeSeguimiento(seg).filter(fila => {
+      return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
+        if(c === '__FECHA__') return true; // Excluir el filtro de la misma columna
+        if(!permitidos) return true;
+
+        if(c === '__ESTADO__'){
+          const estado = seg.estados[fila.TAG] || 'VER';
+          return permitidos.has(estado);
+        }
+        if(c === '__COMENTARIOS__'){
+          const comentario = seg.comentarios[fila.TAG] || '';
+          if(permitidos.has('(sin comentarios)')) return !comentario;
+          return permitidos.has(comentario);
+        }
+        return permitidos.has((fila[c] ?? '').toString());
+      });
+    });
+    valores = [...new Set(filas.map(f => {
+      const fechaMod = (seg.fechasModificacion || {})[f.TAG];
+      if(!fechaMod) return '(sin fecha)';
+      return new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    }))].sort();
   } else {
-    valores = valoresUnicosSeguimiento(seg, col);
+    // Para columnas regulares (incluida la principal), aplicar OTROS filtros excepto esta columna
+    const filas = filasDeSeguimiento(seg).filter(fila => {
+      return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
+        if(c === col) return true; // Excluir el filtro de la misma columna
+        if(!permitidos) return true;
+
+        if(c === '__ESTADO__'){
+          const estado = seg.estados[fila.TAG] || 'VER';
+          return permitidos.has(estado);
+        }
+        if(c === '__COMENTARIOS__'){
+          const comentario = seg.comentarios[fila.TAG] || '';
+          if(permitidos.has('(sin comentarios)')) return !comentario;
+          return permitidos.has(comentario);
+        }
+        if(c === '__FECHA__'){
+          const fechaMod = (seg.fechasModificacion || {})[fila.TAG];
+          if(!fechaMod) return permitidos.has('(sin fecha)');
+          const fechaFormateada = new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+          return permitidos.has(fechaFormateada);
+        }
+        return permitidos.has((fila[c] ?? '').toString());
+      });
+    });
+    valores = [...new Set(filas.map(f => (f[col] ?? '').toString()))].sort();
   }
 
   const seleccion = seg.filtrosVista[col] || new Set(valores);
@@ -6664,7 +6918,11 @@ document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)
 
 // ---- Detalle de instrumento: se abre al tocar la celda de TAG, campos uno debajo del otro ----
 function abrirDetalleInstrumento(fila){
-  document.getElementById('detalle-instrumento-titulo').textContent = fila.TAG || 'Detalle';
+  const titulo = document.getElementById('detalle-instrumento-titulo');
+  titulo.innerHTML = `
+    <span class="detalle-doc-valor-texto" style="flex:1; font-size:18px; font-weight:600;">${fila.TAG || 'Detalle'}</span>
+  `;
+
   const cont = document.getElementById('detalle-campos');
 
   // TAG repetido dentro de un mismo documento: desplegable con el detalle de cada ocurrencia
@@ -6696,35 +6954,27 @@ function abrirDetalleInstrumento(fila){
     });
 
     bloqueDuplicados = `
-      <div class="tag-duplicado-aviso" id="tag-duplicado-aviso" style="border:1px solid #FFC107; border-radius:6px; margin-bottom:16px; overflow:hidden;">
-        <div id="tag-duplicado-toggle" style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:#FFF3CD; cursor:pointer;">
+      <div class="tag-duplicado-aviso" id="tag-duplicado-aviso" style="display:block; width:100%; border:1px solid #FFC107; border-radius:6px; margin-bottom:16px; overflow:visible; flex-shrink:0;">
+        <div id="tag-duplicado-toggle" style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:#FFF3CD; cursor:pointer; width:100%; box-sizing:border-box;">
           <span style="flex:1; font-weight:600; color:#856404; font-size:13px;">TAG repetido en el mismo documento</span>
-          <svg id="tag-duplicado-flecha" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2.4" style="transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg id="tag-duplicado-flecha" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2.4" style="transition:transform 0.15s ease; transform:rotate(180deg); flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div id="tag-duplicado-detalle" style="display:none; padding:10px 12px; font-size:12.5px; color:#856404;">
+        <div id="tag-duplicado-detalle" style="display:block; padding:10px 12px; font-size:12.5px; color:#856404; width:100%; box-sizing:border-box;">
           ${resumen.map(({ doc, total, cantidadIguales, cantidadDistintas, grupos, info }) => {
             return `
               <div style="margin-bottom:14px;" data-doc="${doc}">
-                <div style="font-weight:600; margin-bottom:8px; font-size:13px;">${doc}</div>
-                <div style="display:flex; gap:16px; margin-bottom:8px; font-size:12px;">
-                  <div><span style="font-weight:600;">${cantidadIguales}</span> repetido${cantidadIguales !== 1 ? 's' : ''} igual${cantidadIguales !== 1 ? 'es' : ''}</div>
-                  <div><span style="font-weight:600;">${cantidadDistintas}</span> repetido${cantidadDistintas !== 1 ? 's' : ''} distinto${cantidadDistintas !== 1 ? 's' : ''}</div>
-                </div>
-                ${grupos.map((grupo, gIdx) => {
-                  const esDistinto = grupo.indices.length === 1 && grupos.length > 1;
-                  const campos = Object.entries(grupo.datos).filter(([c])=>c!=='TAG').map(([c,v])=>`${c}: ${v||'(vacío)'}`).join(', ');
-                  const label = grupo.indices.length > 1
-                    ? `${grupo.indices.length} veces iguales (filas ${grupo.indices.map(i=>i+1).join(', ')})`
-                    : `Fila ${grupo.indices[0]+1} (distinta)`;
-
-                  return `
-                    <div style="padding:6px 0 6px 10px; border-left:2px solid ${esDistinto ? '#FF6B35' : '#FFC107'}; margin-bottom:4px; background:${esDistinto ? 'rgba(255,107,53,0.08)' : 'transparent'};">
-                      <div style="font-weight:600; margin-bottom:2px; color:${esDistinto ? '#C44808' : '#664d03'};">${label}</div>
-                      <div style="color:#856404;">${campos}</div>
-                      ${esDistinto ? `<button class="btn-mini btn-agregar-distinto" style="margin-top:6px; background:#FF6B35; color:white; border-color:#FF6B35;" data-doc="${doc}" data-grupo-idx="${gIdx}">Agregar como TAG nuevo</button>` : ''}
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                  <div style="flex:1;">
+                    <div style="font-weight:600; margin-bottom:8px; font-size:13px;">${doc}</div>
+                    <div style="display:flex; gap:16px; font-size:12px;">
+                      <div><span style="font-weight:600;">${cantidadIguales}</span> igual${cantidadIguales !== 1 ? 'es' : ''}</div>
+                      <div><span style="font-weight:600;">${cantidadDistintas}</span> distinto${cantidadDistintas !== 1 ? 's' : ''}</div>
                     </div>
-                  `;
-                }).join('')}
+                  </div>
+                  <button class="btn-mas-detalle" data-doc="${doc}" style="padding:4px 10px; font-size:11px; font-weight:600; color:#856404; background:white; border:1px solid #FFC107; border-radius:5px; cursor:pointer; white-space:nowrap; transition:all 0.12s ease; line-height:1.3; text-align:center; align-self:flex-start; margin-top:0;">
+                    Más<br>detalle
+                  </button>
+                </div>
               </div>
             `;
           }).join('')}
@@ -6733,17 +6983,16 @@ function abrirDetalleInstrumento(fila){
     `;
   }
 
+  // Limpiar el div fijo (no lo usamos)
+  document.getElementById('detalle-duplicados-fijo').innerHTML = '';
+
+  // Poner el bloque de duplicados y los campos en el área scrolleable
   cont.innerHTML = bloqueDuplicados + COLUMNAS.map(col => `
     <div class="detalle-campo">
       <div class="detalle-label">${col}</div>
       <div class="detalle-valor">${fila[col] ?? '—'}</div>
     </div>
-  `).join('') + `
-    <div style="display:flex; gap:8px; margin-top:16px;">
-      <button class="btn" id="btn-modificar-nombre-tag" style="flex:1;">Modificar nombre</button>
-      <button class="btn btn-danger" id="btn-eliminar-tag" style="flex:1;">Eliminar tag</button>
-    </div>
-  `;
+  `).join('');
 
   const toggle = document.getElementById('tag-duplicado-toggle');
   if(toggle){
@@ -6755,19 +7004,21 @@ function abrirDetalleInstrumento(fila){
     });
   }
 
-  // Event delegation para botones de agregar TAG distinto
-  cont.querySelectorAll('.btn-agregar-distinto').forEach(btn => {
+  // Event delegation para botones "Más detalle"
+  cont.querySelectorAll('.btn-mas-detalle').forEach(btn => {
     btn.addEventListener('click', () => {
       const doc = btn.dataset.doc;
-      const grupoIdx = parseInt(btn.dataset.grupoIdx);
-      agregarFilaDistinta(doc, grupoIdx, fila);
+      mostrarMasDetalleDuplicados(doc, fila);
     });
   });
 
+  // Event listener para el botón modificar nombre
   document.getElementById('btn-modificar-nombre-tag').addEventListener('click', ()=>{
     document.getElementById('overlay-detalle-instrumento').classList.remove('open');
     abrirModalRenombrarTag(fila);
   });
+
+  // Event listener para el botón eliminar
   document.getElementById('btn-eliminar-tag').addEventListener('click', ()=>{
     document.getElementById('overlay-detalle-instrumento').classList.remove('open');
     abrirModalEliminarTag(fila);
@@ -6777,6 +7028,10 @@ function abrirDetalleInstrumento(fila){
 }
 document.getElementById('cerrar-detalle-instrumento').addEventListener('click', ()=>{
   document.getElementById('overlay-detalle-instrumento').classList.remove('open');
+});
+
+document.getElementById('cerrar-detalle-duplicados').addEventListener('click', ()=>{
+  document.getElementById('overlay-detalle-duplicados').classList.remove('open');
 });
 
 // ---- Agregar TAG repetido distinto ----
@@ -6910,9 +7165,182 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
   }
 
   document.getElementById('overlay-agregar-tag-distinto').classList.remove('open');
-  document.getElementById('overlay-detalle-instrumento').classList.remove('open');
   renderTabla();
+
+  // Reabrir el modal de "Más detalle" con los datos actualizados
+  if(filaDistintaActual && docDistintoActual){
+    // Si todavía tiene duplicados para este documento, reabrir
+    if(filaDistintaActual.__duplicados && filaDistintaActual.__duplicados[docDistintoActual]){
+      mostrarMasDetalleDuplicados(docDistintoActual, filaDistintaActual);
+    } else {
+      // Si ya no tiene duplicados para este documento, volver al detalle del TAG
+      document.getElementById('overlay-detalle-duplicados').classList.remove('open');
+      abrirDetalleInstrumento(filaDistintaActual);
+    }
+  }
 });
+
+// ---- Mostrar más detalle de duplicados ----
+function mostrarMasDetalleDuplicados(doc, fila){
+  if(!fila.__duplicados || !fila.__duplicados[doc]) return;
+
+  const info = fila.__duplicados[doc];
+  const ocurrencias = info.ocurrencias || [];
+
+  // Agrupar por igualdad de valores
+  const grupos = [];
+  const procesados = new Set();
+
+  ocurrencias.forEach((o, i) => {
+    if(procesados.has(i)) return;
+    const jsonO = JSON.stringify(o);
+    const iguales = [];
+    ocurrencias.forEach((x, j) => {
+      if(JSON.stringify(x) === jsonO) {
+        iguales.push(j);
+        procesados.add(j);
+      }
+    });
+    grupos.push({ datos: o, indices: iguales });
+  });
+
+  // Separar grupos en iguales y distintos
+  const gruposIguales = grupos.filter(g => g.indices.length > 1);
+  const gruposDistintos = grupos.filter(g => g.indices.length === 1 && grupos.length > 1);
+
+  // Construir el contenido del modal con detalles completos
+  let contenido = `
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600; font-size:14px; margin-bottom:8px; color:var(--text);">Documento: ${doc}</div>
+      <div style="font-size:13px; color:var(--text-muted);">TAG: <strong>${fila.TAG}</strong></div>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Total de ocurrencias: ${ocurrencias.length}</div>
+    </div>
+    <div style="max-height:400px; overflow-y:auto;">
+  `;
+
+  // Mostrar grupos de iguales
+  if(gruposIguales.length > 0){
+    gruposIguales.forEach((grupo) => {
+      const campos = Object.entries(grupo.datos).filter(([c]) => c !== 'TAG');
+      const label = `Iguales (${grupo.indices.length} ocurrencias)`;
+
+      contenido += `
+        <div style="margin-bottom:16px; padding:12px; border:1px solid #FFC107; border-radius:6px; background:rgba(255,193,7,0.05);">
+          <div style="font-weight:600; font-size:12.5px; color:#664d03; margin-bottom:8px;">${label}</div>
+          <div style="overflow-x:auto; margin-top:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px; min-width:400px;">
+              <thead>
+                <tr style="background:var(--bg);">
+      `;
+
+      campos.forEach(([campo]) => {
+        contenido += `<th style="padding:8px; text-align:left; font-weight:600; color:var(--text-muted); border-bottom:2px solid var(--line); white-space:nowrap;">${campo}</th>`;
+      });
+
+      contenido += `
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+      `;
+
+      campos.forEach(([campo, valor]) => {
+        contenido += `<td style="padding:8px; border-bottom:1px solid var(--line); color:var(--text);">${valor || '(vacío)'}</td>`;
+      });
+
+      contenido += `
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // Mostrar grupos de distintos - TODOS en la misma tabla
+  if(gruposDistintos.length > 0){
+    const campos = Object.entries(gruposDistintos[0].datos).filter(([c]) => c !== 'TAG');
+    const label = `Distintos (${gruposDistintos.length} ${gruposDistintos.length === 1 ? 'ocurrencia' : 'ocurrencias'})`;
+
+    contenido += `
+      <div style="margin-bottom:16px; padding:12px; border:1px solid #FF6B35; border-radius:6px; background:rgba(255,107,53,0.05);">
+        <div style="font-weight:600; font-size:12.5px; color:#C44808; margin-bottom:8px;">${label}</div>
+        <div style="overflow-x:auto; margin-top:8px;">
+          <table style="width:100%; border-collapse:collapse; font-size:12px; min-width:400px;">
+            <thead>
+              <tr style="background:rgba(255,107,53,0.1);">
+    `;
+
+    campos.forEach(([campo]) => {
+      contenido += `<th style="padding:8px; text-align:left; font-weight:600; color:var(--text-muted); border-bottom:2px solid #FF6B35; white-space:nowrap;">${campo}</th>`;
+    });
+
+    contenido += `
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    // Detectar qué columnas tienen valores distintos
+    const valoresPorCampo = {};
+    campos.forEach(([campo]) => {
+      valoresPorCampo[campo] = new Set();
+      gruposDistintos.forEach(grupo => {
+        valoresPorCampo[campo].add(grupo.datos[campo]);
+      });
+    });
+
+    gruposDistintos.forEach((grupo) => {
+      const grupoIdxOriginal = grupos.findIndex(g => g === grupo);
+      contenido += `<tr>`;
+      campos.forEach(([campo]) => {
+        const valor = grupo.datos[campo];
+        const esDistinto = valoresPorCampo[campo].size > 1; // Si hay más de un valor único, es distinto
+        const estiloExtra = esDistinto ? 'background:rgba(255,107,53,0.15); font-weight:600;' : '';
+        contenido += `<td style="padding:8px; border-bottom:1px solid #FF6B35; color:var(--text); ${estiloExtra}">${valor || '(vacío)'}</td>`;
+      });
+      contenido += `</tr>`;
+    });
+
+    contenido += `
+            </tbody>
+          </table>
+        </div>
+    `;
+
+    // Botones de agregar para cada distinto
+    gruposDistintos.forEach((grupo, idx) => {
+      const grupoIdxOriginal = grupos.findIndex(g => g === grupo);
+      contenido += `
+        <button class="btn-mini btn-agregar-distinto-modal" style="margin-top:10px; margin-right:8px; background:#FF6B35; color:white; border:1px solid #FF6B35; padding:6px 12px; border-radius:5px; cursor:pointer; font-size:11.5px; font-weight:600;" data-grupo-idx="${grupoIdxOriginal}">
+          Agregar fila ${idx + 1} como TAG nuevo
+        </button>
+      `;
+    });
+
+    contenido += `</div>`;
+  }
+
+  contenido += `</div>`;
+
+  // Mostrar en un modal
+  const modal = document.getElementById('modal-detalle-duplicados-contenido');
+  if(modal){
+    modal.innerHTML = contenido;
+
+    // Event listeners para botones de agregar
+    modal.querySelectorAll('.btn-agregar-distinto-modal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const grupoIdx = parseInt(btn.dataset.grupoIdx);
+        document.getElementById('overlay-detalle-duplicados').classList.remove('open');
+        agregarFilaDistinta(doc, grupoIdx, fila);
+      });
+    });
+
+    document.getElementById('overlay-detalle-duplicados').classList.add('open');
+  }
+}
 
 // ---- Modificar nombre de TAG ----
 let tagARenombrar = null;
@@ -6923,6 +7351,9 @@ function abrirModalRenombrarTag(fila){
 }
 document.getElementById('cancel-renombrar-tag').addEventListener('click', ()=>{
   document.getElementById('overlay-renombrar-tag').classList.remove('open');
+  if(tagARenombrar){
+    abrirDetalleInstrumento(tagARenombrar);
+  }
 });
 document.getElementById('confirm-renombrar-tag').addEventListener('click', async ()=>{
   const nuevoTag = document.getElementById('input-renombrar-tag').value.trim().toUpperCase();
@@ -7533,6 +7964,137 @@ document.getElementById('confirm-delete').addEventListener('click', async ()=>{
   PROYECTOS = PROYECTOS.filter(p=>p.id !== proyectoActivo.id);
   overlayDelete.classList.remove('open');
   volverHome();
+});
+
+// ---- Modal copia de seguridad ----
+const overlayBackup = document.getElementById('overlay-backup');
+document.getElementById('menu-backup').addEventListener('click', ()=>{
+  cerrarMenu();
+  overlayBackup.classList.add('open');
+});
+document.getElementById('close-backup').addEventListener('click', ()=>{
+  overlayBackup.classList.remove('open');
+});
+
+// Crear copia de seguridad
+document.getElementById('btn-crear-backup').addEventListener('click', async ()=>{
+  try {
+    // Recolectar todos los datos del proyecto actual
+    const backup = {
+      version: '1.0',
+      fecha: new Date().toISOString(),
+      proyecto: {
+        id: proyectoActivo.id,
+        nombre: proyectoActivo.nombre,
+        columnas: COLUMNAS,
+        filas: FILAS,
+        documentos: DOCUMENTOS,
+        seguimientos: SEGUIMIENTOS
+      }
+    };
+
+    // Crear archivo JSON y descargarlo
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_${proyectoActivo.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    overlayBackup.classList.remove('open');
+    alert('Copia de seguridad creada exitosamente.');
+  } catch(error){
+    console.error('Error al crear la copia de seguridad:', error);
+    alert('Error al crear la copia de seguridad. Revisá la consola para más detalle.');
+  }
+});
+
+// Importar copia de seguridad
+document.getElementById('btn-importar-backup').addEventListener('click', ()=>{
+  document.getElementById('input-importar-backup').click();
+});
+
+document.getElementById('input-importar-backup').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+
+  try {
+    const text = await file.text();
+    const backup = JSON.parse(text);
+
+    // Validar estructura básica
+    if(!backup.version || !backup.proyecto){
+      alert('El archivo no tiene el formato correcto de copia de seguridad.');
+      return;
+    }
+
+    // Confirmar la importación
+    const confirmar = confirm(`¿Querés importar la copia de seguridad del proyecto "${backup.proyecto.nombre}"?\n\nEsto reemplazará TODOS los datos actuales del proyecto "${proyectoActivo.nombre}".`);
+    if(!confirmar) return;
+
+    // Restaurar datos
+    COLUMNAS = backup.proyecto.columnas || [];
+    FILAS = backup.proyecto.filas || [];
+    DOCUMENTOS = backup.proyecto.documentos || [];
+    SEGUIMIENTOS = backup.proyecto.seguimientos || [];
+
+    // Guardar en Supabase
+    const { error: errorProyecto } = await supabaseClient.from('proyectos').update({
+      columnas: COLUMNAS
+    }).eq('id', proyectoActivo.id);
+
+    if(errorProyecto){
+      console.error('Error al actualizar el proyecto:', errorProyecto);
+      alert('Error al guardar las columnas. Revisá la consola.');
+      return;
+    }
+
+    // Eliminar documentos existentes e insertar los nuevos
+    await supabaseClient.from('documentos').delete().eq('proyecto_id', proyectoActivo.id);
+    if(DOCUMENTOS.length > 0){
+      const docsParaInsertar = DOCUMENTOS.map(doc => ({
+        proyecto_id: proyectoActivo.id,
+        nombre: doc.nombre,
+        tipo: doc.tipo,
+        proyecto: doc.proyecto,
+        proveedor: doc.proveedor,
+        hojas: doc.hojas
+      }));
+      await supabaseClient.from('documentos').insert(docsParaInsertar);
+    }
+
+    // Eliminar seguimientos existentes e insertar los nuevos
+    await supabaseClient.from('seguimientos').delete().eq('proyecto_id', proyectoActivo.id);
+    if(SEGUIMIENTOS.length > 0){
+      const segsParaInsertar = SEGUIMIENTOS.map(seg => ({
+        proyecto_id: proyectoActivo.id,
+        titulo: seg.titulo,
+        columnas: seg.columnas,
+        columna_principal: seg.columnaPrincipal,
+        filtros: seg.filtros,
+        estados: seg.estados || {},
+        comentarios: seg.comentarios || {},
+        fechas_modificacion: seg.fechasModificacion || {},
+        filtros_vista: seg.filtrosVista || {},
+        orden_vista: seg.ordenVista || []
+      }));
+      await supabaseClient.from('seguimientos').insert(segsParaInsertar);
+    }
+
+    overlayBackup.classList.remove('open');
+    e.target.value = ''; // Limpiar el input
+
+    // Recargar el proyecto
+    await cargarProyecto(proyectoActivo.id);
+    alert('Copia de seguridad importada exitosamente.');
+  } catch(error){
+    console.error('Error al importar la copia de seguridad:', error);
+    alert('Error al importar la copia de seguridad. Asegurate de que el archivo sea válido.');
+    e.target.value = '';
+  }
 });
 
 // ---- Modal agregar documento ----
