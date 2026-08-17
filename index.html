@@ -697,6 +697,23 @@
   table.datatable td.tag-duplicado:hover{
     background:rgba(255,193,7,0.40) !important;
   }
+  table.datatable th.col-hoja-datos{
+    background:var(--card);
+    white-space:nowrap;
+  }
+  table.datatable td.col-hoja-datos{
+    text-align:center;
+    font-weight:600;
+    font-size:12px;
+  }
+  table.datatable td.col-hoja-datos.hd-si{
+    color:#1F7A3F;
+    background:rgba(70,150,90,0.10);
+  }
+  table.datatable td.col-hoja-datos.hd-no{
+    color:var(--red);
+    background:rgba(216,105,90,0.10);
+  }
   table.datatable td.celda-conflicto{
     background:rgba(216,105,90,0.18) !important;
     cursor:pointer;
@@ -2759,35 +2776,21 @@
       </div>
 
       <label class="field-label">Tipo de documento</label>
-      <select class="field-select" id="input-tipo-doc">
-        <option value="">Sin especificar</option>
-        <option>Instrument Index</option>
-        <option>Datasheet</option>
-        <option value="__nuevo__">+ Crear nuevo tipo...</option>
-      </select>
-      <div class="nuevo-tipo-row" id="nuevo-tipo-row" style="display:none;">
-        <input type="text" class="field-input" id="input-nuevo-tipo" placeholder="Nombre del nuevo tipo">
-        <button class="btn-mini primary" id="btn-crear-tipo">Crear</button>
+      <div style="position:relative;">
+        <input type="text" class="field-input" id="input-tipo-doc" placeholder="Ej: Hoja de Datos" autocomplete="off">
+        <div id="autocomplete-dropdown-tipo-doc" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;"></div>
       </div>
 
       <label class="field-label">Número de proyecto</label>
-      <select class="field-select" id="input-proyecto-doc">
-        <option value="">Sin especificar</option>
-        <option value="__nuevo__">+ Crear nuevo...</option>
-      </select>
-      <div class="nuevo-tipo-row" id="nuevo-proyecto-row" style="display:none;">
-        <input type="text" class="field-input" id="input-nuevo-proyecto" placeholder="Ej: 4521-INST">
-        <button class="btn-mini primary" id="btn-crear-proyecto">Crear</button>
+      <div style="position:relative;">
+        <input type="text" class="field-input" id="input-proyecto-doc" placeholder="Ej: 4521-INST" autocomplete="off">
+        <div id="autocomplete-dropdown-proyecto-doc" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;"></div>
       </div>
 
       <label class="field-label">Proveedor</label>
-      <select class="field-select" id="input-proveedor-doc">
-        <option value="">Sin especificar</option>
-        <option value="__nuevo__">+ Crear nuevo...</option>
-      </select>
-      <div class="nuevo-tipo-row" id="nuevo-proveedor-row" style="display:none;">
-        <input type="text" class="field-input" id="input-nuevo-proveedor" placeholder="Ej: Endress+Hauser">
-        <button class="btn-mini primary" id="btn-crear-proveedor">Crear</button>
+      <div style="position:relative;">
+        <input type="text" class="field-input" id="input-proveedor-doc" placeholder="Ej: Endress+Hauser" autocomplete="off">
+        <div id="autocomplete-dropdown-proveedor-doc" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;"></div>
       </div>
 
       <div class="modal-actions modal-actions-split" style="margin-top:6px;">
@@ -3762,6 +3765,26 @@ async function guardarOrdenColumnas(){
   resultados.forEach(({ error }) => { if(error) console.error('Error al guardar el orden de columnas:', error); });
 }
 
+// Supabase corta las consultas de lectura en 1000 filas por defecto: esta función pagina
+// en bloques de 1000 hasta traer todo, sin importar cuántas filas tenga la tabla.
+async function fetchAllRows(tabla, filtroColumna, filtroValor){
+  let todas = [];
+  let desde = 0;
+  const tam = 1000;
+  while(true){
+    const { data, error } = await supabaseClient
+      .from(tabla)
+      .select('*')
+      .eq(filtroColumna, filtroValor)
+      .range(desde, desde + tam - 1);
+    if(error){ console.error(`Error al cargar ${tabla}:`, error); break; }
+    todas = todas.concat(data || []);
+    if(!data || data.length < tam) break;
+    desde += tam;
+  }
+  return todas;
+}
+
 async function cargarBaseDeDatos(proyectoId){
   const { data: colsData, error: colsErr } = await supabaseClient
     .from('columnas').select('*').eq('proyecto_id', proyectoId).order('orden');
@@ -3781,9 +3804,7 @@ async function cargarBaseDeDatos(proyectoId){
     await supabaseClient.from('columnas').insert({ proyecto_id: proyectoId, nombre:'TAG', orden:0 });
   }
 
-  const { data: filasData, error: filasErr } = await supabaseClient
-    .from('instrumentos').select('*').eq('proyecto_id', proyectoId);
-  if(filasErr) console.error('Error al cargar instrumentos:', filasErr);
+  const filasData = await fetchAllRows('instrumentos', 'proyecto_id', proyectoId);
 
   FILAS = (filasData || []).map(filaDesdeSupabase);
 
@@ -3831,6 +3852,13 @@ function valoresUnicos(col){
   return [...new Set(filasRelevantes.map(f => (f[col] ?? '').toString()))].sort();
 }
 
+// Una fila "tiene hoja de datos" si alguno de los documentos que le aportó algún dato
+// es de tipo "Hoja de Datos". Se calcula solo, no hace falta cargar nada a mano.
+function tieneHojaDeDatos(fila){
+  if(!fila.__documentos) return false;
+  return DOCUMENTOS_PROYECTO.some(d => d.tipo === 'Hoja de Datos' && fila.__documentos.has(d.nombre));
+}
+
 function filasFiltradas(){
   return FILAS.filter(fila => {
     if(!pasaFiltroDocumento(fila)) return false;
@@ -3860,7 +3888,7 @@ function renderHead(){
         <div class="filter-popup" id="popup-${col}"></div>
       </th>
     `;
-  }).join('');
+  }).join('') + `<th class="col-hoja-datos" title="Se completa sola cuando subís un documento de tipo 'Hoja de Datos' que incluya este TAG">Hoja de Datos</th>`;
 
   row.querySelectorAll('.th-filter').forEach(el=>{
     el.addEventListener('click', (e)=>{
@@ -4321,14 +4349,14 @@ function renderTabla(){
   const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
 
   if(cargandoBaseDeDatos){
-    body.innerHTML = `<tr class="empty-row"><td colspan="${columnasVisibles.length+1}">Cargando base de datos...</td></tr>`;
+    body.innerHTML = `<tr class="empty-row"><td colspan="${columnasVisibles.length+2}">Cargando base de datos...</td></tr>`;
     return;
   }
 
   const filas = filasFiltradas();
 
   if(filas.length === 0){
-    body.innerHTML = `<tr class="empty-row"><td colspan="${columnasVisibles.length+1}">No hay filas que coincidan con el filtro</td></tr>`;
+    body.innerHTML = `<tr class="empty-row"><td colspan="${columnasVisibles.length+2}">No hay filas que coincidan con el filtro</td></tr>`;
     return;
   }
 
@@ -4356,7 +4384,10 @@ function renderTabla(){
       return `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
     }).join('');
 
-    return `<tr data-fila-idx="${i}"><td class="col-num col-key">${i+1}</td>${celdas}</tr>`;
+    const tieneHD = tieneHojaDeDatos(f);
+    const celdaHojaDatos = `<td class="col-hoja-datos ${tieneHD ? 'hd-si' : 'hd-no'}">${tieneHD ? '✓' : 'Falta'}</td>`;
+
+    return `<tr data-fila-idx="${i}"><td class="col-num col-key">${i+1}</td>${celdas}${celdaHojaDatos}</tr>`;
   }).join('');
 
   body.querySelectorAll('.tag-clickable').forEach(td=>{
@@ -5901,7 +5932,10 @@ document.getElementById('overlay-detalle-documento').addEventListener('click', (
     const valorActual = doc[campo] || '';
 
     fila.innerHTML = `
-      <input type="text" value="${valorActual}">
+      <div style="position:relative; flex:1;">
+        <input type="text" value="${valorActual}" id="input-editar-doc-${campo}" autocomplete="off">
+        <div id="autocomplete-dropdown-editar-doc-${campo}" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;"></div>
+      </div>
       <button class="guardar-campo-doc" data-campo="${campo}" title="Guardar">✓</button>
       <button class="cancelar-campo-doc" data-campo="${campo}" title="Cancelar">×</button>
     `;
@@ -5912,6 +5946,24 @@ document.getElementById('overlay-detalle-documento').addEventListener('click', (
       if(ev.key === 'Enter') fila.querySelector('.guardar-campo-doc').click();
       if(ev.key === 'Escape') fila.querySelector('.cancelar-campo-doc').click();
     });
+
+    // Mismo autocompletado que al agregar un documento, con las opciones ya usadas en el proyecto
+    if(campo === 'tipo' || campo === 'proyecto' || campo === 'proveedor'){
+      const obtenerOpcionesPorCampo = {
+        tipo: () => {
+          const fijos = ['Hoja de Datos', 'Listado de Instrumentos', 'Listado de Señales'];
+          const usados = DOCUMENTOS_PROYECTO.map(d => d.tipo).filter(v => v && v !== 'Sin especificar');
+          return [...new Set([...fijos, ...usados])].sort();
+        },
+        proyecto: () => [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proyecto).filter(v => v))].sort(),
+        proveedor: () => [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proveedor).filter(v => v))].sort(),
+      };
+      iniciarAutocompletado({
+        inputId: `input-editar-doc-${campo}`,
+        dropdownId: `autocomplete-dropdown-editar-doc-${campo}`,
+        obtenerOpciones: obtenerOpcionesPorCampo[campo],
+      });
+    }
     return;
   }
 
@@ -8237,15 +8289,8 @@ fileDrop.addEventListener('click', ()=> inputFile.click());
 
 function abrirModalAgregarDoc(){
   document.getElementById('input-tipo-doc').value = '';
-  poblarSelectorProyectoProveedor();
   document.getElementById('input-proyecto-doc').value = '';
   document.getElementById('input-proveedor-doc').value = '';
-  document.getElementById('nuevo-tipo-row').style.display = 'none';
-  document.getElementById('input-nuevo-tipo').value = '';
-  document.getElementById('nuevo-proyecto-row').style.display = 'none';
-  document.getElementById('input-nuevo-proyecto').value = '';
-  document.getElementById('nuevo-proveedor-row').style.display = 'none';
-  document.getElementById('input-nuevo-proveedor').value = '';
   inputFile.value = '';
   fileDrop.classList.remove('filled');
   fileDrop.style.borderColor = '';
@@ -8256,74 +8301,90 @@ function abrirModalAgregarDoc(){
 }
 document.getElementById('btn-agregar-documento').addEventListener('click', ()=>{ modoActualizarDoc = false; abrirModalAgregarDoc(); });
 
-// Arma las opciones de proyecto/proveedor a partir de los documentos ya cargados
-function poblarSelectorProyectoProveedor(){
-  const proyectos = [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proyecto).filter(v => v))].sort();
-  const proveedores = [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proveedor).filter(v => v))].sort();
+// ---- Autocompletado genérico y reutilizable: cualquier campo de texto con sugerencias +Crear ----
+function iniciarAutocompletado({ inputId, dropdownId, obtenerOpciones, alConfirmar }){
+  const input = document.getElementById(inputId);
+  const dropdown = document.getElementById(dropdownId);
+  let indiceActivo = -1;
 
-  const selProyecto = document.getElementById('input-proyecto-doc');
-  selProyecto.innerHTML = '<option value="">Sin especificar</option>' +
-    proyectos.map(p => `<option value="${p}">${p}</option>`).join('') +
-    '<option value="__nuevo__">+ Crear nuevo...</option>';
+  function filtrar(mostrarTodos){
+    const texto = input.value.trim();
+    const textoLower = texto.toLowerCase();
+    const todas = obtenerOpciones();
+    const opciones = (texto || mostrarTodos) ? todas.filter(o => o.toLowerCase().includes(textoLower)) : [];
 
-  const selProveedor = document.getElementById('input-proveedor-doc');
-  selProveedor.innerHTML = '<option value="">Sin especificar</option>' +
-    proveedores.map(p => `<option value="${p}">${p}</option>`).join('') +
-    '<option value="__nuevo__">+ Crear nuevo...</option>';
+    let html = '';
+    opciones.slice(0, 10).forEach(o => {
+      html += `<div class="autocomplete-option" data-value="${o}" style="padding:8px 12px; cursor:pointer; font-size:13px;">${o}</div>`;
+    });
+    if(texto){
+      const coincideExacto = todas.some(o => o.toLowerCase() === textoLower);
+      if(!coincideExacto){
+        html += `<div class="autocomplete-option crear-nuevo" data-value="${texto}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto}"</div>`;
+      }
+    }
+    dropdown.innerHTML = html;
+    dropdown.style.display = html ? 'block' : 'none';
+    indiceActivo = -1;
+  }
+
+  function marcarActivo(){
+    [...dropdown.querySelectorAll('.autocomplete-option')].forEach((o,i)=>{
+      o.style.background = i === indiceActivo ? 'var(--green-soft)' : '';
+    });
+  }
+
+  input.addEventListener('input', ()=> filtrar(false));
+  input.addEventListener('focus', ()=> filtrar(true));
+  input.addEventListener('keydown', (e)=>{
+    const opciones = [...dropdown.querySelectorAll('.autocomplete-option')];
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      if(opciones.length){ indiceActivo = (indiceActivo + 1) % opciones.length; marcarActivo(); opciones[indiceActivo].scrollIntoView({block:'nearest'}); }
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      if(opciones.length){ indiceActivo = (indiceActivo - 1 + opciones.length) % opciones.length; marcarActivo(); opciones[indiceActivo].scrollIntoView({block:'nearest'}); }
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      if(indiceActivo >= 0 && opciones[indiceActivo]){
+        input.value = opciones[indiceActivo].dataset.value;
+      }
+      dropdown.style.display = 'none';
+      if(alConfirmar) alConfirmar(input.value.trim());
+    } else if(e.key === 'Escape'){
+      dropdown.style.display = 'none';
+    }
+  });
+  dropdown.addEventListener('mousedown', (e)=>{
+    const opt = e.target.closest('.autocomplete-option');
+    if(!opt) return;
+    input.value = opt.dataset.value;
+    dropdown.style.display = 'none';
+    if(alConfirmar) alConfirmar(input.value.trim());
+  });
+  document.addEventListener('click', (e)=>{
+    if(e.target !== input && !dropdown.contains(e.target)) dropdown.style.display = 'none';
+  });
 }
 
-document.getElementById('input-proyecto-doc').addEventListener('change', ()=>{
-  const esNuevo = document.getElementById('input-proyecto-doc').value === '__nuevo__';
-  document.getElementById('nuevo-proyecto-row').style.display = esNuevo ? 'flex' : 'none';
-  if(esNuevo) document.getElementById('input-nuevo-proyecto').focus();
+iniciarAutocompletado({
+  inputId: 'input-tipo-doc',
+  dropdownId: 'autocomplete-dropdown-tipo-doc',
+  obtenerOpciones: () => {
+    const fijos = ['Hoja de Datos', 'Listado de Instrumentos', 'Listado de Señales'];
+    const usados = DOCUMENTOS_PROYECTO.map(d => d.tipo).filter(v => v && v !== 'Sin especificar');
+    return [...new Set([...fijos, ...usados])].sort();
+  },
 });
-document.getElementById('btn-crear-proyecto').addEventListener('click', ()=>{
-  const nombre = document.getElementById('input-nuevo-proyecto').value.trim();
-  if(!nombre) return;
-  const sel = document.getElementById('input-proyecto-doc');
-  const opt = document.createElement('option');
-  opt.value = nombre; opt.textContent = nombre;
-  sel.insertBefore(opt, sel.lastElementChild);
-  sel.value = nombre;
-  document.getElementById('nuevo-proyecto-row').style.display = 'none';
+iniciarAutocompletado({
+  inputId: 'input-proyecto-doc',
+  dropdownId: 'autocomplete-dropdown-proyecto-doc',
+  obtenerOpciones: () => [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proyecto).filter(v => v))].sort(),
 });
-
-document.getElementById('input-proveedor-doc').addEventListener('change', ()=>{
-  const esNuevo = document.getElementById('input-proveedor-doc').value === '__nuevo__';
-  document.getElementById('nuevo-proveedor-row').style.display = esNuevo ? 'flex' : 'none';
-  if(esNuevo) document.getElementById('input-nuevo-proveedor').focus();
-});
-document.getElementById('btn-crear-proveedor').addEventListener('click', ()=>{
-  const nombre = document.getElementById('input-nuevo-proveedor').value.trim();
-  if(!nombre) return;
-  const sel = document.getElementById('input-proveedor-doc');
-  const opt = document.createElement('option');
-  opt.value = nombre; opt.textContent = nombre;
-  sel.insertBefore(opt, sel.lastElementChild);
-  sel.value = nombre;
-  document.getElementById('nuevo-proveedor-row').style.display = 'none';
-});
-
-// ---- Crear nuevo tipo de documento ----
-const selectTipoDoc = document.getElementById('input-tipo-doc');
-const nuevoTipoRow = document.getElementById('nuevo-tipo-row');
-selectTipoDoc.addEventListener('change', ()=>{
-  if(selectTipoDoc.value === '__nuevo__'){
-    nuevoTipoRow.style.display = 'flex';
-    document.getElementById('input-nuevo-tipo').focus();
-  } else {
-    nuevoTipoRow.style.display = 'none';
-  }
-});
-document.getElementById('btn-crear-tipo').addEventListener('click', ()=>{
-  const nombre = document.getElementById('input-nuevo-tipo').value.trim();
-  if(!nombre) return;
-  const opt = document.createElement('option');
-  opt.value = nombre;
-  opt.textContent = nombre;
-  selectTipoDoc.insertBefore(opt, selectTipoDoc.lastElementChild);
-  selectTipoDoc.value = nombre;
-  nuevoTipoRow.style.display = 'none';
+iniciarAutocompletado({
+  inputId: 'input-proveedor-doc',
+  dropdownId: 'autocomplete-dropdown-proveedor-doc',
+  obtenerOpciones: () => [...new Set(DOCUMENTOS_PROYECTO.map(d => d.proveedor).filter(v => v))].sort(),
 });
 
 inputFile.addEventListener('change', ()=>{
@@ -8413,12 +8474,10 @@ btnContinuarDoc.addEventListener('click', ()=>{
   }
   const file = inputFile.files[0];
   archivoActual = file.name;
-  const valorProyecto = document.getElementById('input-proyecto-doc').value;
-  const valorProveedor = document.getElementById('input-proveedor-doc').value;
   metadatosDocumentoActual = {
-    tipo: document.getElementById('input-tipo-doc').value || 'Sin especificar',
-    proyecto: (valorProyecto === '__nuevo__' ? document.getElementById('input-nuevo-proyecto').value : valorProyecto).trim(),
-    proveedor: (valorProveedor === '__nuevo__' ? document.getElementById('input-nuevo-proveedor').value : valorProveedor).trim(),
+    tipo: document.getElementById('input-tipo-doc').value.trim() || 'Sin especificar',
+    proyecto: document.getElementById('input-proyecto-doc').value.trim(),
+    proveedor: document.getElementById('input-proveedor-doc').value.trim(),
   };
 
   btnContinuarDoc.disabled = true;
