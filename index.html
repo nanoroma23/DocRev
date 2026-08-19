@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DocRev v0.0.162</title>
+<title>DocRev</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1252,16 +1252,6 @@
     background:var(--card);
   }
 
-  .sheet-tipo-topbar{
-    display:none;
-    align-items:center;
-    gap:16px;
-    padding:12px 24px;
-    border-bottom:1px solid var(--line);
-    background:var(--card);
-  }
-  .sheet-tipo-topbar.open{ display:flex; }
-
   .sheet-final-topbar{
     display:none;
     align-items:center;
@@ -2090,7 +2080,6 @@
     
     /* Sheet fullscreen */
     .sheet-fullscreen .doc-viewer-topbar,
-    .sheet-tipo-topbar,
     .sheet-final-topbar {
       padding: 10px 12px;
       flex-wrap: wrap;
@@ -2814,13 +2803,6 @@
 
   <!-- Vista pantalla completa: Hoja 1 -->
   <div class="sheet-fullscreen" id="sheet-fullscreen">
-    <div class="sheet-tipo-topbar" id="sheet-tipo-topbar">
-      <button class="btn" id="volver-tipo-topbar">← Volver</button>
-      <div class="sheet-select-row" style="margin:0;">
-        <label>Hoja</label>
-        <select class="field-select" id="select-hoja"></select>
-      </div>
-    </div>
     <div class="sheet-final-topbar" id="sheet-final-topbar">
       <div class="sft-left">
         <button class="btn" id="cancel-final">Cancelar</button>
@@ -2855,6 +2837,10 @@
       <!-- Paso 1: tipo de carga -->
       <div id="float-step-tipo">
         <div class="float-file-name" id="float-file-name">Documento.xlsx</div>
+        <div class="sheet-select-row">
+          <label>Hoja</label>
+          <select class="field-select" id="select-hoja"></select>
+        </div>
         <p>¿Qué tipo de documento vas a cargar?</p>
         <div class="option-card" data-opcion="tabla">
           <div class="option-title">Tipo tabla</div>
@@ -2873,21 +2859,13 @@
         </div>
       </div>
 
-      <!-- Paso 2: selección de hoja, título y rango en una sola ventana -->
+      <!-- Paso 2: selección de rango — la primera fila del rango elegido es siempre el título -->
       <div id="float-step-rango" style="display:none;">
         <div class="float-file-name" id="float-file-name-rango">Documento.xlsx</div>
         <div class="tipo-carga-legend" id="tipo-carga-legend">Documento tipo tabla</div>
-        <div class="sheet-select-row">
-          <label>Hoja</label>
-          <select class="field-select" id="select-hoja-rango"></select>
-        </div>
-        <p class="rango-label">Fila de título (tocá el campo para elegir):</p>
-        <div class="rango-field" id="titulo-field" style="cursor:pointer;">
-          <input type="text" id="titulo-field-input" class="rango-field-input" placeholder="Ej: 1" autocomplete="off" inputmode="numeric" readonly style="cursor:pointer;">
-        </div>
-        <p class="rango-label">Rango de datos (tocá el campo para elegir):</p>
-        <div class="rango-field" id="rango-field" style="cursor:pointer;">
-          <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters" readonly style="cursor:pointer;">
+        <p class="rango-label">Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):</p>
+        <div class="rango-field" id="rango-field">
+          <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters">
         </div>
         <div class="modal-actions modal-actions-split" style="margin-top:14px;">
           <button class="btn" id="cancel-rango">Cancelar</button>
@@ -2895,32 +2873,6 @@
             <button class="btn" id="atras-rango">Atrás</button>
             <button class="btn btn-primary" id="continuar-rango" disabled>Continuar</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Mini ventana: selección de fila de título -->
-      <div id="float-step-titulo-picker" style="display:none;">
-        <div class="float-file-name" id="float-file-name-titulo">Documento.xlsx</div>
-        <p class="rango-label" style="margin-top:0;">Fila de título (tocá una fila, o escribí el número):</p>
-        <div class="rango-field" id="titulo-field-picker">
-          <input type="text" id="titulo-field-picker-input" class="rango-field-input" placeholder="Ej: 1" autocomplete="off" inputmode="numeric">
-        </div>
-        <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="cancel-titulo-picker">Cancelar</button>
-          <button class="btn btn-primary" id="aplicar-titulo-picker" disabled>Aplicar</button>
-        </div>
-      </div>
-
-      <!-- Mini ventana: selección de rango de datos -->
-      <div id="float-step-rango-picker" style="display:none;">
-        <div class="float-file-name" id="float-file-name-rango-picker">Documento.xlsx</div>
-        <p class="rango-label" style="margin-top:0;">Rango de datos (arrastrá sobre la hoja, shift+click, o escribí):</p>
-        <div class="rango-field" id="rango-field-picker">
-          <input type="text" id="rango-field-picker-input" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters">
-        </div>
-        <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="cancel-rango-picker">Cancelar</button>
-          <button class="btn btn-primary" id="aplicar-rango-picker" disabled>Aplicar</button>
         </div>
       </div>
 
@@ -3338,6 +3290,18 @@
   </div>
 
   <!-- Modal confirmar eliminar columna -->
+  <!-- Modal confirmar unificar columnas -->
+  <div class="overlay" id="overlay-confirmar-unificar-columna">
+    <div class="modal">
+      <h3>Unificar columnas</h3>
+      <p id="texto-confirmar-unificar-columna"></p>
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-confirmar-unificar-columna">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-confirmar-unificar-columna">Unificar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay-eliminar-columna">
     <div class="modal">
       <h3>Eliminar columna</h3>
@@ -3783,6 +3747,23 @@ async function fetchAllRows(tabla, filtroColumna, filtroValor){
     desde += tam;
   }
   return todas;
+}
+
+// Un DELETE ... WHERE id IN (...) con cientos/miles de ids arma una URL tan larga que el
+// servidor la rechaza (400) sin borrar nada. Esta función parte la lista en bloques chicos
+// y manda varios pedidos en su lugar. Devuelve true si todos los bloques se borraron bien.
+async function deleteRowsInBatches(tabla, ids){
+  const tam = 150;
+  let huboError = false;
+  for(let i = 0; i < ids.length; i += tam){
+    const bloque = ids.slice(i, i + tam);
+    const { error } = await supabaseClient.from(tabla).delete().in('id', bloque);
+    if(error){
+      console.error(`Error al borrar un bloque de ${tabla}:`, error);
+      huboError = true;
+    }
+  }
+  return !huboError;
 }
 
 async function cargarBaseDeDatos(proyectoId){
@@ -6076,8 +6057,8 @@ async function eliminarDocumento(idx){
   if(filasParaBorrar.length){
     const ids = filasParaBorrar.map(f => f.__id).filter(Boolean);
     if(ids.length){
-      const { error } = await supabaseClient.from('instrumentos').delete().in('id', ids);
-      if(error) console.error('Error al borrar instrumentos huérfanos:', error);
+      const ok = await deleteRowsInBatches('instrumentos', ids);
+      if(!ok) alert('Algunos instrumentos huérfanos no se pudieron borrar de la base. Revisá la consola para más detalle.');
     }
   }
   await Promise.all(filasParaActualizar.map(f => guardarFilaEnSupabase(f)));
@@ -7542,8 +7523,17 @@ document.getElementById('confirm-renombrar-tag').addEventListener('click', async
     document.getElementById('overlay-renombrar-tag').classList.remove('open');
     return;
   }
-  if(FILAS.some(f => f !== tagARenombrar && f.TAG === nuevoTag)){
-    alert('Ya existe un instrumento con ese TAG.');
+  const filaExistente = FILAS.find(f => f !== tagARenombrar && f.TAG === nuevoTag);
+  if(filaExistente){
+    document.getElementById('overlay-renombrar-tag').classList.remove('open');
+    const quiereUnificar = await confirmarUnificar(
+      `Ya existe un instrumento con el TAG "${nuevoTag}". ¿Querés unificarlo con "${tagARenombrar.TAG}"? Se van a combinar todos los datos de los dos en uno solo, y "${tagARenombrar.TAG}" se va a eliminar. Si en alguna columna los dos valores no coinciden, esa celda va a quedar marcada como conflicto para que la revises.`
+    );
+    if(quiereUnificar){
+      await unificarInstrumentos(tagARenombrar, filaExistente);
+      tagARenombrar = null;
+      renderTabla();
+    }
     return;
   }
   const btn = document.getElementById('confirm-renombrar-tag');
@@ -7655,12 +7645,63 @@ async function agregarColumnaBD(nombre){
 }
 
 // Renombra una columna: valida, actualiza todo en memoria, y persiste (incluye Supabase)
+// Combina TODAS las columnas de filaOrigen dentro de filaDestino (dos TAG distintos que en
+// realidad son el mismo instrumento), y elimina filaOrigen. Mismo criterio que unificar
+// columnas: si un valor falta de un lado, se completa; si difieren, queda marcado en conflicto.
+async function unificarInstrumentos(filaOrigen, filaDestino){
+  COLUMNAS.forEach(col=>{
+    if(col === 'TAG') return;
+    const valorOrigen = filaOrigen[col];
+    const valorDestino = filaDestino[col];
+
+    if(filaOrigen.__historial && filaOrigen.__historial[col]){
+      filaDestino.__historial = filaDestino.__historial || {};
+      filaDestino.__historial[col] = filaDestino.__historial[col] || {};
+      Object.entries(filaOrigen.__historial[col]).forEach(([doc, val])=>{
+        filaDestino.__historial[col][doc] = val;
+      });
+    }
+
+    if(valorOrigen !== undefined && valorOrigen !== ''){
+      if(valorDestino === undefined || valorDestino === ''){
+        filaDestino[col] = valorOrigen;
+      } else if(valorDestino !== valorOrigen){
+        filaDestino.__conflictos = filaDestino.__conflictos || new Set();
+        filaDestino.__conflictos.add(col);
+      }
+    }
+  });
+
+  if(filaOrigen.__documentos){
+    filaDestino.__documentos = filaDestino.__documentos || new Set();
+    filaOrigen.__documentos.forEach(d => filaDestino.__documentos.add(d));
+  }
+  if(filaOrigen.__duplicados){
+    filaDestino.__duplicados = filaDestino.__duplicados || {};
+    Object.entries(filaOrigen.__duplicados).forEach(([doc, info])=>{
+      filaDestino.__duplicados[doc] = info;
+    });
+  }
+
+  FILAS = FILAS.filter(f => f !== filaOrigen);
+
+  if(filaOrigen.__id){
+    const { error } = await supabaseClient.from('instrumentos').delete().eq('id', filaOrigen.__id);
+    if(error) console.error('Error al eliminar el instrumento de origen tras unificar:', error);
+  }
+  const resultado = await guardarFilaEnSupabase(filaDestino);
+  if(!resultado.ok) console.error('No se pudo guardar el instrumento unificado en Supabase.');
+
+  return true;
+}
+
 async function renombrarColumnaCompleta(nombreViejo, nuevoNombre){
   if(!nuevoNombre || nuevoNombre === nombreViejo) return false;
   const existente = buscarColumnaExistente(nuevoNombre);
   if(existente && existente !== nombreViejo){
-    alert('Ya existe una columna con ese nombre');
-    return false;
+    const quiereUnificar = await confirmarUnificarColumnas(nombreViejo, existente);
+    if(!quiereUnificar) return false;
+    return await unificarColumnas(nombreViejo, existente);
   }
   const idx = COLUMNAS.indexOf(nombreViejo);
   if(idx === -1) return false;
@@ -7683,6 +7724,77 @@ async function renombrarColumnaCompleta(nombreViejo, nuevoNombre){
 
   await renombrarColumna(proyectoActivo.id, nombreViejo, nuevoNombre);
   await renombrarColumnaEnExtracciones(nombreViejo, nuevoNombre);
+  return true;
+}
+
+// Pregunta genérica de "¿unificar X con Y?", reutilizada tanto para columnas como para TAGs
+function confirmarUnificar(mensaje){
+  return new Promise(resolve=>{
+    document.getElementById('texto-confirmar-unificar-columna').textContent = mensaje;
+    document.getElementById('overlay-confirmar-unificar-columna').classList.add('open');
+    document.getElementById('cancel-confirmar-unificar-columna').onclick = ()=>{
+      document.getElementById('overlay-confirmar-unificar-columna').classList.remove('open');
+      resolve(false);
+    };
+    document.getElementById('confirm-confirmar-unificar-columna').onclick = ()=>{
+      document.getElementById('overlay-confirmar-unificar-columna').classList.remove('open');
+      resolve(true);
+    };
+  });
+}
+function confirmarUnificarColumnas(colOrigen, colDestino){
+  return confirmarUnificar(
+    `Ya existe una columna "${colDestino}". ¿Querés unificar "${colOrigen}" con "${colDestino}"? Se van a combinar los datos de las dos en una sola columna, y "${colOrigen}" se va a eliminar. Si en alguna fila los dos valores no coinciden, esa celda va a quedar marcada como conflicto para que la revises.`
+  );
+}
+
+// Combina los datos de colOrigen dentro de colDestino, fila por fila, y elimina colOrigen.
+// Si en alguna fila los dos valores no coinciden, se marca esa celda como conflicto (igual
+// que cuando dos documentos no coinciden) en vez de perder cualquiera de los dos valores.
+async function unificarColumnas(colOrigen, colDestino){
+  const filasAfectadas = [];
+
+  FILAS.forEach(fila=>{
+    const valorOrigen = fila[colOrigen];
+    const valorDestino = fila[colDestino];
+
+    if(fila.__historial && fila.__historial[colOrigen]){
+      fila.__historial[colDestino] = fila.__historial[colDestino] || {};
+      Object.entries(fila.__historial[colOrigen]).forEach(([doc, val])=>{
+        fila.__historial[colDestino][doc] = val;
+      });
+    }
+
+    if(valorOrigen !== undefined && valorOrigen !== ''){
+      if(valorDestino === undefined || valorDestino === ''){
+        fila[colDestino] = valorOrigen;
+        filasAfectadas.push(fila);
+      } else if(valorDestino !== valorOrigen){
+        fila.__conflictos = fila.__conflictos || new Set();
+        fila.__conflictos.add(colDestino);
+        filasAfectadas.push(fila);
+      }
+    }
+  });
+
+  COLUMNAS = COLUMNAS.filter(c => c !== colOrigen);
+  FILAS.forEach(f=>{
+    delete f[colOrigen];
+    if(f.__historial) delete f.__historial[colOrigen];
+  });
+  delete FILTROS[colOrigen];
+  columnasOcultas.delete(colOrigen);
+  nivelesOrden = nivelesOrden.filter(n => n.columna !== colOrigen);
+
+  const { error } = await supabaseClient.from('columnas').delete()
+    .eq('proyecto_id', proyectoActivo.id).eq('nombre', colOrigen);
+  if(error) console.error('Error al eliminar la columna de origen tras unificar:', error);
+
+  const resultados = await Promise.all(filasAfectadas.map(f => guardarFilaEnSupabase(f)));
+  const fallidas = resultados.filter(r => !r.ok).length;
+  if(fallidas) console.error(`${fallidas} fila(s) no se pudieron actualizar en Supabase tras unificar columnas.`);
+
+  await quitarColumnaDeExtracciones(colOrigen);
   return true;
 }
 
@@ -8502,11 +8614,10 @@ btnContinuarDoc.addEventListener('click', ()=>{
   });
 });
 
-// ---- Selector de hojas: se llena con las hojas reales del workbook (2 selects sincronizados) ----
+// ---- Selector de hoja: se llena con las hojas reales del workbook ----
 function poblarSelectorHojas(){
   const opciones = workbookActual.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
   document.getElementById('select-hoja').innerHTML = opciones;
-  document.getElementById('select-hoja-rango').innerHTML = opciones;
 }
 
 // ---- Vista pantalla completa: renderiza la hoja seleccionada con datos reales ----
@@ -8556,16 +8667,13 @@ function abrirHojaFullscreen(){
   abrirVentanaFlotante();
 }
 
-// Cambiar de hoja (desde cualquiera de los 2 selectores) -> sincroniza el otro, re-renderiza y limpia el rango y título elegidos
+// Cambiar de hoja -> re-renderiza y limpia el rango elegido
 function alCambiarHoja(nuevoValor){
   document.getElementById('select-hoja').value = nuevoValor;
-  document.getElementById('select-hoja-rango').value = nuevoValor;
   renderGrid();
-  resetearCampoTitulo();
   resetearCampoRango();
 }
 document.getElementById('select-hoja').addEventListener('change', (e)=> alCambiarHoja(e.target.value));
-document.getElementById('select-hoja-rango').addEventListener('change', (e)=> alCambiarHoja(e.target.value));
 
 function cerrarFlujoCarga(){
   document.getElementById('sheet-fullscreen').classList.remove('open');
@@ -8610,7 +8718,6 @@ function volverDesdeTipo(){
   }
 }
 document.getElementById('atras-float').addEventListener('click', volverDesdeTipo);
-document.getElementById('volver-tipo-topbar').addEventListener('click', volverDesdeTipo);
 
 // Cancelar (desde la ventana flotante, paso 1): misma confirmación que en el modal
 document.getElementById('cancel-float').addEventListener('click', ()=>{
@@ -8656,8 +8763,6 @@ const NOMBRES_TIPO_CARGA = {
 function mostrarPasoFloat(paso){
   floatStepTipo.style.display = paso==='tipo' ? 'block' : 'none';
   floatStepRango.style.display = paso==='rango' ? 'block' : 'none';
-  document.getElementById('float-step-titulo-picker').style.display = paso==='titulo-picker' ? 'block' : 'none';
-  document.getElementById('float-step-rango-picker').style.display = paso==='rango-picker' ? 'block' : 'none';
   floatStepUnir.style.display = paso==='unir' ? 'block' : 'none';
   floatStepSacar.style.display = paso==='sacar' ? 'block' : 'none';
   floatStepRenombrar.style.display = paso==='renombrar' ? 'block' : 'none';
@@ -8665,21 +8770,17 @@ function mostrarPasoFloat(paso){
   floatStepCampo.style.display = paso==='campo' ? 'block' : 'none';
   document.getElementById('float-step-nombre-celda').style.display = paso==='nombre-celda' ? 'block' : 'none';
   document.getElementById('float-step-mapeo-actualizar').style.display = paso==='mapeo-actualizar' ? 'block' : 'none';
-  document.getElementById('sheet-tipo-topbar').classList.toggle('open', paso==='tipo');
 
   // El fondo se oscurece y bloquea la hoja, salvo en los pasos donde hay que tocarla de verdad
-  const pasosConHojaInteractiva = ['titulo-picker', 'rango-picker', 'campo', 'nombre-celda', 'unir', 'sacar'];
+  const pasosConHojaInteractiva = ['rango', 'campo', 'nombre-celda', 'unir', 'sacar'];
   document.getElementById('float-backdrop').classList.toggle('open', !pasosConHojaInteractiva.includes(paso));
 
   // Cambiar modo de grilla según el paso
-
-  // Cambiar modo de grilla según el paso
-  if(paso === 'titulo-picker') modoGrilla = 'titulo';
-  else if(paso === 'rango-picker') modoGrilla = 'rango';
+  if(paso === 'rango') modoGrilla = 'libre';
   else if(paso === 'campo' || paso === 'nombre-celda') modoGrilla = 'celda-multi';
   else if(paso === 'unir') modoGrilla = 'unir-columnas';
   else if(paso === 'sacar') modoGrilla = 'sacar-columnas';
-  else if(paso === 'rango') modoGrilla = 'ninguno';
+  else modoGrilla = 'ninguno';
 }
 
 function abrirVentanaFlotante(){
@@ -8711,33 +8812,20 @@ document.querySelectorAll('.option-card').forEach(card=>{
   });
 });
 
-// Continuar (paso 1 -> paso 2): la ventana flotante sigue visible, solo cambia su contenido
+// Continuar (paso 1 -> paso 2)
 document.getElementById('confirmar-tipo-carga').addEventListener('click', ()=>{
   if(opcionCargaSeleccionada === 'tag-hoja'){
     abrirSeleccionHojas();
     return;
   }
   document.getElementById('float-file-name-rango').textContent = archivoActual;
-  document.getElementById('select-hoja-rango').value = document.getElementById('select-hoja').value;
   document.getElementById('tipo-carga-legend').textContent = NOMBRES_TIPO_CARGA[opcionCargaSeleccionada] || 'Documento';
-  resetearCampoTitulo();
   resetearCampoRango();
   mostrarPasoFloat('rango');
 });
 
-// ---- Campo de rango (paso 2): se puede escribir a mano, o tocar "Elegir en la hoja" ----
+// ---- Campo de rango: se puede escribir a mano o arrastrar directo sobre la hoja ----
 let rangoConfirmado = null; // ej: "B2:E10"
-
-function resetearCampoTitulo(){
-  filaTituloRaw = null;
-  document.getElementById('titulo-field').classList.remove('filled');
-  document.getElementById('titulo-field-input').value = '';
-  document.getElementById('titulo-field-picker').classList.remove('filled');
-  document.getElementById('titulo-field-picker-input').value = '';
-  document.getElementById('aplicar-titulo-picker').disabled = true;
-  actualizarBotonContinuarRango();
-  limpiarSeleccionVisual();
-}
 
 function resetearCampoRango(){
   rangoConfirmado = null;
@@ -8746,14 +8834,11 @@ function resetearCampoRango(){
   selEnd = null;
   document.getElementById('rango-field').classList.remove('filled');
   document.getElementById('rango-field-text').value = '';
-  document.getElementById('rango-field-picker').classList.remove('filled');
-  document.getElementById('rango-field-picker-input').value = '';
-  document.getElementById('aplicar-rango-picker').disabled = true;
-  actualizarBotonContinuarRango();
+  document.getElementById('continuar-rango').disabled = true;
   limpiarSeleccionVisual();
 }
 
-// Escribir el rango a mano (para cuando no se puede hacer shift+click, como en el celular)
+// Escribir el rango a mano (para cuando no se puede arrastrar, como en el celular)
 function parsearRangoEscrito(texto){
   const match = texto.trim().toUpperCase().match(/^([A-Z]+)\s*(\d+)\s*:\s*([A-Z]+)\s*(\d+)$/);
   if(!match) return null;
@@ -8770,26 +8855,21 @@ function parsearRangoEscrito(texto){
   };
 }
 
-// ---- Gestos sobre la hoja: arrastrar define el rango, un toque simple (sin arrastre) define
-// la fila de título. Funciona igual con mouse que con el dedo. ----
+// ---- Gestos sobre la hoja: arrastrar (o shift+click) define el rango. La primera fila del
+// rango elegido es siempre la fila de título. ----
 let selAnchor = null;
 let selEnd = null;
 let arrastrandoSeleccion = false;
-let mousedownPos = null;
-let arrastroDetectado = false;
-let filaTituloRaw = null; // fila de título elegida (número real de la hoja, sin recortar aún)
 const gridEl = document.getElementById('sheet-grid');
 
 function iniciarSeleccionRango(){
   selAnchor = null;
   selEnd = null;
-  filaTituloRaw = null;
   limpiarSeleccionVisual();
 }
 
 function limpiarSeleccionVisual(){
   document.querySelectorAll('td.cell.selected').forEach(td => td.classList.remove('selected'));
-  document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
 }
 
 function letraCol(ci){ return GRID_COLS[ci]; }
@@ -8803,137 +8883,71 @@ function pintarSeleccion(){
     td.classList.toggle('selected', r>=r1 && r<=r2 && c>=c1 && c<=c2);
   });
   const rangoTexto = `${letraCol(c1)}${r1}:${letraCol(c2)}${r2}`;
-  const rangoPickerInput = document.getElementById('rango-field-picker-input');
-  if(rangoPickerInput) rangoPickerInput.value = rangoTexto;
-  document.getElementById('rango-field-picker').classList.add('filled');
-  actualizarBotonAplicarRango();
-}
-
-function pintarFilaTitulo(){
-  document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
-  if(filaTituloRaw !== null){
-    const tr = document.querySelector(`tr[data-r-fila="${filaTituloRaw}"]`);
-    if(tr) tr.classList.add('fila-titulo-elegida');
-  }
-}
-
-function actualizarBotonAplicarTitulo(){
-  const hayTitulo = !!(document.getElementById('titulo-field-picker-input').value.trim());
-  document.getElementById('aplicar-titulo-picker').disabled = !hayTitulo;
-}
-
-function actualizarBotonAplicarRango(){
-  const hayRango = !!(document.getElementById('rango-field-picker-input').value.trim());
-  document.getElementById('aplicar-rango-picker').disabled = !hayRango;
+  const rangoInput = document.getElementById('rango-field-text');
+  if(rangoInput) rangoInput.value = rangoTexto;
+  document.getElementById('rango-field').classList.add('filled');
+  actualizarBotonContinuarRango();
 }
 
 function actualizarBotonContinuarRango(){
-  const hayTitulo = !!(document.getElementById('titulo-field-input').value.trim());
   const hayRango = !!(document.getElementById('rango-field-text').value.trim());
-  document.getElementById('continuar-rango').disabled = !(hayTitulo && hayRango);
-}
-
-function iniciarGesto(r, c, esShift){
-  if(modoGrilla === 'titulo'){
-    // En modo título, solo guardamos la posición para detectar click simple
-    mousedownPos = { r, c };
-    arrastroDetectado = false;
-    arrastrandoSeleccion = false;
-    return;
-  }
-  if(modoGrilla !== 'rango') return;
-  if(esShift && selAnchor){
-    // Shift+click: extender selección desde el anchor hasta aquí
-    selEnd = { r, c };
-    pintarSeleccion();
-    mousedownPos = null;
-    arrastrandoSeleccion = false;
-    arrastroDetectado = false;
-    return;
-  }
-  mousedownPos = { r, c };
-  arrastroDetectado = false;
-  arrastrandoSeleccion = true;
-}
-function moverGesto(r, c){
-  if(modoGrilla === 'titulo'){
-    // En modo título, cualquier movimiento se detecta como arrastre (y lo ignoramos)
-    if(mousedownPos && (r !== mousedownPos.r || c !== mousedownPos.c)){
-      arrastroDetectado = true;
-    }
-    return;
-  }
-  if(modoGrilla !== 'rango' || !arrastrandoSeleccion || !mousedownPos) return;
-  if(r !== mousedownPos.r || c !== mousedownPos.c){
-    arrastroDetectado = true;
-    selAnchor = mousedownPos;
-    selEnd = { r, c };
-    pintarSeleccion();
-  }
-}
-function finalizarGesto(){
-  if(modoGrilla === 'titulo' && mousedownPos && !arrastroDetectado){
-    // Fue un toque simple, sin arrastre: define la fila de título
-    filaTituloRaw = mousedownPos.r;
-    document.getElementById('titulo-field-picker-input').value = filaTituloRaw;
-    document.getElementById('titulo-field-picker').classList.add('filled');
-    pintarFilaTitulo();
-    actualizarBotonAplicarTitulo();
-  }
-  if(modoGrilla === 'rango' && mousedownPos && !arrastroDetectado){
-    // Click simple sin arrastrar ni shift: establecer anchor (punto inicial para futuro shift+click)
-    selAnchor = mousedownPos;
-    selEnd = mousedownPos;
-    pintarSeleccion();
-  }
-  arrastrandoSeleccion = false;
-  mousedownPos = null;
-  arrastroDetectado = false;
+  document.getElementById('continuar-rango').disabled = !hayRango;
 }
 
 gridEl.addEventListener('mousedown', (e)=>{
   const td = e.target.closest('td.cell');
-  if(!td) return;
-  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
+  if(!td || modoGrilla !== 'libre') return;
   e.preventDefault();
-  iniciarGesto(Number(td.dataset.r), Number(td.dataset.c), e.shiftKey);
+  const r = Number(td.dataset.r), c = Number(td.dataset.c);
+  if(e.shiftKey && selAnchor){
+    selEnd = { r, c };
+    pintarSeleccion();
+    return;
+  }
+  selAnchor = { r, c };
+  selEnd = { r, c };
+  arrastrandoSeleccion = true;
+  pintarSeleccion();
 });
 document.addEventListener('mousemove', (e)=>{
+  if(modoGrilla !== 'libre' || !arrastrandoSeleccion) return;
   const td = e.target.closest('td.cell');
   if(!td) return;
-  moverGesto(Number(td.dataset.r), Number(td.dataset.c));
+  selEnd = { r: Number(td.dataset.r), c: Number(td.dataset.c) };
+  pintarSeleccion();
 });
-document.addEventListener('mouseup', finalizarGesto);
+document.addEventListener('mouseup', ()=>{ arrastrandoSeleccion = false; });
 
 gridEl.addEventListener('touchstart', (e)=>{
-  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
-  const touch = e.touches[0];
-  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
-  if(!td) return;
-  iniciarGesto(Number(td.dataset.r), Number(td.dataset.c), false);
-}, { passive:true });
-gridEl.addEventListener('touchmove', (e)=>{
-  if(modoGrilla !== 'titulo' && modoGrilla !== 'rango') return;
-  if(modoGrilla === 'rango' && !arrastrandoSeleccion) return;
-  if(!mousedownPos) return;
+  if(modoGrilla !== 'libre') return;
   const touch = e.touches[0];
   const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
   if(!td) return;
   const r = Number(td.dataset.r), c = Number(td.dataset.c);
-  if(r !== mousedownPos.r || c !== mousedownPos.c) e.preventDefault(); // bloquea el scroll solo si ya es un arrastre real
-  moverGesto(r, c);
+  selAnchor = { r, c };
+  selEnd = { r, c };
+  arrastrandoSeleccion = true;
+  pintarSeleccion();
+}, { passive:true });
+gridEl.addEventListener('touchmove', (e)=>{
+  if(modoGrilla !== 'libre' || !arrastrandoSeleccion) return;
+  const touch = e.touches[0];
+  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
+  if(!td) return;
+  e.preventDefault();
+  selEnd = { r: Number(td.dataset.r), c: Number(td.dataset.c) };
+  pintarSeleccion();
 }, { passive:false });
-gridEl.addEventListener('touchend', finalizarGesto);
+gridEl.addEventListener('touchend', ()=>{ arrastrandoSeleccion = false; });
 
-// Escribir el rango a mano en el picker: sincroniza la selección visual en vivo mientras se escribe
-document.getElementById('rango-field-picker-input').addEventListener('input', (e)=>{
+// Escribir el rango a mano: sincroniza la selección visual en vivo mientras se escribe
+document.getElementById('rango-field-text').addEventListener('input', (e)=>{
   const texto = e.target.value.trim();
   if(!texto){
     document.querySelectorAll('td.cell.selected').forEach(td => td.classList.remove('selected'));
     selAnchor = null;
     selEnd = null;
-    document.getElementById('rango-field-picker').classList.remove('filled');
-    actualizarBotonAplicarRango();
+    actualizarBotonContinuarRango();
     return;
   }
   const rango = parsearRangoEscrito(texto);
@@ -8944,158 +8958,10 @@ document.getElementById('rango-field-picker-input').addEventListener('input', (e
       const r = Number(td.dataset.r), c = Number(td.dataset.c);
       td.classList.toggle('selected', r>=rango.r1 && r<=rango.r2 && c>=rango.c1 && c<=rango.c2);
     });
-    document.getElementById('rango-field-picker').classList.add('filled');
-    actualizarBotonAplicarRango();
+    actualizarBotonContinuarRango();
   }
 });
 
-// Escribir la fila de título a mano en el picker: resalta esa fila en vivo mientras se escribe
-document.getElementById('titulo-field-picker-input').addEventListener('input', (e)=>{
-  const numero = parseInt(e.target.value.trim(), 10);
-  if(!numero || numero < 1){
-    filaTituloRaw = null;
-    document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
-    document.getElementById('titulo-field-picker').classList.remove('filled');
-    actualizarBotonAplicarTitulo();
-    return;
-  }
-  filaTituloRaw = numero;
-  pintarFilaTitulo();
-  document.getElementById('titulo-field-picker').classList.add('filled');
-  actualizarBotonAplicarTitulo();
-});
-
-// Click consolidado sobre la grilla: deshacer fusión, renombrar, elegir fila título, elegir columnas, o seleccionar celdas
-
-gridEl.addEventListener('click', (e)=>{
-  if(modoGrilla === 'celda-multi'){
-    const td = e.target.closest('td.cell');
-    if(!td) return;
-    const r = Number(td.dataset.r), c = Number(td.dataset.c);
-    const key = `${r},${c}`;
-
-    // Verificar si esta celda ya tiene nombre confirmado
-    const yaConfirmada = camposDefinidos.some(campo => campo.celda.r === r && campo.celda.c === c);
-    if(yaConfirmada){
-      // Ya está confirmada, abrir para editar nombre
-      abrirAsignarNombreCelda(r, c);
-      return;
-    }
-
-    // Primer click: abrir directamente para asignar nombre
-    // Si había una celda pendiente, la desmarcamos
-    if(celdaEditandoNombre && celdaEditandoNombre.key !== key){
-      const [rPrev, cPrev] = celdaEditandoNombre.key.split(',').map(Number);
-      const tdPrev = document.querySelector(`td.cell[data-r="${rPrev}"][data-c="${cPrev}"]`);
-      if(tdPrev) tdPrev.classList.remove('selected-pending');
-    }
-
-    // Marcar esta celda como pendiente
-    td.classList.add('selected-pending');
-
-    // Abrir ventana de nombre
-    abrirAsignarNombreCelda(r, c);
-    return;
-  }
-
-  const btnUnmerge = e.target.closest('.unmerge-btn');
-  if(btnUnmerge){
-    deshacerMerge(Number(btnUnmerge.dataset.col));
-    return;
-  }
-
-  const btnLapiz = e.target.closest('.lapiz-btn');
-  if(btnLapiz){
-    abrirRenombrarColumna(Number(btnLapiz.dataset.col));
-    return;
-  }
-
-  if(modoGrilla === 'unir-columnas' || modoGrilla === 'sacar-columnas'){
-    const th = e.target.closest('thead th');
-    if(!th || th.dataset.col === undefined) return;
-    const c = Number(th.dataset.col);
-    if(colsSeleccionadas.has(c)) colsSeleccionadas.delete(c); else colsSeleccionadas.add(c);
-    renderTablaFinal();
-    actualizarSeleccionColumnas();
-    return;
-  }
-});
-
-// ---- Construye la matriz de datos del rango elegido (como si fuera un excel nuevo) ----
-function construirTablaData(){
-  const hoja = workbookActual.Sheets[hojaActivaSeleccionada()];
-  const { r1, r2, c1, c2 } = rangoConfirmadoObj;
-  const nCols = c2 - c1 + 1;
-  const nRows = r2 - r1 + 1;
-  const data = [];
-  for(let r=0; r<nRows; r++){
-    const fila = [];
-    for(let c=0; c<nCols; c++){
-      const cellRef = XLSX.utils.encode_cell({ r: (r1 - 1 + r), c: (c1 + c) });
-      const cell = hoja[cellRef];
-      fila.push(cell ? XLSX.utils.format_cell(cell) : '');
-    }
-    data.push(fila);
-  }
-  return data;
-}
-
-// ---- Renderiza tablaData completa, con los estados de selección/marcado/fusión vigentes ----
-function renderTablaFinal(){
-  const grid = document.getElementById('sheet-grid');
-  if(!tablaData.length){ grid.innerHTML = ''; return; }
-
-  const colTagIdxFinal = filaTituloIdx !== null && tablaData[filaTituloIdx] ? tablaData[filaTituloIdx].indexOf('TAG') : -1;
-
-  const nCols = tablaData[0].length;
-  const letras = [];
-  for(let c=0; c<nCols; c++) letras.push(XLSX.utils.encode_col(c));
-
-  const seleccionActiva = (modoGrilla === 'unir-columnas' || modoGrilla === 'sacar-columnas');
-
-  let html = '<thead><tr><th class="corner"></th>' + letras.map((l,c)=>{
-    const cls = [];
-    if(seleccionActiva) cls.push('col-selectable');
-    if(colsSeleccionadas.has(c)) cls.push('col-selected');
-    if(columnasMarcadasEliminar.has(c)) cls.push('col-marked-remove');
-    return `<th class="${cls.join(' ')}" data-col="${c}">${l}</th>`;
-  }).join('') + '</tr></thead><tbody>';
-
-  tablaData.forEach((fila, r)=>{
-    const esTitulo = (r === filaTituloIdx);
-    html += `<tr data-fila-recortada="${r+1}" class="${esTitulo ? 'header-row-selected' : ''}">`;
-    html += `<td class="row-head">${r+1}</td>`;
-    fila.forEach((valor, c)=>{
-      const cls = [];
-      if(seleccionActiva) cls.push('col-selectable');
-      if(colsSeleccionadas.has(c)) cls.push('col-selected');
-      if(columnasMarcadasEliminar.has(c)) cls.push('col-marked-remove');
-      const esMerge = mergedColumns.some(m => m.posicion === c) && r === filaTituloIdx;
-      const boton = esMerge ? `<button class="unmerge-btn" data-col="${c}" title="Separar columnas">↺</button>` : '';
-      const mostrarLapiz = (r === filaTituloIdx && modoGrilla === 'final');
-      const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
-
-      // Solo mostrar títulos celestes en la pantalla final donde se ponen nombres
-      if(esTitulo && valor && !buscarColumnaExistente(valor) && modoGrilla === 'final') cls.push('titulo-columna-nueva');
-
-      let valorMostrado = valor;
-      if(celdasDiferentesActualizar.has(`${r}-${c}`)){
-        cls.push('celda-actualizacion-distinta');
-        // Muestra el valor que hay ahora en la base de datos, no el extraído: es lo que se va a pisar
-        const tagValor = colTagIdxFinal >= 0 ? tablaData[r][colTagIdxFinal] : null;
-        const dbCol = mapeoActualizarColumnas[c];
-        const filaDB = tagValor ? FILAS.find(f => f.TAG === tagValor) : null;
-        if(filaDB && dbCol) valorMostrado = filaDB[dbCol] ?? '';
-      }
-      html += `<td class="${cls.join(' ')}" title="${celdasDiferentesActualizar.has(`${r}-${c}`) ? 'Valor nuevo: ' + valor : ''}">${valorMostrado}${boton}${lapiz}</td>`;
-    });
-    html += '</tr>';
-  });
-  html += '</tbody>';
-  grid.innerHTML = html;
-}
-
-// ---- Event listeners para paso rango (ventana principal) ----
 document.getElementById('atras-rango').addEventListener('click', ()=>{
   limpiarSeleccionVisual();
   mostrarPasoFloat('tipo');
@@ -9105,85 +8971,8 @@ document.getElementById('cancel-rango').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
 
-document.getElementById('continuar-rango').addEventListener('click', avanzarAFinalDesdeRango);
-
-// Al hacer click en el campo de título, abrir mini ventana para seleccionar
-document.getElementById('titulo-field').addEventListener('click', ()=>{
-  document.getElementById('float-file-name-titulo').textContent = archivoActual;
-  document.getElementById('titulo-field-picker-input').value = document.getElementById('titulo-field-input').value;
-  if(filaTituloRaw !== null) {
-    document.getElementById('titulo-field-picker').classList.add('filled');
-    document.getElementById('aplicar-titulo-picker').disabled = false;
-    pintarFilaTitulo();
-  } else {
-    document.getElementById('titulo-field-picker').classList.remove('filled');
-    document.getElementById('aplicar-titulo-picker').disabled = true;
-  }
-  mostrarPasoFloat('titulo-picker');
-});
-
-// Al hacer click en el campo de rango, abrir mini ventana para seleccionar
-document.getElementById('rango-field').addEventListener('click', ()=>{
-  document.getElementById('float-file-name-rango-picker').textContent = archivoActual;
-  document.getElementById('rango-field-picker-input').value = document.getElementById('rango-field-text').value;
-  if(selAnchor && selEnd) {
-    document.getElementById('rango-field-picker').classList.add('filled');
-    document.getElementById('aplicar-rango-picker').disabled = false;
-    pintarSeleccion();
-  } else {
-    document.getElementById('rango-field-picker').classList.remove('filled');
-    document.getElementById('aplicar-rango-picker').disabled = true;
-  }
-  mostrarPasoFloat('rango-picker');
-});
-
-// ---- Event listeners para mini ventana de título ----
-document.getElementById('aplicar-titulo-picker').addEventListener('click', ()=>{
-  const numero = parseInt(document.getElementById('titulo-field-picker-input').value.trim(), 10);
-  if(!numero || numero < 1){
-    alert('Elegí una fila de título válida.');
-    return;
-  }
-  filaTituloRaw = numero;
-  document.getElementById('titulo-field-input').value = numero;
-  document.getElementById('titulo-field').classList.add('filled');
-  limpiarSeleccionVisual();
-  actualizarBotonContinuarRango();
-  mostrarPasoFloat('rango');
-});
-
-document.getElementById('cancel-titulo-picker').addEventListener('click', ()=>{
-  limpiarSeleccionVisual();
-  mostrarPasoFloat('rango');
-});
-
-// ---- Event listeners para mini ventana de rango ----
-document.getElementById('aplicar-rango-picker').addEventListener('click', ()=>{
-  const textoRango = document.getElementById('rango-field-picker-input').value.trim();
-  const rango = parsearRangoEscrito(textoRango);
-  if(!rango){
-    alert('Escribí un rango válido. Ejemplo: A1:F50');
-    return;
-  }
-  if(rango.c2 >= GRID_COLS.length){
-    alert('Ese rango tiene columnas que no existen en esta hoja.');
-    return;
-  }
-  selAnchor = { r: rango.r1, c: rango.c1 };
-  selEnd = { r: rango.r2, c: rango.c2 };
-  document.getElementById('rango-field-text').value = textoRango;
-  document.getElementById('rango-field').classList.add('filled');
-  limpiarSeleccionVisual();
-  actualizarBotonContinuarRango();
-  mostrarPasoFloat('rango');
-});
-
-document.getElementById('cancel-rango-picker').addEventListener('click', ()=>{
-  limpiarSeleccionVisual();
-  mostrarPasoFloat('rango');
-});
-
-// Continuar (paso 2): recorta la hoja al rango elegido y usa la fila de título seleccionada
+// Continuar: valida el rango y va directo a la pantalla final. La primera fila del
+// rango elegido es siempre la fila de título — ya no hace falta elegirla aparte.
 function avanzarAFinalDesdeRango(){
   const textoRango = document.getElementById('rango-field-text').value.trim();
   const rango = parsearRangoEscrito(textoRango);
@@ -9195,40 +8984,16 @@ function avanzarAFinalDesdeRango(){
     alert('Ese rango tiene columnas que no existen en esta hoja.');
     return;
   }
-  if(filaTituloRaw === null){
-    alert('Elegí la fila de título antes de continuar.');
-    return;
-  }
 
   rangoConfirmadoObj = rango;
   rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
 
   tablaData = construirTablaData();
-
-  // Calcular el índice de la fila de título dentro de los datos
-  // Si el título está dentro del rango, usar su posición relativa
-  // Si está fuera, necesitamos leer esa fila específica de la hoja
-  if(filaTituloRaw >= rango.r1 && filaTituloRaw <= rango.r2){
-    filaTituloIdx = filaTituloRaw - rango.r1; // índice dentro de tablaData, ya recortada
-    nombresOriginales = [...tablaData[filaTituloIdx]];
-  } else {
-    // La fila de título está fuera del rango de datos, leerla directamente de la hoja
-    const hoja = workbookActual.Sheets[hojaActivaSeleccionada()];
-    const filaTitulos = [];
-    for(let c = 0; c < (rango.c2 - rango.c1 + 1); c++){
-      const cellRef = XLSX.utils.encode_cell({ r: filaTituloRaw - 1, c: (rango.c1 + c) });
-      const cell = hoja[cellRef];
-      filaTitulos.push(cell ? XLSX.utils.format_cell(cell) : '');
-    }
-    // Insertar la fila de títulos al inicio de tablaData
-    tablaData.unshift(filaTitulos);
-    filaTituloIdx = 0;
-    nombresOriginales = [...filaTitulos];
-  }
-
+  filaTituloIdx = 0; // siempre la primera fila del rango elegido
   mergedColumns = [];
   columnasMarcadasEliminar = new Set();
   colsSeleccionadas = new Set();
+  nombresOriginales = [...tablaData[0]];
 
   modoGrilla = 'final';
   floatWindow.classList.remove('open');
@@ -9238,6 +9003,7 @@ function avanzarAFinalDesdeRango(){
   actualizarBotonesColumnasTopbar();
   renderTablaFinal();
 }
+document.getElementById('continuar-rango').addEventListener('click', avanzarAFinalDesdeRango);
 
 // Los botones de unificar/sacar columnas solo tienen sentido en el flujo "Tipo tabla"
 function actualizarBotonesColumnasTopbar(){
