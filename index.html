@@ -8973,6 +8973,106 @@ document.getElementById('cancel-rango').addEventListener('click', ()=>{
 
 // Continuar: valida el rango y va directo a la pantalla final. La primera fila del
 // rango elegido es siempre la fila de título — ya no hace falta elegirla aparte.
+// ---- Construye la matriz de datos del rango elegido (como si fuera un excel nuevo) ----
+function construirTablaData(){
+  const hoja = workbookActual.Sheets[hojaActivaSeleccionada()];
+  const { r1, r2, c1, c2 } = rangoConfirmadoObj;
+  const nCols = c2 - c1 + 1;
+  const nRows = r2 - r1 + 1;
+  const data = [];
+  for(let r=0; r<nRows; r++){
+    const fila = [];
+    for(let c=0; c<nCols; c++){
+      const cellRef = XLSX.utils.encode_cell({ r: (r1 - 1 + r), c: (c1 + c) });
+      const cell = hoja[cellRef];
+      fila.push(cell ? XLSX.utils.format_cell(cell) : '');
+    }
+    data.push(fila);
+  }
+  return data;
+}
+
+// Dibuja la pantalla final: encabezados editables (con lápiz para renombrar, deshacer si
+// están fusionadas), y las filas de datos debajo. En modo unir/sacar columnas, tocar un
+// encabezado lo selecciona/deselecciona en vez de abrir el renombrado.
+function renderTablaFinal(){
+  const grid = document.getElementById('sheet-grid');
+  if(!tablaData.length || filaTituloIdx === null){ grid.innerHTML = ''; return; }
+
+  const filaNombres = tablaData[filaTituloIdx];
+  const nCols = filaNombres.length;
+  const modoSeleccion = modoGrilla === 'unir-columnas' || modoGrilla === 'sacar-columnas';
+
+  let html = '<thead><tr><th class="corner"></th>';
+  for(let c=0; c<nCols; c++){
+    const nombre = filaNombres[c] ?? '';
+    const esFusionada = mergedColumns.some(m => m.posicion === c);
+    const marcadaEliminar = columnasMarcadasEliminar.has(c);
+    const seleccionada = colsSeleccionadas.has(c);
+    const existeEnBase = !!buscarColumnaExistente(nombre);
+
+    let estiloTh = 'padding:6px 8px; vertical-align:top;';
+    if(marcadaEliminar) estiloTh += 'background:rgba(216,105,90,0.18); text-decoration:line-through;';
+    else if(seleccionada) estiloTh += 'background:rgba(70,150,90,0.18);';
+    else if(esFusionada) estiloTh += 'background:rgba(70,120,180,0.12);';
+
+    const colorNombre = existeEnBase ? 'inherit' : 'var(--green-dark)';
+    const mostrarLapiz = modoGrilla === 'final' && !marcadaEliminar;
+    const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
+    const deshacerBtn = (modoGrilla === 'final' && esFusionada)
+      ? `<button class="lapiz-btn" data-col-deshacer="${c}" title="Deshacer unión">↩</button>` : '';
+
+    html += `<th data-col-final="${c}" style="${estiloTh} ${modoSeleccion ? 'cursor:pointer;' : ''}">
+      <div style="display:flex; align-items:center; gap:4px;">
+        <span style="flex:1; color:${colorNombre}; font-weight:600; font-size:12px;">${nombre || '(sin título)'}</span>
+        ${lapiz}${deshacerBtn}
+      </div>
+    </th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  tablaData.forEach((fila, r)=>{
+    if(r === filaTituloIdx) return;
+    html += `<tr><td class="row-head">${r+1}</td>`;
+    for(let c=0; c<nCols; c++){
+      const marcadaEliminar = columnasMarcadasEliminar.has(c);
+      const diferente = modoActualizarDoc && celdasDiferentesActualizar.has(`${r}-${c}`);
+      let estiloTd = '';
+      if(marcadaEliminar) estiloTd = 'background:rgba(216,105,90,0.10); text-decoration:line-through;';
+      else if(diferente) estiloTd = 'background:rgba(70,120,180,0.15);';
+      html += `<td style="${estiloTd}">${fila[c] ?? ''}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  grid.innerHTML = html;
+
+  if(modoSeleccion){
+    grid.querySelectorAll('th[data-col-final]').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const c = Number(th.dataset.colFinal);
+        if(colsSeleccionadas.has(c)) colsSeleccionadas.delete(c);
+        else colsSeleccionadas.add(c);
+        actualizarSeleccionColumnas();
+        renderTablaFinal();
+      });
+    });
+  }
+
+  grid.querySelectorAll('.lapiz-btn[data-col]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      abrirRenombrarColumna(Number(btn.dataset.col));
+    });
+  });
+  grid.querySelectorAll('[data-col-deshacer]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deshacerMerge(Number(btn.dataset.colDeshacer));
+    });
+  });
+}
+
 function avanzarAFinalDesdeRango(){
   const textoRango = document.getElementById('rango-field-text').value.trim();
   const rango = parsearRangoEscrito(textoRango);
