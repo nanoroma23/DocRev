@@ -728,6 +728,17 @@
   table.datatable td.celda-editable{ cursor:pointer; }
   table.datatable td.celda-editable:hover{ background:#F0ECE0; }
 
+  table.datatable td.celda-con-comentario{ position:relative; }
+  table.datatable td.celda-con-comentario::before{
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:6px; height:6px;
+    border-radius:50%;
+    background:#4E9A5C;
+    pointer-events:none;
+  }
+
   .conflicto-opcion{
     position:relative;
     border:1px solid var(--line);
@@ -3167,12 +3178,18 @@
         <div id="valores-documentos-lista" style="display:flex; flex-direction:column; gap:6px;"></div>
       </div>
 
-      <label class="field-label" style="margin-top:14px;">Comentario (opcional)</label>
-      <textarea class="field-input" id="input-comentario-celda" rows="2" placeholder="Ej: confirmado según revisión de planos, rev. C"></textarea>
-
-      <div class="modal-actions" style="margin-top:14px; justify-content:flex-end;">
-        <button class="btn" id="cerrar-conflicto-celda">Cerrar</button>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px;">
+        <label class="field-label" style="margin-top:0;">Comentario (opcional)</label>
+        <div style="display:flex; gap:4px;">
+          <button type="button" class="col-icon-btn danger" id="cancelar-comentario-celda" title="Cancelar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <button type="button" class="col-icon-btn" id="confirmar-comentario-celda" title="Guardar comentario">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
       </div>
+      <textarea class="field-input" id="input-comentario-celda" rows="2" placeholder="Ej: confirmado según revisión de planos, rev. C"></textarea>
     </div>
   </div>
 
@@ -3197,9 +3214,14 @@
     <div class="modal" style="width:420px; max-height:85vh; overflow-y:auto;">
       <h3>Otros filtros</h3>
 
-      <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px;">
-        <input type="checkbox" id="chk-solo-conflictos-global">
+      <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px; align-items:center;">
+        <input type="checkbox" id="chk-solo-conflictos-global" style="margin:0;">
         <span style="color:var(--red); font-weight:600;">Solo celdas con conflicto</span>
+      </label>
+
+      <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px; margin-top:8px; align-items:center;">
+        <input type="checkbox" id="chk-solo-comentarios-global" style="margin:0;">
+        <span style="color:#4E9A5C; font-weight:600;">Solo celdas con comentario</span>
       </label>
 
       <label class="field-label" style="margin-top:16px;">Otros criterios</label>
@@ -3565,6 +3587,12 @@ function pasaFiltroGlobalConflicto(fila){
   return !!(tieneRojoOAzul || tieneAmarillo);
 }
 
+let filtroGlobalSoloComentarios = false; // true = solo mostrar filas con algún comentario cargado
+function pasaFiltroGlobalComentario(fila){
+  if(!filtroGlobalSoloComentarios) return true;
+  return !!(fila.__comentarios && Object.keys(fila.__comentarios).length > 0);
+}
+
 // ---- Conversión entre filas de Supabase (tabla "instrumentos") y el formato que usa la app ----
 function filaDesdeSupabase(row){
   const fila = {
@@ -3844,6 +3872,7 @@ function filasFiltradas(){
   return FILAS.filter(fila => {
     if(!pasaFiltroDocumento(fila)) return false;
     if(!pasaFiltroGlobalConflicto(fila)) return false;
+    if(!pasaFiltroGlobalComentario(fila)) return false;
     return COLUMNAS.every(col => {
       const permitidos = FILTROS[col];
       if(!permitidos) return true;
@@ -4177,6 +4206,10 @@ function abrirFiltro(col){
         <input type="checkbox" class="chk-solo-conflicto-popup">
         <span style="color:var(--red);">Solo con conflicto</span>
       </label>
+      <label class="filter-option" style="border-bottom:1px solid var(--line);">
+        <input type="checkbox" class="chk-solo-comentario-popup">
+        <span style="color:#4E9A5C;">Solo con comentario</span>
+      </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
           <input type="checkbox" class="chk-valor" value="${v}" ${seleccion.has(v) ? 'checked':''}>
@@ -4229,6 +4262,20 @@ function abrirFiltro(col){
         }).map(f => (f[col] ?? '').toString())
       );
       chksValor().forEach(c => { c.checked = valoresConConflicto.has(c.value); });
+    } else {
+      chksValor().forEach(c => { c.checked = true; });
+    }
+    actualizarEstadoTodos();
+  });
+
+  // "Solo con comentario": mismo criterio, marca solo los valores que tienen alguna fila
+  // con un comentario cargado en esta columna
+  popup.querySelector('.chk-solo-comentario-popup').addEventListener('change', (e)=>{
+    if(e.target.checked){
+      const valoresConComentario = new Set(
+        FILAS.filter(f => f.__comentarios && f.__comentarios[col]).map(f => (f[col] ?? '').toString())
+      );
+      chksValor().forEach(c => { c.checked = valoresConComentario.has(c.value); });
     } else {
       chksValor().forEach(c => { c.checked = true; });
     }
@@ -4360,6 +4407,8 @@ function renderTabla(){
         cls.push('celda-editable');
         dataAttr = `data-col-editable="${col}"`;
       }
+      const tieneComentario = f.__comentarios && f.__comentarios[col];
+      if(tieneComentario) cls.push('celda-con-comentario');
       const valor = f[col] ?? '';
       const valorEscapado = String(valor).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
@@ -5856,9 +5905,14 @@ document.getElementById('cerrar-graficos-adicionales').addEventListener('click',
   seguimientoGraficosActivo = null;
 });
 
-// Cerrar al hacer click en el overlay
+// Cerrar al hacer click en el overlay (chequeando que el mousedown también haya arrancado
+// ahí, para no cerrar por accidente al seleccionar texto y soltar afuera)
+let mousedownEnFondoGraficos = false;
+document.getElementById('overlay-graficos-adicionales').addEventListener('mousedown', (e) => {
+  mousedownEnFondoGraficos = e.target.id === 'overlay-graficos-adicionales';
+});
 document.getElementById('overlay-graficos-adicionales').addEventListener('click', (e) => {
-  if(e.target.id === 'overlay-graficos-adicionales'){
+  if(e.target.id === 'overlay-graficos-adicionales' && mousedownEnFondoGraficos){
     document.getElementById('overlay-graficos-adicionales').classList.remove('open');
     seguimientoGraficosActivo = null;
   }
@@ -6690,7 +6744,7 @@ document.getElementById('aplicar-ordenar-docs').addEventListener('click', ()=>{
 
 // ---- Filtro por documento de origen ----
 function actualizarBadgeFiltroDocumentos(){
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos));
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos || filtroGlobalSoloComentarios));
 }
 
 // ---- Modal "Otros filtros": conflictos globales, filtrar por documento, comparador ----
@@ -6821,6 +6875,7 @@ document.getElementById('comparar-doc-b').addEventListener('change', actualizarC
 
 document.getElementById('btn-otros-filtros').addEventListener('click', ()=>{
   document.getElementById('chk-solo-conflictos-global').checked = filtroGlobalSoloConflictos;
+  document.getElementById('chk-solo-comentarios-global').checked = filtroGlobalSoloComentarios;
   document.getElementById('btn-doc-otros-filtros').classList.toggle('active', !!filtroDocumentos);
   poblarComparadorDocumentos();
   document.getElementById('overlay-otros-filtros').classList.add('open');
@@ -6830,7 +6885,8 @@ document.getElementById('cancelar-otros-filtros').addEventListener('click', ()=>
 });
 document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
   filtroGlobalSoloConflictos = document.getElementById('chk-solo-conflictos-global').checked;
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroDocumentos));
+  filtroGlobalSoloComentarios = document.getElementById('chk-solo-comentarios-global').checked;
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroDocumentos));
   document.getElementById('overlay-otros-filtros').classList.remove('open');
   renderTabla();
 });
@@ -6919,9 +6975,12 @@ function abrirEditarCelda(fila, col){
   conflictoColActual = col;
 
   mostrarValorActualComoTexto(fila[col] ?? '');
-  document.getElementById('input-comentario-celda').value = '';
+  const comentarioExistente = (fila.__comentarios && fila.__comentarios[col] && fila.__comentarios[col].texto) || '';
+  document.getElementById('input-comentario-celda').value = comentarioExistente;
   document.getElementById('input-comentario-celda').readOnly = !modoEdicionBaseDeDatos;
   document.getElementById('btn-lapiz-valor-actual').style.display = modoEdicionBaseDeDatos ? '' : 'none';
+  document.getElementById('confirmar-comentario-celda').style.display = 'none';
+  document.getElementById('cancelar-comentario-celda').style.display = 'none';
 
   // Agrupado por VALOR (no por documento): cada valor distinto que aparece en algún
   // documento es una fila; se despliega para ver cuáles documentos lo tienen, con un botón
@@ -7069,12 +7128,51 @@ function guardarValorCeldaActual(valorNuevo){
   abrirEditarCelda(fila, col); // refresca el modal con el nuevo valor y estado
 }
 
-document.getElementById('cerrar-conflicto-celda').addEventListener('click', ()=>{
-  document.getElementById('overlay-conflicto-celda').classList.remove('open');
+// Guarda solo el comentario, sin tocar el valor de la celda — mismo mecanismo de historial
+// que usa la edición de valor, pero sin pasar por ahí
+function guardarComentarioCelda(){
+  const fila = conflictoFilaActual;
+  const col = conflictoColActual;
+  const comentario = document.getElementById('input-comentario-celda').value.trim();
+  if(!comentario) return;
+
+  fila.__comentarios = fila.__comentarios || {};
+  fila.__comentarios[col] = {
+    texto: comentario,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    valor: fila[col] ?? '',
+  };
+
+  renderTabla();
+  guardarFilaEnSupabase(fila);
+  document.getElementById('confirmar-comentario-celda').style.display = 'none';
+  document.getElementById('cancelar-comentario-celda').style.display = 'none';
+}
+
+document.getElementById('confirmar-comentario-celda').addEventListener('click', guardarComentarioCelda);
+document.getElementById('cancelar-comentario-celda').addEventListener('click', ()=>{
+  const fila = conflictoFilaActual;
+  const col = conflictoColActual;
+  const comentarioExistente = (fila.__comentarios && fila.__comentarios[col] && fila.__comentarios[col].texto) || '';
+  document.getElementById('input-comentario-celda').value = comentarioExistente;
+  document.getElementById('confirmar-comentario-celda').style.display = 'none';
+  document.getElementById('cancelar-comentario-celda').style.display = 'none';
 });
-// Tocar afuera de la ventana (el fondo, no el contenido) la cierra sin necesidad de Cancelar
+// Tocar el campo (o escribir en él) muestra la cruz y la tilde, para agregar o modificar el comentario
+document.getElementById('input-comentario-celda').addEventListener('focus', ()=>{
+  if(!modoEdicionBaseDeDatos) return;
+  document.getElementById('confirmar-comentario-celda').style.display = '';
+  document.getElementById('cancelar-comentario-celda').style.display = '';
+});
+// Tocar afuera de la ventana (el fondo, no el contenido) la cierra. Se chequea que el
+// mousedown también haya arrancado en el fondo, para no cerrar por accidente cuando se
+// selecciona texto adentro del modal y se suelta el botón afuera.
+let mousedownEnFondoCelda = false;
+document.getElementById('overlay-conflicto-celda').addEventListener('mousedown', (e)=>{
+  mousedownEnFondoCelda = e.target.id === 'overlay-conflicto-celda';
+});
 document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)=>{
-  if(e.target.id === 'overlay-conflicto-celda') e.currentTarget.classList.remove('open');
+  if(e.target.id === 'overlay-conflicto-celda' && mousedownEnFondoCelda) e.currentTarget.classList.remove('open');
 });
 
 // ---- Detalle de instrumento: se abre al tocar la celda de TAG, campos uno debajo del otro ----
@@ -9015,16 +9113,19 @@ function renderTablaFinal(){
     if(marcadaEliminar) estiloTh += 'background:rgba(216,105,90,0.18); text-decoration:line-through;';
     else if(seleccionada) estiloTh += 'background:rgba(70,150,90,0.18);';
     else if(esFusionada) estiloTh += 'background:rgba(70,120,180,0.12);';
+    else if(!existeEnBase) estiloTh += 'background:#D4ECF5;';
 
-    const colorNombre = existeEnBase ? 'inherit' : 'var(--green-dark)';
     const mostrarLapiz = modoGrilla === 'final' && !marcadaEliminar;
     const lapiz = mostrarLapiz ? `<button class="lapiz-btn" data-col="${c}" title="Renombrar columna">✎</button>` : '';
     const deshacerBtn = (modoGrilla === 'final' && esFusionada)
       ? `<button class="lapiz-btn" data-col-deshacer="${c}" title="Deshacer unión">↩</button>` : '';
+    const checkbox = modoSeleccion
+      ? `<input type="checkbox" ${seleccionada ? 'checked' : ''} style="pointer-events:none; margin-right:2px;">` : '';
 
     html += `<th data-col-final="${c}" style="${estiloTh} ${modoSeleccion ? 'cursor:pointer;' : ''}">
       <div style="display:flex; align-items:center; gap:4px;">
-        <span style="flex:1; color:${colorNombre}; font-weight:600; font-size:12px;">${nombre || '(sin título)'}</span>
+        ${checkbox}
+        <span style="flex:1; font-weight:600; font-size:12px;">${nombre || '(sin título)'}</span>
         ${lapiz}${deshacerBtn}
       </div>
     </th>`;
@@ -9046,6 +9147,10 @@ function renderTablaFinal(){
   });
   html += '</tbody>';
   grid.innerHTML = html;
+
+  // Al entrar (o volver) a esta pantalla, arrancar viendo desde arriba de la tabla
+  const wrap = grid.closest('.sheet-grid-wrap');
+  if(wrap) wrap.scrollTop = 0;
 
   if(modoSeleccion){
     grid.querySelectorAll('th[data-col-final]').forEach(th=>{
@@ -10249,7 +10354,7 @@ function construirRegistroExtraccion(){
     );
     return { tipo: 'celdas', celdas };
   }
-  // Guardamos también la fila de título real (esté dentro o fuera del rango) y el mapeo
+  // Guardamos también la fila de título real (siempre la primera del rango elegido) y el mapeo
   // posición-dentro-del-rango → nombre de columna en la base, para poder reconstruir más
   // adelante exactamente qué celda del archivo original corresponde a cada dato
   // (lo usa "Actualizar documento" para pisar solo lo que cambió, sin volver a preguntar nada).
@@ -10258,7 +10363,7 @@ function construirRegistroExtraccion(){
     tipo: 'rango',
     hoja: hojaActivaSeleccionada(),
     ...rangoConfirmadoObj,
-    filaTituloRaw,
+    filaTituloRaw: rangoConfirmadoObj.r1,
     mapaColumnas,
   };
 }
