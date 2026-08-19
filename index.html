@@ -3234,13 +3234,12 @@
       </div>
 
       <label class="field-label" style="margin-top:16px;">Comparador de documentos</label>
-      <p style="margin-top:0;">Elegí dos documentos y mostramos los TAGs que difieren entre ellos.</p>
+      <p style="margin-top:0;">Mostrar los TAGs de un documento que no están en otro. Al tocar Aplicar, la base queda filtrada con esos TAGs.</p>
       <div style="display:flex; gap:8px; align-items:center;">
         <select class="field-select" id="comparar-doc-a"></select>
-        <span style="color:var(--text-dim);">vs</span>
+        <span style="color:var(--text-dim); white-space:nowrap;">que no estén en</span>
         <select class="field-select" id="comparar-doc-b"></select>
       </div>
-      <div id="resultado-comparar-documentos" style="margin-top:10px;"></div>
 
       <div class="modal-actions" style="margin-top:16px; justify-content:flex-end;">
         <button class="btn" id="cancelar-otros-filtros">Cerrar</button>
@@ -3593,6 +3592,12 @@ function pasaFiltroGlobalComentario(fila){
   return !!(fila.__comentarios && Object.keys(fila.__comentarios).length > 0);
 }
 
+let filtroComparadorTags = null; // null = sin aplicar, o Set con los TAGs que están en uno de los dos documentos elegidos y no en el otro
+function pasaFiltroComparador(fila){
+  if(!filtroComparadorTags) return true;
+  return filtroComparadorTags.has(fila.TAG);
+}
+
 // ---- Conversión entre filas de Supabase (tabla "instrumentos") y el formato que usa la app ----
 function filaDesdeSupabase(row){
   const fila = {
@@ -3873,6 +3878,7 @@ function filasFiltradas(){
     if(!pasaFiltroDocumento(fila)) return false;
     if(!pasaFiltroGlobalConflicto(fila)) return false;
     if(!pasaFiltroGlobalComentario(fila)) return false;
+    if(!pasaFiltroComparador(fila)) return false;
     return COLUMNAS.every(col => {
       const permitidos = FILTROS[col];
       if(!permitidos) return true;
@@ -6744,7 +6750,7 @@ document.getElementById('aplicar-ordenar-docs').addEventListener('click', ()=>{
 
 // ---- Filtro por documento de origen ----
 function actualizarBadgeFiltroDocumentos(){
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos || filtroGlobalSoloComentarios));
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroComparadorTags));
 }
 
 // ---- Modal "Otros filtros": conflictos globales, filtrar por documento, comparador ----
@@ -6837,41 +6843,24 @@ function poblarComparadorDocumentos(){
 
 // Compara solo presencia: qué TAGs tiene uno de los documentos y el otro no (y viceversa).
 // Se dispara solo al elegir/cambiar cualquiera de los dos documentos, sin botón aparte.
-function actualizarComparadorDocumentos(){
-  const docA = document.getElementById('comparar-doc-a').value;
-  const docB = document.getElementById('comparar-doc-b').value;
-  const cont = document.getElementById('resultado-comparar-documentos');
-  if(!docA || !docB || docA === docB){
-    cont.innerHTML = '<p style="color:var(--text-dim); font-size:12px; margin:6px 0 0;">Elegí dos documentos distintos.</p>';
-    return;
-  }
-
-  const soloA = [], soloB = [];
-  FILAS.forEach(fila=>{
-    const enA = fila.__documentos && fila.__documentos.has(docA);
-    const enB = fila.__documentos && fila.__documentos.has(docB);
-    if(enA && !enB) soloA.push(fila.TAG);
-    if(enB && !enA) soloB.push(fila.TAG);
-  });
-
-  const filas = Math.max(soloA.length, soloB.length);
-  let filasHtml = '';
-  for(let i = 0; i < filas; i++){
-    filasHtml += `<tr><td style="padding:4px 8px; border-top:1px solid var(--line);">${soloA[i] || ''}</td><td style="padding:4px 8px; border-top:1px solid var(--line);">${soloB[i] || ''}</td></tr>`;
-  }
-
-  cont.innerHTML = `
-    <table style="width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;">
-      <thead><tr>
-        <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line);">Solo en "${docA}" (${soloA.length})</th>
-        <th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line);">Solo en "${docB}" (${soloB.length})</th>
-      </tr></thead>
-      <tbody>${filasHtml || '<tr><td colspan="2" style="padding:8px; color:var(--text-dim);">No hay diferencias de presencia entre los dos.</td></tr>'}</tbody>
-    </table>
-  `;
+function poblarComparadorDocumentos(){
+  const nombres = DOCUMENTOS_PROYECTO.map(d => d.nombre);
+  const selA = document.getElementById('comparar-doc-a');
+  selA.innerHTML = `<option value="">Seleccionar</option>` + nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  selA.value = '';
+  poblarComparadorDocB();
 }
-document.getElementById('comparar-doc-a').addEventListener('change', actualizarComparadorDocumentos);
-document.getElementById('comparar-doc-b').addEventListener('change', actualizarComparadorDocumentos);
+
+// El segundo desplegable nunca muestra el documento ya elegido en el primero
+function poblarComparadorDocB(){
+  const docA = document.getElementById('comparar-doc-a').value;
+  const nombres = DOCUMENTOS_PROYECTO.map(d => d.nombre).filter(n => n !== docA);
+  const selB = document.getElementById('comparar-doc-b');
+  const valorPrevio = selB.value;
+  selB.innerHTML = `<option value="">Seleccionar</option>` + nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  selB.value = nombres.includes(valorPrevio) ? valorPrevio : '';
+}
+document.getElementById('comparar-doc-a').addEventListener('change', poblarComparadorDocB);
 
 document.getElementById('btn-otros-filtros').addEventListener('click', ()=>{
   document.getElementById('chk-solo-conflictos-global').checked = filtroGlobalSoloConflictos;
@@ -6886,7 +6875,18 @@ document.getElementById('cancelar-otros-filtros').addEventListener('click', ()=>
 document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
   filtroGlobalSoloConflictos = document.getElementById('chk-solo-conflictos-global').checked;
   filtroGlobalSoloComentarios = document.getElementById('chk-solo-comentarios-global').checked;
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroDocumentos));
+
+  const docA = document.getElementById('comparar-doc-a').value;
+  const docB = document.getElementById('comparar-doc-b').value;
+  if(docA && docB){
+    filtroComparadorTags = new Set(
+      FILAS.filter(fila => fila.__documentos && fila.__documentos.has(docA) && !fila.__documentos.has(docB)).map(f => f.TAG)
+    );
+  } else {
+    filtroComparadorTags = null;
+  }
+
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroDocumentos || filtroComparadorTags));
   document.getElementById('overlay-otros-filtros').classList.remove('open');
   renderTabla();
 });
