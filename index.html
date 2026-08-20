@@ -3236,12 +3236,12 @@
       </div>
 
       <label class="field-label" style="margin-top:16px;">Comparador de documentos</label>
-      <p style="margin-top:0;">Mostrar los TAGs de un documento que no están en otro. Al tocar Aplicar, la base queda filtrada con esos TAGs.</p>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <select class="field-select" id="comparar-doc-a"></select>
-        <span style="color:var(--text-dim); white-space:nowrap;">que no estén en</span>
-        <select class="field-select" id="comparar-doc-b"></select>
-      </div>
+      <select class="field-select" id="comparar-doc-a" style="width:100%;"></select>
+      <select class="field-select" id="comparar-modo" style="width:100%; margin-top:8px;">
+        <option value="diferencia">que no estén en</option>
+        <option value="interseccion">que compartan con</option>
+      </select>
+      <select class="field-select" id="comparar-doc-b" style="width:100%; margin-top:8px;"></select>
 
       <div class="modal-actions" style="margin-top:16px; justify-content:flex-end;">
         <button class="btn" id="cancelar-otros-filtros">Cerrar</button>
@@ -3565,7 +3565,13 @@ let COLUMNAS = ["TAG"];
 // "p&id" y "P&Id" (o "Título" y "titulo") se reconozcan como la misma columna en cualquier
 // comparación — tanto al cargar un documento nuevo como al actualizar uno existente.
 function normalizarNombreColumna(s){
-  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return normalizarEspacios(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+// Colapsa cualquier espacio de más (dos, tres, tabs) a uno solo, y recorta las puntas.
+// Se aplica a cualquier valor leído de un Excel, para que "Reactor  1" y "Reactor 1" no
+// se traten como valores distintos y generen un conflicto falso.
+function normalizarEspacios(texto){
+  return (texto === null || texto === undefined) ? '' : texto.toString().replace(/\s+/g, ' ').trim();
 }
 // Devuelve el nombre EXACTO tal como está guardado en COLUMNAS si hay una coincidencia
 // (ignorando mayúsculas/tildes), o null si no existe ninguna columna así.
@@ -6226,7 +6232,7 @@ async function iniciarActualizacionDesdeBase(idx){
     if(r === ext.filaTituloRaw) continue; // saltar la fila de título si cae dentro del rango de datos
     const cellRef = XLSX.utils.encode_cell({ r: r - 1, c: ext.c1 + mapaTag.posicion });
     const cell = hoja[cellRef];
-    const valor = cell ? XLSX.utils.format_cell(cell).trim().toUpperCase() : '';
+    const valor = cell ? normalizarEspacios(XLSX.utils.format_cell(cell)).toUpperCase() : '';
     if(valor) actualizacionTagsOriginales.push({ tag: valor, filaHoja: r });
   }
 
@@ -6354,7 +6360,7 @@ function valorCeldaOriginalActualizar(filaHoja, posicionCol){
   const hoja = actualizacionWorkbook.Sheets[actualizacionExtraccion.hoja];
   const cellRef = XLSX.utils.encode_cell({ r: filaHoja - 1, c: actualizacionExtraccion.c1 + posicionCol });
   const cell = hoja[cellRef];
-  return cell ? XLSX.utils.format_cell(cell).trim() : '';
+  return cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
 }
 
 function abrirComparacionActualizar(){
@@ -6866,9 +6872,13 @@ document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
 
   const docA = document.getElementById('comparar-doc-a').value;
   const docB = document.getElementById('comparar-doc-b').value;
+  const modo = document.getElementById('comparar-modo').value;
   if(docA && docB){
     filtroComparadorTags = new Set(
-      FILAS.filter(fila => fila.__documentos && fila.__documentos.has(docA) && !fila.__documentos.has(docB)).map(f => f.TAG)
+      FILAS.filter(fila=>{
+        if(!fila.__documentos || !fila.__documentos.has(docA)) return false;
+        return modo === 'interseccion' ? fila.__documentos.has(docB) : !fila.__documentos.has(docB);
+      }).map(f => f.TAG)
     );
   } else {
     filtroComparadorTags = null;
@@ -9161,7 +9171,7 @@ function construirTablaData(){
     for(let c=0; c<nCols; c++){
       const cellRef = XLSX.utils.encode_cell({ r: (r1 - 1 + r), c: (c1 + c) });
       const cell = hoja[cellRef];
-      fila.push(cell ? XLSX.utils.format_cell(cell) : '');
+      fila.push(cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '');
     }
     data.push(fila);
   }
@@ -10266,7 +10276,7 @@ function continuarAlFinalDesdeTagHoja(){
     const fila = camposDefinidos.map(c=>{
       const cellRef = XLSX.utils.encode_cell({ r: c.celda.r - 1, c: c.celda.c });
       const cell = hoja[cellRef];
-      return cell ? XLSX.utils.format_cell(cell) : '';
+      return cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
     });
     tablaData.push(fila);
   });
