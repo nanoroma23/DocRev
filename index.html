@@ -1097,6 +1097,8 @@
     cursor:pointer;
     white-space:nowrap;
   }
+  .btn-mini.danger{ border-color:var(--red); color:var(--red); }
+  .btn-mini.danger:hover{ background:var(--red-soft); }
   .btn-mini.primary{
     background:var(--green);
     border-color:var(--green);
@@ -3574,6 +3576,18 @@ function buscarColumnaExistente(nombre){
 }
 let FILAS = [];
 let FILTROS = {}; // { columna: Set(valoresPermitidos) | null }
+let FILTROS_CONFLICTO_COL = {}; // { columna: true | null } — mostrar solo filas con conflicto en esa columna puntual
+let FILTROS_COMENTARIO_COL = {}; // { columna: true | null } — mostrar solo filas con comentario en esa columna puntual
+function pasaFiltroConflictoColumna(fila, col){
+  if(!FILTROS_CONFLICTO_COL[col]) return true;
+  const rojoOAzul = (fila.__conflictos && fila.__conflictos.has(col)) || (fila.__resueltos && fila.__resueltos.has(col));
+  const amarillo = col === 'TAG' && fila.__duplicados && Object.keys(fila.__duplicados).length > 0;
+  return !!(rojoOAzul || amarillo);
+}
+function pasaFiltroComentarioColumna(fila, col){
+  if(!FILTROS_COMENTARIO_COL[col]) return true;
+  return !!(fila.__comentarios && fila.__comentarios[col]);
+}
 let filtroAbierto = null;
 let columnasOcultas = new Set();
 let columnasAnchos = {}; // { columna: ancho en px }
@@ -3880,6 +3894,8 @@ function filasFiltradas(){
     if(!pasaFiltroGlobalComentario(fila)) return false;
     if(!pasaFiltroComparador(fila)) return false;
     return COLUMNAS.every(col => {
+      if(!pasaFiltroConflictoColumna(fila, col)) return false;
+      if(!pasaFiltroComentarioColumna(fila, col)) return false;
       const permitidos = FILTROS[col];
       if(!permitidos) return true;
       return permitidos.has((fila[col] ?? '').toString());
@@ -3896,7 +3912,7 @@ function renderHead(){
       <th data-col="${col}" class="${col==='TAG' ? 'col-key' : 'col-draggable'}" ${anchoStyle}>
         <div class="th-inner">
           <span>${col}</span>
-          <span class="th-filter ${FILTROS[col] ? 'active' : ''}" data-col-filter="${col}">
+          <span class="th-filter ${(FILTROS[col] || FILTROS_CONFLICTO_COL[col] || FILTROS_COMENTARIO_COL[col]) ? 'active' : ''}" data-col-filter="${col}">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
           </span>
         </div>
@@ -4209,11 +4225,11 @@ function abrirFiltro(col){
         <span>Seleccionar todo</span>
       </label>
       <label class="filter-option" style="border-bottom:1px solid var(--line);">
-        <input type="checkbox" class="chk-solo-conflicto-popup">
+        <input type="checkbox" class="chk-solo-conflicto-popup" ${FILTROS_CONFLICTO_COL[col] ? 'checked':''}>
         <span style="color:var(--red);">Solo con conflicto</span>
       </label>
       <label class="filter-option" style="border-bottom:1px solid var(--line);">
-        <input type="checkbox" class="chk-solo-comentario-popup">
+        <input type="checkbox" class="chk-solo-comentario-popup" ${FILTROS_COMENTARIO_COL[col] ? 'checked':''}>
         <span style="color:#4E9A5C;">Solo con comentario</span>
       </label>
       ${valores.map(v => `
@@ -4258,36 +4274,6 @@ function abrirFiltro(col){
 
   // "Solo con conflicto": marca solo los valores que tienen alguna fila en conflicto en esta
   // columna, y desmarca el resto — mismo criterio que el buscador
-  popup.querySelector('.chk-solo-conflicto-popup').addEventListener('change', (e)=>{
-    if(e.target.checked){
-      const valoresConConflicto = new Set(
-        FILAS.filter(f=>{
-          const rojoOAzul = (f.__conflictos && f.__conflictos.has(col)) || (f.__resueltos && f.__resueltos.has(col));
-          const amarillo = col === 'TAG' && f.__duplicados && Object.keys(f.__duplicados).length > 0;
-          return rojoOAzul || amarillo;
-        }).map(f => (f[col] ?? '').toString())
-      );
-      chksValor().forEach(c => { c.checked = valoresConConflicto.has(c.value); });
-    } else {
-      chksValor().forEach(c => { c.checked = true; });
-    }
-    actualizarEstadoTodos();
-  });
-
-  // "Solo con comentario": mismo criterio, marca solo los valores que tienen alguna fila
-  // con un comentario cargado en esta columna
-  popup.querySelector('.chk-solo-comentario-popup').addEventListener('change', (e)=>{
-    if(e.target.checked){
-      const valoresConComentario = new Set(
-        FILAS.filter(f => f.__comentarios && f.__comentarios[col]).map(f => (f[col] ?? '').toString())
-      );
-      chksValor().forEach(c => { c.checked = valoresConComentario.has(c.value); });
-    } else {
-      chksValor().forEach(c => { c.checked = true; });
-    }
-    actualizarEstadoTodos();
-  });
-
   // Buscador interno: filtra las opciones visibles y marca solo lo que coincide,
   // desmarcando el resto (resetea la selección al buscar)
   popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
@@ -4308,6 +4294,8 @@ function abrirFiltro(col){
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
+    FILTROS_CONFLICTO_COL[col] = popup.querySelector('.chk-solo-conflicto-popup').checked || null;
+    FILTROS_COMENTARIO_COL[col] = popup.querySelector('.chk-solo-comentario-popup').checked || null;
     cerrarFiltros();
     renderTabla();
     guardarPreferenciasProyecto();
@@ -6970,6 +6958,46 @@ let modoEdicionBaseDeDatos = false;
 let conflictoFilaActual = null;
 let conflictoColActual = null;
 
+// Saca solo el valor "puesto a mano" (Creado en la base de datos) de esta celda, y recalcula
+// el valor/estado de conflicto según lo que quede aportado por los documentos reales:
+// si queda un solo valor entre ellos, se usa ese sin conflicto; si quedan varios distintos,
+// vuelve a quedar en rojo para resolver de nuevo; si no queda ninguno, la celda queda vacía.
+function eliminarValorManualCelda(){
+  const fila = conflictoFilaActual;
+  const col = conflictoColActual;
+  if(!fila.__historial || !fila.__historial[col]) return;
+  delete fila.__historial[col]['Creado en la base de datos'];
+
+  if(fila.__documentos){
+    const quedaAlgunManual = COLUMNAS.some(c => fila.__historial[c] && fila.__historial[c]['Creado en la base de datos']);
+    if(!quedaAlgunManual) fila.__documentos.delete('Creado en la base de datos');
+  }
+
+  const entradasRestantes = Object.entries(fila.__historial[col] || {}).filter(([,v]) => v);
+  const valoresRestantes = new Set(entradasRestantes.map(([,v]) => v.toString().toLowerCase()));
+
+  fila.__conflictos = fila.__conflictos || new Set();
+  fila.__resueltos = fila.__resueltos || new Set();
+
+  if(valoresRestantes.size === 0){
+    fila[col] = '';
+    fila.__conflictos.delete(col);
+    fila.__resueltos.delete(col);
+  } else if(valoresRestantes.size === 1){
+    fila[col] = entradasRestantes[0][1];
+    fila.__conflictos.delete(col);
+    fila.__resueltos.delete(col);
+  } else {
+    // los documentos siguen sin coincidir entre ellos: vuelve a quedar en rojo para elegir de nuevo
+    fila.__conflictos.add(col);
+    fila.__resueltos.delete(col);
+  }
+
+  renderTabla();
+  guardarFilaEnSupabase(fila);
+  abrirEditarCelda(fila, col); // refresca el modal con el nuevo estado
+}
+
 function abrirEditarCelda(fila, col){
   conflictoFilaActual = fila;
   conflictoColActual = col;
@@ -6990,26 +7018,41 @@ function abrirEditarCelda(fila, col){
   const entradas = Object.entries(historialCol).filter(([, valor]) => valor);
   if(entradas.length){
     bloque.style.display = 'block';
-    const grupos = {}; // valor -> [documentos]
+    const grupos = {}; // valorNormalizado (solo mayúsc/minúsc) -> { display, docs:[documentos] }
     entradas.forEach(([origen, valor])=>{
-      grupos[valor] = grupos[valor] || [];
-      grupos[valor].push(origen);
+      const valorTexto = valor.toString();
+      const clave = valorTexto.toLowerCase();
+      if(!grupos[clave]) grupos[clave] = { display: valorTexto, docs: [] };
+      grupos[clave].docs.push(origen);
     });
-    document.getElementById('valores-documentos-lista').innerHTML = Object.entries(grupos).map(([valor, docs], i) => `
+    document.getElementById('valores-documentos-lista').innerHTML = Object.entries(grupos).map(([, grupo], i) => `
       <div class="valor-doc-grupo">
         <div class="valor-doc-fila" data-toggle-idx="${i}" style="display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; cursor:pointer;">
-          <span style="flex:1; font-size:13px; font-weight:600;">${valor}</span>
-          <span style="font-size:11px; color:var(--text-dim);">${docs.length} documento${docs.length===1?'':'s'}</span>
+          <span style="flex:1; font-size:13px; font-weight:600;">${grupo.display}</span>
+          <span style="font-size:11px; color:var(--text-dim);">${grupo.docs.length} documento${grupo.docs.length===1?'':'s'}</span>
           <svg class="valor-doc-flecha" data-idx="${i}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div class="valor-doc-expandido" id="valor-doc-expandido-${i}" style="display:none; padding:8px 9px; border:1px solid var(--line); border-top:none; border-radius:0 0 6px 6px; background:var(--bg);">
           <div style="display:flex; flex-direction:column; gap:3px; margin-bottom:8px;">
-            ${docs.map(d => `<div style="font-size:12px; color:var(--text-muted);">${d}</div>`).join('')}
+            ${grupo.docs.map(d => d === 'Creado en la base de datos'
+              ? `<div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+                   <span style="flex:1;">${d}</span>
+                   <button type="button" class="btn-mini danger" data-eliminar-manual="1" title="Eliminar este valor puesto a mano">Eliminar</button>
+                 </div>`
+              : `<div style="font-size:12px; color:var(--text-muted);">${d}</div>`
+            ).join('')}
           </div>
           <button type="button" class="btn-mini" data-copiar-idx="${i}">Copiar lista</button>
         </div>
       </div>
     `).join('');
+
+    document.getElementById('valores-documentos-lista').querySelectorAll('[data-eliminar-manual]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        eliminarValorManualCelda();
+      });
+    });
 
     document.getElementById('valores-documentos-lista').querySelectorAll('[data-toggle-idx]').forEach(fila_=>{
       fila_.addEventListener('click', ()=>{
@@ -7024,7 +7067,7 @@ function abrirEditarCelda(fila, col){
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
         const idx = btn.dataset.copiarIdx;
-        const docs = grupos[Object.keys(grupos)[idx]];
+        const docs = Object.values(grupos)[idx].docs;
         navigator.clipboard.writeText(docs.join('\n'));
         btn.textContent = 'Copiado ✓';
         setTimeout(()=>{ btn.textContent = 'Copiar lista'; }, 1500);
@@ -7134,14 +7177,18 @@ function guardarComentarioCelda(){
   const fila = conflictoFilaActual;
   const col = conflictoColActual;
   const comentario = document.getElementById('input-comentario-celda').value.trim();
-  if(!comentario) return;
 
-  fila.__comentarios = fila.__comentarios || {};
-  fila.__comentarios[col] = {
-    texto: comentario,
-    fecha: new Date().toLocaleDateString('es-AR'),
-    valor: fila[col] ?? '',
-  };
+  if(!comentario){
+    // El campo quedó vacío: se interpreta como "borrar el comentario", no como "no hacer nada"
+    if(fila.__comentarios) delete fila.__comentarios[col];
+  } else {
+    fila.__comentarios = fila.__comentarios || {};
+    fila.__comentarios[col] = {
+      texto: comentario,
+      fecha: new Date().toLocaleDateString('es-AR'),
+      valor: fila[col] ?? '',
+    };
+  }
 
   renderTabla();
   guardarFilaEnSupabase(fila);
@@ -7419,6 +7466,37 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
     if(Object.keys(filaDistintaActual.__duplicados).length === 0){
       filaDistintaActual.__duplicados = {};
     }
+
+    // La ocurrencia que se separó ya no es parte de esta fila: revisar, columna por columna,
+    // si el conflicto que había (causado por comparar esa ocurrencia contra las demás)
+    // sigue teniendo sentido con lo que queda, o si ahora todos coinciden y hay que sacarlo
+    Object.keys(datosDistintosActuales).forEach(col=>{
+      if(col === 'TAG') return;
+      if(!filaDistintaActual.__conflictos.has(col) && !filaDistintaActual.__resueltos.has(col)) return;
+
+      // Valores que quedan aportando a esta columna: las ocurrencias que siguen en este
+      // documento, más lo que hayan aportado otros documentos (según el historial actual)
+      const valoresEnEsteDoc = nuevasOcurrencias.map(o => (o[col] ?? '').toString()).filter(v => v);
+      const valoresDeOtrosDocs = Object.entries(filaDistintaActual.__historial[col] || {})
+        .filter(([doc]) => doc !== docDistintoActual)
+        .map(([,v]) => (v ?? '').toString()).filter(v => v);
+      const todosLosValores = [...valoresEnEsteDoc, ...valoresDeOtrosDocs];
+      const distintos = new Set(todosLosValores.map(v => v.toLowerCase()));
+
+      if(distintos.size <= 1){
+        // ya no hay ninguna diferencia real: el conflicto queda resuelto solo
+        filaDistintaActual.__conflictos.delete(col);
+        filaDistintaActual.__resueltos.delete(col);
+        if(valoresEnEsteDoc.length){
+          filaDistintaActual.__historial[col][docDistintoActual] = valoresEnEsteDoc[0];
+          filaDistintaActual[col] = todosLosValores[0];
+        } else if(filaDistintaActual.__historial[col]){
+          delete filaDistintaActual.__historial[col][docDistintoActual];
+          if(todosLosValores.length) filaDistintaActual[col] = todosLosValores[0];
+        }
+      }
+      // si todavía hay valores distintos entre lo que queda, el conflicto se deja como está
+    });
 
     await guardarFilaEnSupabase(filaDistintaActual);
   }
@@ -7763,7 +7841,7 @@ async function unificarInstrumentos(filaOrigen, filaDestino){
     if(valorOrigen !== undefined && valorOrigen !== ''){
       if(valorDestino === undefined || valorDestino === ''){
         filaDestino[col] = valorOrigen;
-      } else if(valorDestino !== valorOrigen){
+      } else if(String(valorDestino).toLowerCase() !== String(valorOrigen).toLowerCase()){
         filaDestino.__conflictos = filaDestino.__conflictos || new Set();
         filaDestino.__conflictos.add(col);
       }
@@ -7867,7 +7945,7 @@ async function unificarColumnas(colOrigen, colDestino){
       if(valorDestino === undefined || valorDestino === ''){
         fila[colDestino] = valorOrigen;
         filasAfectadas.push(fila);
-      } else if(valorDestino !== valorOrigen){
+      } else if(String(valorDestino).toLowerCase() !== String(valorOrigen).toLowerCase()){
         fila.__conflictos = fila.__conflictos || new Set();
         fila.__conflictos.add(colDestino);
         filasAfectadas.push(fila);
@@ -10337,7 +10415,7 @@ function fusionarFilaConDocumento(filaExistente, datosNuevos, documento){
       filaExistente[col] = valorNuevo;
       return;
     }
-    if(valorActual !== valorNuevo && !filaExistente.__resueltos.has(col)){
+    if(String(valorActual).toLowerCase() !== String(valorNuevo).toLowerCase() && !filaExistente.__resueltos.has(col)){
       // valores distintos entre documentos y todavía nadie eligió cuál vale: queda en rojo
       filaExistente.__conflictos.add(col);
     }
