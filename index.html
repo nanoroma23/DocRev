@@ -697,6 +697,20 @@
   table.datatable td.tag-duplicado:hover{
     background:rgba(255,193,7,0.40) !important;
   }
+  table.datatable td.tag-renombrado{
+    background:rgba(70,120,180,0.16) !important;
+    border-left:3px solid #4678B4;
+    font-weight:600;
+  }
+  table.datatable td.tag-renombrado:hover{
+    background:rgba(70,120,180,0.28) !important;
+  }
+  /* Si el TAG tiene las dos marcas (viene de un renombrado Y sigue con un duplicado sin
+     resolver en otro documento), el amarillo gana porque necesita atención más urgente */
+  table.datatable td.tag-duplicado.tag-renombrado{
+    background:rgba(255,193,7,0.25) !important;
+    border-left:3px solid #FFC107;
+  }
   table.datatable th.col-hoja-datos{
     background:var(--card);
     white-space:nowrap;
@@ -3167,7 +3181,10 @@
   <!-- Modal editar celda -->
   <div class="overlay" id="overlay-conflicto-celda">
     <div class="modal" style="width:400px;">
-      <label class="field-label" style="margin-top:0;">Valor actual</label>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <label class="field-label" style="margin-top:0;">Valor actual</label>
+        <span id="valor-actual-tag" style="font-size:12px; color:var(--text-dim); font-weight:600;"></span>
+      </div>
       <div id="valor-actual-row" style="display:flex; align-items:stretch; gap:8px; padding:9px 10px; box-sizing:border-box;">
         <div id="valor-actual-texto" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font-size:13px; min-height:18px;"></div>
         <button type="button" class="col-icon-btn col-icon-btn-grande" id="btn-lapiz-valor-actual" title="Editar valor">
@@ -3629,6 +3646,7 @@ function filaDesdeSupabase(row){
     __resueltos: new Set(row.resueltos || []),
     __comentarios: row.comentarios_celda || {},
     __duplicados: row.duplicados || {},
+    __tagAnterior: row.tag_anterior || null,
   };
   Object.entries(row.datos || {}).forEach(([col, valor]) => { fila[col] = valor; });
   return fila;
@@ -3654,6 +3672,7 @@ async function guardarFilaEnSupabase(fila){
     documentos: [...(fila.__documentos || [])],
     comentarios_celda: fila.__comentarios || {},
     duplicados: fila.__duplicados || {},
+    tag_anterior: fila.__tagAnterior || null,
     actualizado_en: new Date().toISOString(),
   }).eq('id', fila.__id);
   if(error){
@@ -3872,10 +3891,14 @@ function pasaFiltroDocumento(fila){
 }
 
 function valoresUnicos(col){
-  // Solo tiene en cuenta las filas que ya pasan los filtros de las OTRAS columnas
-  // y el filtro por documento, así el desplegable muestra únicamente valores realmente posibles
+  // Tiene en cuenta TODOS los filtros ya aplicados (documento, comparador, conflicto/comentario
+  // globales, y las demás columnas), así el desplegable muestra únicamente valores realmente
+  // posibles dentro de lo que ya quedó filtrado
   const filasRelevantes = FILAS.filter(fila => {
     if(!pasaFiltroDocumento(fila)) return false;
+    if(!pasaFiltroComparador(fila)) return false;
+    if(!pasaFiltroGlobalConflicto(fila)) return false;
+    if(!pasaFiltroGlobalComentario(fila)) return false;
     return COLUMNAS.every(c => {
       if(c === col) return true;
       const permitidos = FILTROS[c];
@@ -4397,6 +4420,10 @@ function renderTabla(){
         // Marcar si hay duplicados en algún documento
         if(f.__duplicados && Object.keys(f.__duplicados).length > 0){
           cls.push('tag-duplicado');
+        }
+        // Marcar si este TAG viene de un renombrado o de separar un duplicado
+        if(f.__tagAnterior){
+          cls.push('tag-renombrado');
         }
       } else {
         const enConflicto = f.__conflictos && f.__conflictos.has(col);
@@ -6827,21 +6854,14 @@ document.getElementById('btn-doc-otros-filtros').addEventListener('click', (e)=>
   abrirFiltroDocOtrosFiltros();
 });
 
-function poblarComparadorDocumentos(){
-  const nombres = DOCUMENTOS_PROYECTO.map(d => d.nombre);
-  const opciones = `<option value="">Seleccionar</option>` + nombres.map(n => `<option value="${n}">${n}</option>`).join('');
-  document.getElementById('comparar-doc-a').innerHTML = opciones;
-  document.getElementById('comparar-doc-b').innerHTML = opciones;
-  actualizarComparadorDocumentos();
-}
-
 // Compara solo presencia: qué TAGs tiene uno de los documentos y el otro no (y viceversa).
 // Se dispara solo al elegir/cambiar cualquiera de los dos documentos, sin botón aparte.
 function poblarComparadorDocumentos(){
   const nombres = DOCUMENTOS_PROYECTO.map(d => d.nombre);
   const selA = document.getElementById('comparar-doc-a');
+  const valorPrevioA = selA.value;
   selA.innerHTML = `<option value="">Seleccionar</option>` + nombres.map(n => `<option value="${n}">${n}</option>`).join('');
-  selA.value = '';
+  selA.value = nombres.includes(valorPrevioA) ? valorPrevioA : '';
   poblarComparadorDocB();
 }
 
@@ -7012,6 +7032,7 @@ function abrirEditarCelda(fila, col){
   conflictoFilaActual = fila;
   conflictoColActual = col;
 
+  document.getElementById('valor-actual-tag').textContent = fila.TAG || '';
   mostrarValorActualComoTexto(fila[col] ?? '');
   const comentarioExistente = (fila.__comentarios && fila.__comentarios[col] && fila.__comentarios[col].texto) || '';
   document.getElementById('input-comentario-celda').value = comentarioExistente;
@@ -7235,8 +7256,13 @@ document.getElementById('overlay-conflicto-celda').addEventListener('click', (e)
 // ---- Detalle de instrumento: se abre al tocar la celda de TAG, campos uno debajo del otro ----
 function abrirDetalleInstrumento(fila){
   const titulo = document.getElementById('detalle-instrumento-titulo');
+  const nombreAnteriorHtml = fila.__tagAnterior
+    ? `<div style="font-size:11.5px; color:#4678B4; margin-top:2px;">Antes: ${fila.__tagAnterior}</div>` : '';
   titulo.innerHTML = `
-    <span class="detalle-doc-valor-texto" style="flex:1; font-size:18px; font-weight:600;">${fila.TAG || 'Detalle'}</span>
+    <div style="flex:1;">
+      <span class="detalle-doc-valor-texto" style="font-size:18px; font-weight:600;">${fila.TAG || 'Detalle'}</span>
+      ${nombreAnteriorHtml}
+    </div>
   `;
 
   const cont = document.getElementById('detalle-campos');
@@ -7421,6 +7447,7 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
     __resueltos: new Set(),
     __comentarios: {},
     __duplicados: {},
+    __tagAnterior: filaDistintaActual.TAG, // de qué TAG se separó
   };
 
   // Copiar los datos del grupo distinto
@@ -7445,6 +7472,7 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
     resueltos: [],
     comentarios_celda: {},
     duplicados: {},
+    tag_anterior: nuevaFila.__tagAnterior,
   }).select().single();
 
   btn.disabled = false;
@@ -7724,13 +7752,15 @@ document.getElementById('confirm-renombrar-tag').addEventListener('click', async
   }
   const btn = document.getElementById('confirm-renombrar-tag');
   btn.disabled = true;
-  const { error } = await supabaseClient.from('instrumentos').update({ tag: nuevoTag }).eq('id', tagARenombrar.__id);
+  const nombreAnterior = tagARenombrar.TAG;
+  const { error } = await supabaseClient.from('instrumentos').update({ tag: nuevoTag, tag_anterior: nombreAnterior }).eq('id', tagARenombrar.__id);
   btn.disabled = false;
   if(error){
     console.error('Error al renombrar el TAG:', error);
     alert('No se pudo renombrar el TAG. Revisá la consola para más detalle.');
     return;
   }
+  tagARenombrar.__tagAnterior = nombreAnterior;
   tagARenombrar.TAG = nuevoTag;
   tagARenombrar = null;
   document.getElementById('overlay-renombrar-tag').classList.remove('open');
