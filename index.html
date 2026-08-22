@@ -1300,13 +1300,13 @@
     background:var(--card);
   }
   .sheet-final-topbar.open{ display:flex; }
-  .sft-left, .sft-center, .sft-right{
+  .sft-left, .sft-right{
     display:flex;
     align-items:center;
     gap:8px;
+    flex-wrap:wrap;
   }
   .sft-left{ flex:1; }
-  .sft-center{ flex:0 0 auto; }
   .sft-right{ flex:1; justify-content:flex-end; }
   .sheet-grid-wrap{
     flex:1;
@@ -2143,7 +2143,6 @@
     }
     
     .sft-left,
-    .sft-center,
     .sft-right {
       flex-wrap: wrap;
       width: 100%;
@@ -2852,11 +2851,9 @@
           Títulos que no existen en la base de datos
         </div>
       </div>
-      <div class="sft-center">
+      <div class="sft-right">
         <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
         <button class="btn-col" id="btn-sacar-columnas">Sacar columnas</button>
-      </div>
-      <div class="sft-right">
         <button class="btn" id="atras-final">Atrás</button>
         <button class="btn btn-primary" id="subir-basedatos">Subir</button>
       </div>
@@ -9370,19 +9367,42 @@ document.addEventListener('mousemove', (e)=>{
 });
 document.addEventListener('mouseup', ()=>{ arrastrandoSeleccion = false; });
 
+// En el celular, tocar y arrastrar de una selecciona celdas — pero eso choca con querer
+// scrollear la tabla con el dedo. Se pide mantener apretado un instante antes de arrancar
+// la selección: si te movés mucho antes de eso, se entiende que querías scrollear, no elegir.
+let touchHoldTimer = null;
+let touchInicioXY = null;
+
 gridEl.addEventListener('touchstart', (e)=>{
   if(modoGrilla !== 'libre') return;
   const touch = e.touches[0];
+  touchInicioXY = { x: touch.clientX, y: touch.clientY };
   const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
   if(!td) return;
-  const r = Number(td.dataset.r), c = Number(td.dataset.c);
-  selAnchor = { r, c };
-  selEnd = { r, c };
-  arrastrandoSeleccion = true;
-  pintarSeleccion();
+  touchHoldTimer = setTimeout(()=>{
+    touchHoldTimer = null;
+    const r = Number(td.dataset.r), c = Number(td.dataset.c);
+    selAnchor = { r, c };
+    selEnd = { r, c };
+    arrastrandoSeleccion = true;
+    pintarSeleccion();
+  }, 350);
 }, { passive:true });
 gridEl.addEventListener('touchmove', (e)=>{
-  if(modoGrilla !== 'libre' || !arrastrandoSeleccion) return;
+  if(modoGrilla !== 'libre') return;
+  if(touchHoldTimer){
+    // Todavía no se cumplió el tiempo de espera: si ya se movió el dedo, era scroll,
+    // no selección — se cancela el temporizador y se deja actuar al scroll nativo
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchInicioXY.x);
+    const dy = Math.abs(touch.clientY - touchInicioXY.y);
+    if(dx > 10 || dy > 10){
+      clearTimeout(touchHoldTimer);
+      touchHoldTimer = null;
+    }
+    return;
+  }
+  if(!arrastrandoSeleccion) return;
   const touch = e.touches[0];
   const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('td.cell');
   if(!td) return;
@@ -9390,7 +9410,10 @@ gridEl.addEventListener('touchmove', (e)=>{
   selEnd = { r: Number(td.dataset.r), c: Number(td.dataset.c) };
   pintarSeleccion();
 }, { passive:false });
-gridEl.addEventListener('touchend', ()=>{ arrastrandoSeleccion = false; });
+gridEl.addEventListener('touchend', ()=>{
+  if(touchHoldTimer){ clearTimeout(touchHoldTimer); touchHoldTimer = null; }
+  arrastrandoSeleccion = false;
+});
 
 // Escribir el rango a mano: sincroniza la selección visual en vivo mientras se escribe
 document.getElementById('rango-field-text').addEventListener('input', (e)=>{
