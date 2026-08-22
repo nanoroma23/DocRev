@@ -1292,27 +1292,24 @@
 
   .sheet-final-topbar{
     display:none;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
+    flex-direction:column;
+    gap:8px;
     padding:12px 24px;
     border-bottom:1px solid var(--line);
     background:var(--card);
   }
   .sheet-final-topbar.open{ display:flex; }
-  .sft-left, .sft-right{
+  .sft-row-top, .sft-row-bottom{
     display:flex;
     align-items:center;
     gap:8px;
     flex-wrap:wrap;
   }
-  .sft-left{ flex:1; }
-  .sft-right{ flex:1; justify-content:flex-end; }
-  .sft-divisor{
-    width:1px;
-    align-self:stretch;
-    background:var(--line);
-    margin:0 4px;
+  .sft-row-bottom{ justify-content:flex-end; }
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
   }
   .sheet-grid-wrap{
     flex:1;
@@ -2148,13 +2145,10 @@
       padding: 0 6px;
     }
     
-    .sft-left,
-    .sft-right {
-      flex-wrap: wrap;
+    .sft-row-top,
+    .sft-row-bottom {
       width: 100%;
     }
-    .sft-divisor{ display:none; }
-    .sft-right > div{ margin-bottom:4px; }
     
     /* Ajustes de texto para móvil */
     .seg-card-titulo {
@@ -2852,23 +2846,18 @@
   <!-- Vista pantalla completa: Hoja 1 -->
   <div class="sheet-fullscreen" id="sheet-fullscreen">
     <div class="sheet-final-topbar" id="sheet-final-topbar">
-      <div class="sft-left">
+      <div class="sft-row-top">
         <button class="btn" id="cancel-final">Cancelar</button>
         <div class="nota-titulos-nuevos" id="nota-titulos-nuevos">
           <span class="nota-titulos-nuevos-swatch"></span>
           Títulos que no existen en la base de datos
         </div>
       </div>
-      <div class="sft-right">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
-          <button class="btn-col" id="btn-sacar-columnas">Sacar columnas</button>
-        </div>
-        <div class="sft-divisor"></div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button class="btn" id="atras-final">Atrás</button>
-          <button class="btn btn-primary" id="subir-basedatos">Subir</button>
-        </div>
+      <div class="sft-row-bottom">
+        <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
+        <button class="btn-col" id="btn-sacar-columnas">Sacar columnas</button>
+        <button class="btn" id="atras-final">Atrás</button>
+        <button class="btn btn-primary" id="subir-basedatos">Subir</button>
       </div>
     </div>
     <div class="sheet-grid-wrap">
@@ -6585,8 +6574,7 @@ async function iniciarExtraccionDesdeDocumento(idx){
   metadatosDocumentoActual = { tipo: doc.tipo, proyecto: doc.proyecto, proveedor: doc.proveedor };
 
   document.getElementById('overlay-detalle-documento').classList.remove('open');
-  document.getElementById('select-hoja').innerHTML =
-    workbook.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+  poblarSelectorHojas();
 
   abrirHojaFullscreen(); // dibuja la hoja y abre la ventana de "tipo de carga"
 }
