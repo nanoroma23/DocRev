@@ -1308,6 +1308,12 @@
   }
   .sft-left{ flex:1; }
   .sft-right{ flex:1; justify-content:flex-end; }
+  .sft-divisor{
+    width:1px;
+    align-self:stretch;
+    background:var(--line);
+    margin:0 4px;
+  }
   .sheet-grid-wrap{
     flex:1;
     overflow:auto;
@@ -2147,6 +2153,8 @@
       flex-wrap: wrap;
       width: 100%;
     }
+    .sft-divisor{ display:none; }
+    .sft-right > div{ margin-bottom:4px; }
     
     /* Ajustes de texto para móvil */
     .seg-card-titulo {
@@ -2852,10 +2860,15 @@
         </div>
       </div>
       <div class="sft-right">
-        <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
-        <button class="btn-col" id="btn-sacar-columnas">Sacar columnas</button>
-        <button class="btn" id="atras-final">Atrás</button>
-        <button class="btn btn-primary" id="subir-basedatos">Subir</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn-col" id="btn-unificar-columnas">Unificar columnas</button>
+          <button class="btn-col" id="btn-sacar-columnas">Sacar columnas</button>
+        </div>
+        <div class="sft-divisor"></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn" id="atras-final">Atrás</button>
+          <button class="btn btn-primary" id="subir-basedatos">Subir</button>
+        </div>
       </div>
     </div>
     <div class="sheet-grid-wrap">
@@ -2901,6 +2914,10 @@
       <div id="float-step-rango" style="display:none;">
         <div class="float-file-name" id="float-file-name-rango">Documento.xlsx</div>
         <div class="tipo-carga-legend" id="tipo-carga-legend">Documento tipo tabla</div>
+        <div class="sheet-select-row">
+          <label>Hoja</label>
+          <select class="field-select" id="select-hoja-rango"></select>
+        </div>
         <p class="rango-label">Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):</p>
         <div class="rango-field" id="rango-field">
           <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters">
@@ -9067,6 +9084,7 @@ btnContinuarDoc.addEventListener('click', ()=>{
 function poblarSelectorHojas(){
   const opciones = workbookActual.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
   document.getElementById('select-hoja').innerHTML = opciones;
+  document.getElementById('select-hoja-rango').innerHTML = opciones;
 }
 
 // ---- Vista pantalla completa: renderiza la hoja seleccionada con datos reales ----
@@ -9119,10 +9137,12 @@ function abrirHojaFullscreen(){
 // Cambiar de hoja -> re-renderiza y limpia el rango elegido
 function alCambiarHoja(nuevoValor){
   document.getElementById('select-hoja').value = nuevoValor;
+  document.getElementById('select-hoja-rango').value = nuevoValor;
   renderGrid();
   resetearCampoRango();
 }
 document.getElementById('select-hoja').addEventListener('change', (e)=> alCambiarHoja(e.target.value));
+document.getElementById('select-hoja-rango').addEventListener('change', (e)=> alCambiarHoja(e.target.value));
 
 function cerrarFlujoCarga(){
   document.getElementById('sheet-fullscreen').classList.remove('open');
