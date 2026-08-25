@@ -1311,6 +1311,54 @@
     gap:8px;
     flex-wrap:wrap;
   }
+  .comparar-lado-a-lado{
+    position:static;
+  }
+  .comparar-panel{
+    position:absolute;
+    z-index:1;
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--card);
+    box-sizing:border-box;
+  }
+  .comparar-panel-inner{
+    overflow:hidden;
+    border-radius:8px;
+  }
+  .comparar-panel-titulo{
+    padding:8px 12px;
+    height:36px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+    font-weight:600;
+    font-size:13px;
+    flex-shrink:0;
+  }
+  .comparar-panel-scroll{
+    overflow:auto;
+  }
+  .comparar-panel-scroll table{ font-size:12px; }
+  .comparar-panel-scroll th, .comparar-panel-scroll td{
+    padding:4px 8px;
+    border:1px solid var(--line);
+    white-space:nowrap;
+  }
+  .comparar-panel-scroll thead th{
+    height:40px;
+    box-sizing:border-box;
+    vertical-align:middle;
+  }
+  .comparar-panel-scroll td.row-head, .comparar-panel-scroll th.corner{
+    background:var(--card);
+    color:var(--text-dim);
+    text-align:center;
+    font-size:11px;
+  }
   .sheet-grid-wrap{
     flex:1;
     overflow:auto;
@@ -2149,7 +2197,7 @@
     .sft-row-bottom {
       width: 100%;
     }
-    
+
     /* Ajustes de texto para móvil */
     .seg-card-titulo {
       font-size: 13px;
@@ -3066,19 +3114,6 @@
 
   <!-- Modal actualizar documento: elegir cuál -->
   <!-- Actualizar documento (base -> documento): paso 1, filtrar qué TAGs corresponden a este documento -->
-  <div class="overlay" id="overlay-filtro-tags-actualizar">
-    <div class="modal" style="width:360px;">
-      <h3>¿Qué TAGs corresponden a este documento?</h3>
-      <p>Vienen tildados los que ya estaban en el documento. Sumá o sacá según haga falta (ej: filtrá solo los transmisores de presión).</p>
-      <input type="text" class="field-input" id="buscar-tags-actualizar" placeholder="Buscar TAG...">
-      <div class="hojas-list" id="lista-tags-actualizar" style="max-height:320px; margin-top:8px;"></div>
-      <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-        <button class="btn" id="cancel-filtro-tags-actualizar">Cancelar</button>
-        <button class="btn btn-primary" id="confirmar-filtro-tags-actualizar">Continuar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Actualizar documento: paso 2 (solo si hace falta), remapear columnas que ya no existen -->
   <div class="overlay" id="overlay-remapeo-columnas-actualizar">
     <div class="modal" style="width:380px;">
@@ -3093,18 +3128,49 @@
   </div>
 
   <!-- Actualizar documento: paso 3, comparación y las dos formas de generar el archivo -->
-  <div class="overlay" id="overlay-comparacion-actualizar">
-    <div class="modal" style="width:520px; max-height:85vh; overflow-y:auto;">
-      <h3>Esto va a cambiar</h3>
-      <p id="resumen-comparacion-actualizar" style="margin-bottom:10px;"></p>
-      <div id="tabla-comparacion-actualizar"></div>
-      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
+  <div class="sheet-fullscreen" id="overlay-comparacion-actualizar">
+    <div class="doc-viewer-topbar" style="flex-wrap:wrap; gap:8px; position:relative; z-index:10;">
+      <span style="font-weight:600; font-size:13.5px;">Comparar y actualizar</span>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn" id="cancel-comparacion-actualizar">Cancelar</button>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" id="generar-blanco-actualizar">Tabla blanca (celeste = cambió)</button>
-          <button class="btn btn-primary" id="generar-formato-actualizar">Con formato original</button>
+        <button class="btn" id="btn-vincular-columna">Vincular</button>
+        <button class="btn btn-primary" id="generar-formato-actualizar">Actualizar</button>
+      </div>
+    </div>
+    <div class="comparar-lado-a-lado">
+      <div class="comparar-panel">
+        <div class="comparar-panel-inner">
+          <div class="comparar-panel-titulo" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <span>Documento original</span>
+            <select class="field-select" id="select-hoja-comparar-original" style="width:auto; font-size:12px; padding:3px 6px;"></select>
+          </div>
+          <div class="comparar-panel-scroll">
+            <table class="sheet-grid" id="tabla-comparar-original"></table>
+          </div>
         </div>
       </div>
+      <div class="comparar-panel">
+        <div class="comparar-panel-inner">
+          <div class="comparar-panel-titulo">Base de datos</div>
+          <div class="comparar-panel-scroll">
+            <table class="datatable" id="tabla-comparar-base"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vista previa de cómo queda el documento original, antes de descargarlo de verdad -->
+  <div class="sheet-fullscreen" id="overlay-vista-previa-actualizar">
+    <div class="doc-viewer-topbar">
+      <span style="font-weight:600; font-size:13.5px;">Vista previa — celeste marca lo que cambió</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="btn-volver-vista-previa">Volver</button>
+        <button class="btn btn-primary" id="btn-guardar-vista-previa">Guardar</button>
+      </div>
+    </div>
+    <div style="flex:1; overflow:auto;">
+      <table class="sheet-grid" id="tabla-vista-previa"></table>
     </div>
   </div>
 
@@ -3697,6 +3763,7 @@ function filaDesdeSupabase(row){
     __comentarios: row.comentarios_celda || {},
     __duplicados: row.duplicados || {},
     __tagAnterior: row.tag_anterior || null,
+    __tagAnteriorTipo: row.tag_anterior_tipo || null,
   };
   Object.entries(row.datos || {}).forEach(([col, valor]) => { fila[col] = valor; });
   return fila;
@@ -3723,6 +3790,7 @@ async function guardarFilaEnSupabase(fila){
     comentarios_celda: fila.__comentarios || {},
     duplicados: fila.__duplicados || {},
     tag_anterior: fila.__tagAnterior || null,
+    tag_anterior_tipo: fila.__tagAnteriorTipo || null,
     actualizado_en: new Date().toISOString(),
   }).eq('id', fila.__id);
   if(error){
@@ -6313,78 +6381,15 @@ async function iniciarActualizacionDesdeBase(idx){
     if(valor) actualizacionTagsOriginales.push({ tag: valor, filaHoja: r });
   }
 
-  abrirFiltroTagsActualizar();
+  // Con la vista en paralelo ya no hace falta elegir qué TAGs corresponden: se usan
+  // directamente todos los que trae el documento
+  actualizacionTagsFiltrados = new Set(actualizacionTagsOriginales.map(t => t.tag));
+  actualizacionOrdenFinal = actualizacionTagsOriginales.map(t => t.tag);
+
+  verificarMapeoColumnasActualizar();
 }
 
 // ---- Paso 1: filtrar qué TAGs de la base corresponden a este documento ----
-function abrirFiltroTagsActualizar(){
-  const yaEnDocumento = new Set(actualizacionTagsOriginales.map(t => t.tag));
-  const cont = document.getElementById('lista-tags-actualizar');
-  const tagsBase = [...new Set(FILAS.map(f => f.TAG).filter(Boolean))].sort();
-
-  cont.innerHTML = `
-    <label class="filter-option">
-      <input type="checkbox" class="chk-todos-tags-actualizar">
-      <span>Seleccionar todo</span>
-    </label>
-    ${tagsBase.map(tag => `
-      <label class="filter-option" data-valor="${tag.toLowerCase()}">
-        <input type="checkbox" class="chk-tag-actualizar" value="${tag}" ${yaEnDocumento.has(tag) ? 'checked' : ''}>
-        <span>${tag}</span>
-      </label>
-    `).join('')}
-  `;
-
-  const chkTodos = cont.querySelector('.chk-todos-tags-actualizar');
-  const chksValor = () => [...cont.querySelectorAll('.chk-tag-actualizar')];
-  function actualizarEstadoTodos(){
-    const todos = chksValor();
-    const marcados = todos.filter(c => c.checked);
-    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
-    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
-    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
-  }
-  let eraParcial = false;
-  chkTodos.closest('label').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
-  chkTodos.addEventListener('change', ()=>{
-    if(eraParcial){
-      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
-    } else {
-      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
-    }
-    actualizarEstadoTodos();
-  });
-  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
-  actualizarEstadoTodos();
-
-  document.getElementById('buscar-tags-actualizar').value = '';
-  document.getElementById('buscar-tags-actualizar').oninput = (e)=>{
-    const q = e.target.value.trim().toLowerCase();
-    cont.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
-      const coincide = opt.dataset.valor.includes(q);
-      opt.style.display = coincide ? 'flex' : 'none';
-    });
-  };
-
-  document.getElementById('overlay-filtro-tags-actualizar').classList.add('open');
-}
-document.getElementById('cancel-filtro-tags-actualizar').addEventListener('click', ()=>{
-  document.getElementById('overlay-filtro-tags-actualizar').classList.remove('open');
-});
-document.getElementById('confirmar-filtro-tags-actualizar').addEventListener('click', ()=>{
-  const marcados = [...document.querySelectorAll('.chk-tag-actualizar:checked')].map(c => c.value);
-  actualizacionTagsFiltrados = new Set(marcados);
-
-  // Los que ya estaban en el documento y siguen filtrados van primero, en su orden original;
-  // los que se suman nuevos (filtrados pero no estaban) van al final
-  const enDocumentoYFiltrados = actualizacionTagsOriginales.filter(t => actualizacionTagsFiltrados.has(t.tag));
-  const nuevosTags = marcados.filter(tag => !actualizacionTagsOriginales.some(t => t.tag === tag));
-  actualizacionOrdenFinal = [...enDocumentoYFiltrados.map(t => t.tag), ...nuevosTags];
-
-  document.getElementById('overlay-filtro-tags-actualizar').classList.remove('open');
-  verificarMapeoColumnasActualizar();
-});
-
 // ---- Paso 2 (solo si hace falta): columnas del mapeo que ya no existen en la base ----
 function verificarMapeoColumnasActualizar(){
   // Si hay coincidencia (aunque sea con distinta mayúscula/tilde), usamos el nombre EXACTO
@@ -6440,7 +6445,32 @@ function valorCeldaOriginalActualizar(filaHoja, posicionCol){
   return cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
 }
 
+let columnasOcultasComparar = new Set();
 function abrirComparacionActualizar(){
+  // Por las dudas: cerrar cualquier ventana flotante o fondo oscuro que hubiera quedado
+  // abierto de otro momento (tienen más z-index que esta pantalla y la taparían)
+  document.getElementById('float-backdrop').classList.remove('open');
+  document.getElementById('float-window').classList.remove('open');
+  document.getElementById('sheet-fullscreen').classList.remove('open');
+
+  columnasOcultasComparar = new Set(); // arranca mostrando todo, sin heredar nada de otra pantalla
+  filtrosComparar = {};
+  modoVincular = false;
+  document.getElementById('btn-vincular-columna').textContent = 'Vincular';
+  document.getElementById('btn-vincular-columna').classList.remove('btn-filtro-activo');
+  vincularOrigenesPendientes.clear();
+  vinculos = {};
+  {
+    const hojaExt = actualizacionWorkbook.Sheets[actualizacionExtraccion.hoja];
+    for(let c = actualizacionExtraccion.c1; c <= actualizacionExtraccion.c2; c++){
+      const cellRef = XLSX.utils.encode_cell({ r: actualizacionExtraccion.r1 - 1, c });
+      const cell = hojaExt[cellRef];
+      const tituloDoc = cell ? normalizarNombreColumna(XLSX.utils.format_cell(cell)) : '';
+      if(!tituloDoc) continue;
+      const columnaBase = COLUMNAS.find(col => normalizarNombreColumna(col) === tituloDoc);
+      if(columnaBase && columnaBase !== 'TAG') vinculos[c] = columnaBase;
+    }
+  }
   const columnasFinal = actualizacionMapaColumnas.filter(m => m.columna !== 'TAG');
   actualizacionCambios = [];
 
@@ -6465,92 +6495,569 @@ function abrirComparacionActualizar(){
     }
   });
 
-  const nuevos = actualizacionCambios.filter(c => c.tipo === 'nuevo').length;
-  const eliminados = actualizacionCambios.filter(c => c.tipo === 'eliminado').length;
-  const cambios = actualizacionCambios.filter(c => c.tipo === 'cambio').length;
-  document.getElementById('resumen-comparacion-actualizar').textContent =
-    `${cambios} valor(es) cambiado(s), ${nuevos} TAG(s) nuevo(s), ${eliminados} TAG(s) que se sacan.`;
-
-  const filasTabla = actualizacionCambios.map(c=>{
-    if(c.tipo === 'nuevo') return `<tr><td>${c.tag}</td><td colspan="3" style="color:var(--green-dark);">TAG nuevo (se agrega)</td></tr>`;
-    if(c.tipo === 'eliminado') return `<tr><td>${c.tag}</td><td colspan="3" style="color:var(--red);">Ya no está en el filtro (se saca)</td></tr>`;
-    return `<tr><td>${c.tag}</td><td>${c.columna}</td><td>${c.valorDocumento || '(vacío)'}</td><td style="font-weight:600;">${c.valorBase || '(vacío)'}</td></tr>`;
-  }).join('');
-  document.getElementById('tabla-comparacion-actualizar').innerHTML = `
-    <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-      <thead><tr style="text-align:left; border-bottom:1px solid var(--line);">
-        <th style="padding:5px;">TAG</th><th style="padding:5px;">Columna</th><th style="padding:5px;">Documento</th><th style="padding:5px;">Base (nuevo)</th>
-      </tr></thead>
-      <tbody>${filasTabla || '<tr><td colspan="4" style="padding:10px; color:var(--text-dim);">No hay cambios.</td></tr>'}</tbody>
-    </table>
-  `;
-
+  poblarSelectorHojaCompararOriginal();
+  renderTablaCompararOriginal();
+  renderTablaCompararBase();
   document.getElementById('overlay-comparacion-actualizar').classList.add('open');
+  ajustarAlturaCompararLadoALado();
 }
+
+// El CSS solo (flex:1) venía sin funcionar bien acá, así que se mide de verdad cuánto ocupan
+// el topbar y el texto de arriba, y se le da al panel central exactamente lo que sobra —
+// así no queda ni espacio de más abajo, ni el panel tapando al topbar
+// Coordenadas puestas directo contra la pantalla completa (overlay), sin ningún div
+// intermedio de por medio: fila 0 -> alturaTopbar es la topbar, y de alturaTopbar hacia
+// abajo son las dos ventanas (lado a lado si hay ancho, apiladas si la pantalla es angosta)
+function ajustarAlturaCompararLadoALado(){
+  const overlay = document.getElementById('overlay-comparacion-actualizar');
+  const topbar = overlay.querySelector('.doc-viewer-topbar');
+  const rectOverlay = overlay.getBoundingClientRect();
+  const rectTopbar = topbar.getBoundingClientRect();
+
+  const anchoTotal = rectOverlay.width;
+  const altoTotal = rectOverlay.height;
+  const alturaTopbar = rectTopbar.height;
+  const gap = 12;
+  const esAngosta = anchoTotal <= 768;
+
+  const anchoDisponible = anchoTotal;
+  const altoDisponible = altoTotal - alturaTopbar;
+
+  const paneles = [...overlay.querySelectorAll('.comparar-panel')];
+  paneles.forEach((panel, i)=>{
+    let left, top, ancho, alto;
+    if(esAngosta){
+      const altoPanel = (altoDisponible - gap) / 2;
+      left = 0;
+      top = alturaTopbar + (i === 0 ? 0 : altoPanel + gap);
+      ancho = anchoDisponible;
+      alto = altoPanel;
+    } else {
+      const anchoPanel = (anchoDisponible - gap) / 2;
+      left = (i === 0 ? 0 : anchoPanel + gap);
+      top = alturaTopbar;
+      ancho = anchoPanel;
+      alto = altoDisponible;
+    }
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.width = ancho + 'px';
+    panel.style.height = alto + 'px';
+
+    const inner = panel.querySelector('.comparar-panel-inner');
+    const titulo = panel.querySelector('.comparar-panel-titulo');
+    const scroll = panel.querySelector('.comparar-panel-scroll');
+    if(!inner || !titulo || !scroll) return;
+    inner.style.height = alto + 'px';
+    scroll.style.height = Math.max(0, alto - titulo.offsetHeight) + 'px';
+  });
+}
+window.addEventListener('resize', ()=>{
+  if(document.getElementById('overlay-comparacion-actualizar').classList.contains('open')){
+    ajustarAlturaCompararLadoALado();
+  }
+});
+
+// Panel izquierdo: el rango tal cual quedó en el documento original, de referencia (no se toca)
+function poblarSelectorHojaCompararOriginal(){
+  const sel = document.getElementById('select-hoja-comparar-original');
+  sel.innerHTML = actualizacionWorkbook.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+  sel.value = actualizacionExtraccion.hoja;
+}
+document.getElementById('select-hoja-comparar-original').addEventListener('change', (e)=>{
+  renderTablaCompararOriginal(e.target.value);
+});
+
+function renderTablaCompararOriginal(nombreHoja){
+  nombreHoja = nombreHoja || actualizacionExtraccion.hoja;
+  const hoja = actualizacionWorkbook.Sheets[nombreHoja];
+  const ref = hoja['!ref'] || 'A1:H24';
+  const range = XLSX.utils.decode_range(ref);
+  const colFin = Math.max(range.e.c, 7);
+  const filaFin = Math.max(range.e.r, 23);
+
+  // El rango que se extrajo en su momento queda marcado en celeste, para que se vea
+  // clarito qué es lo que le está aportando datos a la Base de Datos
+  function esCeldaExtraida(r, c){
+    const ext = actualizacionExtraccion;
+    return nombreHoja === ext.hoja && (r + 1) >= ext.r1 && (r + 1) <= ext.r2 && c >= ext.c1 && c <= ext.c2;
+  }
+
+  let html = '<thead><tr><th class="corner"></th>';
+  for(let c = 0; c <= colFin; c++){
+    const letra = XLSX.utils.encode_col(c);
+    const vinculado = vinculos[c];
+    const pendiente = vincularOrigenesPendientes.has(c);
+    let estilo = '';
+    if(pendiente) estilo = 'background:#FFC107; cursor:pointer;';
+    else if(vinculado) estilo = 'background:#D4ECF5; cursor:pointer;';
+    else if(modoVincular) estilo = 'cursor:pointer;';
+    const marcaVinculo = vinculado ? `<div style="font-size:9px; font-weight:400; white-space:nowrap;">→ ${vinculado}</div>` : '';
+    html += `<th data-col-vincular-origen="${c}" style="${estilo}">${letra}${marcaVinculo}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for(let r = 0; r <= filaFin; r++){
+    html += `<tr><td class="row-head">${r + 1}</td>`;
+    for(let c = 0; c <= colFin; c++){
+      const cellRef = XLSX.utils.encode_cell({ r, c });
+      const cell = hoja[cellRef];
+      const estilo = esCeldaExtraida(r, c) ? ' style="background:#D4ECF5;"' : '';
+      html += `<td${estilo}>${cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : ''}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  document.getElementById('tabla-comparar-original').innerHTML = html;
+
+  if(modoVincular){
+    document.querySelectorAll('[data-col-vincular-origen]').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const c = Number(th.dataset.colVincularOrigen);
+        if(vincularOrigenesPendientes.has(c)) vincularOrigenesPendientes.delete(c);
+        else vincularOrigenesPendientes.add(c);
+        // Cambio visual inmediato en la celda tocada, sin esperar a redibujar toda la
+        // tabla entera (que puede ser lenta si tiene muchas filas)
+        th.style.background = vincularOrigenesPendientes.has(c) ? '#FFC107' : '';
+        renderTablaCompararBase();
+      });
+    });
+  }
+}
+
+// Panel derecho: la Base de Datos de siempre — mismos filtros de fila que ya tengas puestos,
+// y un ojo en cada columna para ir ocultando hasta dejar solo lo que se quiere pasar
+let filtrosComparar = {}; // { columna: Set(valoresPermitidos) | null } — propio de esta pantalla
+
+// Vínculos manuales: qué columna del documento original (índice absoluto de columna,
+// en la hoja de actualizacionExtraccion) corresponde a cuál columna de la Base de Datos
+let vinculos = {};
+let modoVincular = false;
+let vincularOrigenesPendientes = new Set(); // columnas del documento esperando su pareja (varias a la vez)
+
+document.getElementById('btn-vincular-columna').addEventListener('click', ()=>{
+  modoVincular = !modoVincular;
+  vincularOrigenesPendientes.clear();
+  const btn = document.getElementById('btn-vincular-columna');
+  btn.classList.toggle('btn-filtro-activo', modoVincular);
+  btn.textContent = modoVincular ? 'Terminar de vincular' : 'Vincular';
+  renderTablaCompararOriginal(document.getElementById('select-hoja-comparar-original').value);
+  renderTablaCompararBase();
+});
+
+function renderTablaCompararBase(){
+  const columnasVisibles = COLUMNAS.filter(c => !columnasOcultasComparar.has(c));
+  const filas = FILAS.filter(f => COLUMNAS.every(col => {
+    const permitidos = filtrosComparar[col];
+    if(!permitidos) return true;
+    return permitidos.has((f[col] ?? '').toString());
+  }));
+
+  let html = '<thead><tr><th class="corner"></th>';
+  columnasVisibles.forEach(col=>{
+    const claveId = col.replace(/[^a-zA-Z0-9]/g, '_');
+    const estaVinculada = Object.values(vinculos).includes(col);
+    const puedeElegirse = modoVincular && vincularOrigenesPendientes.size > 0;
+    let estiloExtra = '';
+    if(puedeElegirse) estiloExtra = 'background:rgba(70,120,180,0.14); cursor:pointer;';
+    else if(estaVinculada) estiloExtra = 'background:#D4ECF5;';
+    const dataAttr = puedeElegirse ? ` data-col-vincular-destino="${col}"` : '';
+    html += `<th style="position:relative; ${estiloExtra}"${dataAttr}>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <span style="flex:1;">${col}${estaVinculada ? ' ✓' : ''}</span>
+        <span class="th-filter ${filtrosComparar[col] ? 'active' : ''}" data-filtro-col-comparar="${col}" title="Filtrar">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+        </span>
+      </div>
+      <div class="filter-popup" id="popup-comparar-${claveId}"></div>
+    </th>`;
+  });
+  html += '</tr></thead><tbody>';
+  filas.forEach((f, i)=>{
+    html += `<tr><td class="row-head">${i + 1}</td>` + columnasVisibles.map(col => `<td>${f[col] ?? ''}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('tabla-comparar-base').innerHTML = html;
+
+  document.querySelectorAll('[data-filtro-col-comparar]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      abrirFiltroComparar(el.dataset.filtroColComparar);
+    });
+  });
+  document.querySelectorAll('[data-col-vincular-destino]').forEach(th=>{
+    th.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const col = th.dataset.colVincularDestino;
+      vincularOrigenesPendientes.forEach(c => { vinculos[c] = col; });
+      vincularOrigenesPendientes.clear();
+      renderTablaCompararOriginal(document.getElementById('select-hoja-comparar-original').value);
+      renderTablaCompararBase();
+    });
+  });
+}
+
+// Filtro propio de esta pantalla (mismo aspecto que el de Base de Datos, pero con sus propios
+// popups e IDs, para no chocar con los de la tabla de atrás)
+let filtroCompararAbierto = null;
+function cerrarFiltrosComparar(){
+  document.querySelectorAll('[id^="popup-comparar-"]').forEach(p=>{ p.classList.remove('open'); p.innerHTML=''; });
+  filtroCompararAbierto = null;
+}
+document.addEventListener('click', cerrarFiltrosComparar);
+
+function abrirFiltroComparar(col){
+  cerrarFiltrosComparar();
+  filtroCompararAbierto = col;
+  const claveId = col.replace(/[^a-zA-Z0-9]/g, '_');
+  const popup = document.getElementById(`popup-comparar-${claveId}`);
+  const valores = [...new Set(FILAS.map(f => (f[col] ?? '').toString()))].sort();
+  const seleccion = filtrosComparar[col] || new Set(valores);
+
+  popup.innerHTML = `
+    <div class="filter-popup-head">Filtrar ${col}</div>
+    <div class="filter-search">
+      <input type="text" placeholder="Buscar valor..." class="input-buscar-popup" style="flex:1;">
+      <button class="btn-mini primary btn-aplicar-popup">Aplicar</button>
+    </div>
+    <div class="filter-list">
+      <label class="filter-option">
+        <input type="checkbox" class="chk-todos-popup" ${seleccion.size===valores.length ? 'checked':''}>
+        <span>Seleccionar todo</span>
+      </label>
+      ${valores.map(v => `
+        <label class="filter-option" data-valor="${v.toLowerCase()}">
+          <input type="checkbox" class="chk-valor" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <span>${v || '(vacío)'}</span>
+        </label>
+      `).join('')}
+    </div>
+  `;
+  popup.classList.add('open');
+  popup.addEventListener('click', e => e.stopPropagation());
+
+  const chkTodos = popup.querySelector('.chk-todos-popup');
+  const chksValor = () => [...popup.querySelectorAll('.chk-valor')];
+  function actualizarEstadoTodos(){
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+  let eraParcial = false;
+  chkTodos.closest('label').addEventListener('mousedown', ()=>{ eraParcial = chkTodos.indeterminate; });
+  chkTodos.addEventListener('change', ()=>{
+    if(eraParcial){
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = false; });
+    } else {
+      chksValor().forEach(c=>{ if(c.closest('.filter-option').style.display !== 'none') c.checked = chkTodos.checked; });
+    }
+    actualizarEstadoTodos();
+  });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodos));
+
+  popup.querySelector('.input-buscar-popup').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    popup.querySelectorAll('.filter-option[data-valor]').forEach(opt=>{
+      const coincide = opt.dataset.valor.includes(q);
+      opt.style.display = coincide ? 'flex' : 'none';
+      if(!coincide) opt.querySelector('.chk-valor').checked = false;
+    });
+    actualizarEstadoTodos();
+  });
+
+  actualizarEstadoTodos();
+
+  popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
+    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    filtrosComparar[col] = marcados.length === valores.length ? null : new Set(marcados);
+    cerrarFiltrosComparar();
+    renderTablaCompararBase();
+  });
+}
+
 document.getElementById('cancel-comparacion-actualizar').addEventListener('click', ()=>{
   document.getElementById('overlay-comparacion-actualizar').classList.remove('open');
 });
 
-// ---- Salida A: tabla blanca de cero, con lo que cambió pintado en celeste ----
-document.getElementById('generar-blanco-actualizar').addEventListener('click', ()=>{
-  const columnasFinal = actualizacionMapaColumnas.filter(m => m.columna !== 'TAG').map(m => m.columna);
-  const encabezado = ['TAG', ...columnasFinal];
-  const filas = actualizacionOrdenFinal.map(tag=>{
-    const filaBase = FILAS.find(f => f.TAG === tag);
-    return [tag, ...columnasFinal.map(col => (filaBase && filaBase[col]) || '')];
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas]);
-  actualizacionOrdenFinal.forEach((tag, rIdx)=>{
-    const esNuevo = !actualizacionTagsOriginales.some(t => t.tag === tag);
-    columnasFinal.forEach((col, cIdx)=>{
-      const cambio = esNuevo || actualizacionCambios.some(c => c.tag === tag && c.columna === col && c.tipo === 'cambio');
-      if(cambio){
-        const cellRef = XLSX.utils.encode_cell({ r: rIdx + 1, c: cIdx + 1 });
-        if(!ws[cellRef]) ws[cellRef] = { t:'s', v:'' };
-        ws[cellRef].s = { fill: { patternType:'solid', fgColor: { rgb:'D4ECF5' } } };
-      }
-    });
-  });
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Actualizado');
-  const nombreBase = actualizacionDoc.nombre.replace(/\.[^.]+$/, '');
-  XLSX.writeFile(wb, `actualizado_${nombreBase}.xlsx`, { cellStyles: true });
-});
 
 // ---- Salida B: copia del archivo original, pisando solo los valores que cambiaron
 // (no inserta ni saca filas: los TAGs nuevos/eliminados no se reflejan acá, solo en la tabla blanca) ----
+let wbActualizarPendiente = null; // el libro modificado, esperando confirmación en "Guardar"
+let celdasModificadasActualizar = new Set(); // cellRefs que cambiaron de verdad, para marcar en celeste
+let celdasRojasActualizar = new Set(); // cellRefs que se pintaron de rojo, para no confundir con color que ya traía el archivo
+
 document.getElementById('generar-formato-actualizar').addEventListener('click', ()=>{
-  const buffer = XLSX.write(actualizacionWorkbook, { type:'array', bookType:'xlsx', cellStyles:true });
-  const wbCopia = XLSX.read(buffer, { type:'array', cellStyles:true });
+  if(Object.keys(vinculos).length === 0){
+    alert('Todavía no vinculaste ninguna columna. Tocá "Vincular" y elegí qué columna del documento corresponde a cuál de la Base de Datos.');
+    return;
+  }
+
+  // Si una o más columnas del documento se vincularon a TAG, no tiene sentido escribir
+  // el mismo valor repetido en cada una: se leen esas columnas juntas (unificadas) por
+  // fila, y ESE valor combinado es el que identifica a qué fila corresponde cada TAG
+  const columnasOrigenTag = Object.entries(vinculos)
+    .filter(([, col]) => col === 'TAG')
+    .map(([c]) => Number(c))
+    .sort((a, b) => a - b);
+
+  let tagsOriginalesEfectivo = actualizacionTagsOriginales;
+  const vinculosParaEscribir = { ...vinculos };
+
+  if(columnasOrigenTag.length > 0){
+    columnasOrigenTag.forEach(c => { delete vinculosParaEscribir[c]; });
+
+    const hojaLectura = actualizacionWorkbook.Sheets[actualizacionExtraccion.hoja];
+    tagsOriginalesEfectivo = [];
+    let filasVaciasSeguidas = 0;
+    for(let r = actualizacionExtraccion.r1; r <= actualizacionExtraccion.r2; r++){
+      if(r === actualizacionExtraccion.filaTituloRaw) continue;
+      const piezas = columnasOrigenTag.map(c=>{
+        const cellRef = XLSX.utils.encode_cell({ r: r - 1, c });
+        const cell = hojaLectura[cellRef];
+        return cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
+      });
+      // Se exige que TODAS las columnas vinculadas a TAG tengan algo, no solo alguna —
+      // así una sola celda con contenido "pegado" mucho más abajo de los datos reales
+      // (relleno automático, por ejemplo) no hace que la fila cuente como real
+      const todasLlenas = piezas.every(p => p !== '');
+
+      if(todasLlenas){
+        filasVaciasSeguidas = 0;
+        const tagCombinado = piezas.join('').trim().toUpperCase();
+        if(tagCombinado) tagsOriginalesEfectivo.push({ tag: tagCombinado, filaHoja: r });
+      } else {
+        // El rango guardado puede ser mucho más grande que los datos reales (filas vacías
+        // de más al final). Después de varias filas vacías seguidas, se da por terminada
+        // la información real y se corta ahí, en vez de seguir leyendo hasta el final.
+        filasVaciasSeguidas++;
+        if(filasVaciasSeguidas >= 5) break;
+      }
+    }
+  }
+
+
+  // Las filas a comparar son las que queden después de aplicar los filtros puestos en la
+  // Base de Datos (columna derecha) — el rango del documento se compara contra ESO.
+  // Puede haber TAGs de la base filtrada que no estén en el documento (se agregan en una
+  // fila nueva, justo después del rango), y TAGs del documento que no estén en la base
+  // filtrada (esa fila del documento queda marcada en rojo).
+  const filasAActualizar = FILAS.filter(f => COLUMNAS.every(col => {
+    const permitidos = filtrosComparar[col];
+    if(!permitidos) return true;
+    return permitidos.has((f[col] ?? '').toString());
+  }));
+
+  // En vez de escribir y volver a leer el libro entero (una vuelta completa que puede
+  // introducir problemas en archivos reales complejos), se copia solo la hoja que hace
+  // falta modificar, de forma directa, preservando el resto del libro tal cual estaba
+  const wbCopia = Object.assign({}, actualizacionWorkbook, { Sheets: {} });
+  actualizacionWorkbook.SheetNames.forEach(nombreHoja=>{
+    wbCopia.Sheets[nombreHoja] = structuredClone(actualizacionWorkbook.Sheets[nombreHoja]);
+  });
   const hoja = wbCopia.Sheets[actualizacionExtraccion.hoja];
 
-  actualizacionTagsOriginales.forEach(({ tag, filaHoja })=>{
-    if(!actualizacionTagsFiltrados.has(tag)) return;
-    const filaBase = FILAS.find(f => f.TAG === tag);
-    if(!filaBase) return;
+  celdasModificadasActualizar = new Set();
+  celdasRojasActualizar = new Set();
+  let proximaFilaLibre = actualizacionExtraccion.r2 + 1; // pegada justo después del rango original
+  let contadorFilasNuevas = 0;
 
-    actualizacionMapaColumnas.forEach(m=>{
-      if(m.columna === 'TAG') return;
-      const valorBase = filaBase[m.columna] || '';
-      const valorDocumento = valorCeldaOriginalActualizar(filaHoja, m.posicion);
-      if(valorBase === valorDocumento) return;
+  // Primer pase: ver qué TAGs del documento ya están "tomados" por una coincidencia
+  // directa (el TAG de la base es igual, letra por letra, al del documento). Así, si
+  // separaste un duplicado y dos filas de la base comparten el mismo nombre anterior,
+  // el respaldo por nombre anterior no le puede robar la fila a quien ya la tiene por
+  // coincidencia directa.
+  const filaHojaReclamadas = new Set(); // filaHoja del documento ya asignadas a algún TAG de la base
 
-      const cellRef = XLSX.utils.encode_cell({ r: filaHoja - 1, c: actualizacionExtraccion.c1 + m.posicion });
+  // Cuando hay más de una ocurrencia con el mismo TAG en el documento (duplicados), se
+  // elige la que mejor coincide con esta fila de la base, comparando el resto de las
+  // columnas vinculadas (por ejemplo P&ID) — no solo el TAG
+  function encontrarMejorCandidato(filaBase, tagBuscado){
+    const candidatos = tagsOriginalesEfectivo.filter(t => t.tag === tagBuscado && !filaHojaReclamadas.has(t.filaHoja));
+    if(candidatos.length === 0) return null;
+    if(candidatos.length === 1) return candidatos[0];
+
+    let mejor = candidatos[0];
+    let mejorPuntaje = -1;
+    candidatos.forEach(cand=>{
+      let puntaje = 0;
+      Object.entries(vinculosParaEscribir).forEach(([colStr, columnaBase])=>{
+        const col = Number(colStr);
+        const valorBase = normalizarEspacios(filaBase[columnaBase] || '');
+        const cellRef = XLSX.utils.encode_cell({ r: cand.filaHoja - 1, c: col });
+        const cell = hoja[cellRef];
+        const valorDoc = cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
+        if(valorBase && valorBase === valorDoc) puntaje++;
+      });
+      if(puntaje > mejorPuntaje){
+        mejorPuntaje = puntaje;
+        mejor = cand;
+      }
+    });
+    return mejor;
+  }
+
+  filasAActualizar.forEach(filaBase=>{
+    // Buscar a qué fila del documento corresponde este TAG (por el nombre actual). Si
+    // hay más de una ocurrencia posible (duplicados), se desambigua comparando el resto
+    // de las columnas vinculadas. El nombre anterior solo se usa como respaldo si fue un
+    // renombre simple — si el TAG se separó de un duplicado, se lo trata como nuevo.
+    let original = encontrarMejorCandidato(filaBase, filaBase.TAG);
+    if(!original && filaBase.__tagAnterior && filaBase.__tagAnteriorTipo === 'renombre'){
+      original = encontrarMejorCandidato(filaBase, filaBase.__tagAnterior);
+    }
+    if(original) filaHojaReclamadas.add(original.filaHoja);
+
+    if(!original){
+      // TAG de la base filtrada que no está en el documento: se agrega en una fila
+      // nueva, pegada justo después del rango original (o de la última agregada)
+      const filaExcel = proximaFilaLibre;
+      proximaFilaLibre++;
+      contadorFilasNuevas++;
+
+      // El TAG en sí también hay que escribirlo (en las columnas que estaban vinculadas
+      // a él) — a diferencia de una fila que ya existe, acá no hay ningún lado donde ya
+      // esté escrito el TAG, así que se pierde si no se pone
+      columnasOrigenTag.forEach(col=>{
+        const cellRef = XLSX.utils.encode_cell({ r: filaExcel - 1, c: col });
+        hoja[cellRef] = { v: filaBase.TAG, t: 's', s: { fill: { patternType: 'solid', fgColor: { rgb: 'D4ECF5' }, bgColor: { rgb: 'D4ECF5' } } } };
+        celdasModificadasActualizar.add(cellRef);
+      });
+
+      Object.entries(vinculosParaEscribir).forEach(([colStr, columnaBase])=>{
+        const col = Number(colStr);
+        const valorBase = filaBase[columnaBase] || '';
+        if(!valorBase) return;
+        const cellRef = XLSX.utils.encode_cell({ r: filaExcel - 1, c: col });
+        hoja[cellRef] = { v: valorBase, t: 's', s: { fill: { patternType: 'solid', fgColor: { rgb: 'D4ECF5' }, bgColor: { rgb: 'D4ECF5' } } } };
+        celdasModificadasActualizar.add(cellRef);
+      });
+
+      // Actualizar el rango usado de la hoja, para que Excel (y la vista previa) sepan
+      // que hay datos en esta fila nueva
+      const refNuevo = XLSX.utils.decode_range(hoja['!ref'] || 'A1:A1');
+      refNuevo.e.r = Math.max(refNuevo.e.r, filaExcel - 1);
+      hoja['!ref'] = XLSX.utils.encode_range(refNuevo);
+      return;
+    }
+
+    Object.entries(vinculosParaEscribir).forEach(([colStr, columnaBase])=>{
+      const col = Number(colStr);
+      const valorBase = filaBase[columnaBase] || '';
+      const cellRef = XLSX.utils.encode_cell({ r: original.filaHoja - 1, c: col });
+      const valorActual = hoja[cellRef] ? XLSX.utils.format_cell(hoja[cellRef]) : '';
+      if(normalizarEspacios(valorActual) === normalizarEspacios(valorBase)) return; // sin cambio real
+
       if(!hoja[cellRef]) hoja[cellRef] = {};
       hoja[cellRef].v = valorBase;
       hoja[cellRef].t = 's';
       delete hoja[cellRef].w; // texto formateado cacheado, que ya quedó desactualizado
       // Pintar en celeste, sumando el color al estilo que ya tenía la celda (sin pisar
       // fuente, bordes, etc.)
-      hoja[cellRef].s = hoja[cellRef].s || {};
-      hoja[cellRef].s.fill = { patternType: 'solid', fgColor: { rgb: 'D4ECF5' } };
+      hoja[cellRef].s = Object.assign({}, hoja[cellRef].s, { fill: { patternType: 'solid', fgColor: { rgb: 'D4ECF5' }, bgColor: { rgb: 'D4ECF5' } } });
+      celdasModificadasActualizar.add(cellRef);
     });
   });
 
+  // Pinta de rojo toda una fila del documento (columnas del rango que se extrajo)
+  function pintarFilaDeRojo(filaExcel){
+    for(let c = actualizacionExtraccion.c1; c <= actualizacionExtraccion.c2; c++){
+      const cellRef = XLSX.utils.encode_cell({ r: filaExcel - 1, c });
+      if(!hoja[cellRef]) hoja[cellRef] = { v: '', t: 's' };
+      hoja[cellRef].s = Object.assign({}, hoja[cellRef].s, { fill: { patternType: 'solid', fgColor: { rgb: 'A6483B' }, bgColor: { rgb: 'A6483B' } } });
+      celdasRojasActualizar.add(cellRef);
+    }
+  }
+
+  // Cualquier ocurrencia del documento que no haya sido reclamada por ninguna fila de la
+  // base filtrada queda en rojo — ya sea porque el TAG no está en la base, o porque era
+  // un duplicado que no encontró con qué emparejarse
+  tagsOriginalesEfectivo.forEach(t=>{
+    if(filaHojaReclamadas.has(t.filaHoja)) return;
+    pintarFilaDeRojo(t.filaHoja);
+  });
+
+  wbActualizarPendiente = wbCopia;
+  abrirVistaPreviaActualizar();
+});
+
+// Dibuja la hoja completa tal como quedaría, marcando en celeste solo las celdas que
+// realmente cambiaron — para que el usuario revise antes de decidir si guardar de verdad
+function abrirVistaPreviaActualizar(){
+  const hoja = wbActualizarPendiente.Sheets[actualizacionExtraccion.hoja];
+  const ref = hoja['!ref'] || 'A1:H24';
+  const range = XLSX.utils.decode_range(ref);
+  const colFin = range.e.c;
+  const filaFin = range.e.r;
+
+  let html = '<thead><tr><th class="corner"></th>';
+  for(let c = 0; c <= colFin; c++) html += `<th>${XLSX.utils.encode_col(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  for(let r = 0; r <= filaFin; r++){
+    html += `<tr><td class="row-head">${r + 1}</td>`;
+    for(let c = 0; c <= colFin; c++){
+      const cellRef = XLSX.utils.encode_cell({ r, c });
+      const cell = hoja[cellRef];
+      let estilo = '';
+      if(celdasModificadasActualizar.has(cellRef)) estilo = ' style="background:#D4ECF5;"';
+      else if(celdasRojasActualizar.has(cellRef)) estilo = ' style="background:#A6483B;"';
+      html += `<td${estilo}>${cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : ''}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  document.getElementById('tabla-vista-previa').innerHTML = html;
+  document.getElementById('overlay-vista-previa-actualizar').classList.add('open');
+}
+
+document.getElementById('btn-volver-vista-previa').addEventListener('click', ()=>{
+  document.getElementById('overlay-vista-previa-actualizar').classList.remove('open');
+});
+document.getElementById('btn-guardar-vista-previa').addEventListener('click', ()=>{
   const nombreBase = actualizacionDoc.nombre.replace(/\.[^.]+$/, '');
-  XLSX.writeFile(wbCopia, `actualizado_formato_${nombreBase}.xlsx`, { cellStyles: true });
+
+  // Se arma el Excel de cero, hoja por hoja, en vez de editar el archivo existente
+  // (que venía dando problemas de corrupción con archivos reales complejos)
+  const wbNuevo = XLSX.utils.book_new();
+
+  wbActualizarPendiente.SheetNames.forEach(nombreHoja=>{
+    const hojaOrigen = wbActualizarPendiente.Sheets[nombreHoja];
+    const ref = hojaOrigen['!ref'] || 'A1:A1';
+    const range = XLSX.utils.decode_range(ref);
+
+    const aoa = [];
+    for(let r = range.s.r; r <= range.e.r; r++){
+      const fila = [];
+      for(let c = range.s.c; c <= range.e.c; c++){
+        const cell = hojaOrigen[XLSX.utils.encode_cell({ r, c })];
+        fila.push(cell ? cell.v : '');
+      }
+      aoa.push(fila);
+    }
+
+    const hojaNueva = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Reaplicar el celeste/rojo, solo en la hoja donde corresponde
+    if(nombreHoja === actualizacionExtraccion.hoja){
+      for(let r = range.s.r; r <= range.e.r; r++){
+        for(let c = range.s.c; c <= range.e.c; c++){
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          let color = null;
+          if(celdasModificadasActualizar.has(cellRef)) color = 'D4ECF5';
+          else if(celdasRojasActualizar.has(cellRef)) color = 'A6483B';
+          if(color && hojaNueva[cellRef]){
+            hojaNueva[cellRef].s = { fill: { patternType:'solid', fgColor:{rgb:color}, bgColor:{rgb:color} } };
+          }
+        }
+      }
+    }
+
+    XLSX.utils.book_append_sheet(wbNuevo, hojaNueva, nombreHoja);
+  });
+
+  XLSX.writeFile(wbNuevo, `actualizado_${nombreBase}.xlsx`, { cellStyles: true });
+  document.getElementById('overlay-vista-previa-actualizar').classList.remove('open');
+  document.getElementById('overlay-comparacion-actualizar').classList.remove('open');
 });
 
 async function iniciarExtraccionDesdeDocumento(idx){
@@ -7497,6 +8004,7 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
     __comentarios: {},
     __duplicados: {},
     __tagAnterior: filaDistintaActual.TAG, // de qué TAG se separó
+    __tagAnteriorTipo: 'separado',
   };
 
   // Copiar los datos del grupo distinto
@@ -7522,6 +8030,7 @@ document.getElementById('confirm-agregar-tag-distinto').addEventListener('click'
     comentarios_celda: {},
     duplicados: {},
     tag_anterior: nuevaFila.__tagAnterior,
+    tag_anterior_tipo: nuevaFila.__tagAnteriorTipo,
   }).select().single();
 
   btn.disabled = false;
@@ -7802,7 +8311,7 @@ document.getElementById('confirm-renombrar-tag').addEventListener('click', async
   const btn = document.getElementById('confirm-renombrar-tag');
   btn.disabled = true;
   const nombreAnterior = tagARenombrar.TAG;
-  const { error } = await supabaseClient.from('instrumentos').update({ tag: nuevoTag, tag_anterior: nombreAnterior }).eq('id', tagARenombrar.__id);
+  const { error } = await supabaseClient.from('instrumentos').update({ tag: nuevoTag, tag_anterior: nombreAnterior, tag_anterior_tipo: 'renombre' }).eq('id', tagARenombrar.__id);
   btn.disabled = false;
   if(error){
     console.error('Error al renombrar el TAG:', error);
@@ -7810,6 +8319,7 @@ document.getElementById('confirm-renombrar-tag').addEventListener('click', async
     return;
   }
   tagARenombrar.__tagAnterior = nombreAnterior;
+  tagARenombrar.__tagAnteriorTipo = 'renombre';
   tagARenombrar.TAG = nuevoTag;
   tagARenombrar = null;
   document.getElementById('overlay-renombrar-tag').classList.remove('open');
