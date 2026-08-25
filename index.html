@@ -1292,8 +1292,10 @@
 
   .sheet-final-topbar{
     display:none;
-    flex-direction:column;
-    gap:8px;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
     padding:12px 24px;
     border-bottom:1px solid var(--line);
     background:var(--card);
@@ -2193,6 +2195,10 @@
       padding: 0 6px;
     }
     
+    .sheet-final-topbar{
+      flex-direction: column;
+      align-items: stretch;
+    }
     .sft-row-top,
     .sft-row-bottom {
       width: 100%;
@@ -6618,7 +6624,7 @@ function renderTablaCompararOriginal(nombreHoja){
         // Cambio visual inmediato en la celda tocada, sin esperar a redibujar toda la
         // tabla entera (que puede ser lenta si tiene muchas filas)
         th.style.background = vincularOrigenesPendientes.has(c) ? '#FFC107' : '';
-        renderTablaCompararBase();
+        requestAnimationFrame(() => renderTablaCompararBase());
       });
     });
   }
@@ -6872,6 +6878,7 @@ document.getElementById('generar-formato-actualizar').addEventListener('click', 
   // Cuando hay más de una ocurrencia con el mismo TAG en el documento (duplicados), se
   // elige la que mejor coincide con esta fila de la base, comparando el resto de las
   // columnas vinculadas (por ejemplo P&ID) — no solo el TAG
+
   function encontrarMejorCandidato(filaBase, tagBuscado){
     const candidatos = tagsOriginalesEfectivo.filter(t => t.tag === tagBuscado && !filaHojaReclamadas.has(t.filaHoja));
     if(candidatos.length === 0) return null;
