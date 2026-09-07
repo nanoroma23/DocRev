@@ -644,6 +644,40 @@
     text-overflow:ellipsis;
     white-space:nowrap;
   }
+  .seg-criterios-bar{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    padding:10px 14px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    margin-bottom:10px;
+  }
+  .seg-criterios-resumen{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    flex:1;
+  }
+  .seg-criterio-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--text);
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:5px 8px;
+    position:relative;
+  }
+  .seg-criterio-chip.seg-criterio-principal{
+    background:var(--green-soft);
+    border-color:var(--green);
+    color:var(--green-dark);
+  }
   .th-inner{
     display:flex;
     align-items:center;
@@ -2748,22 +2782,8 @@
           <!-- Panel izquierdo: Configuración -->
           <div class="seg-crear-panel-izq">
             <div class="seg-crear-seccion">
-              <h3 class="seg-crear-seccion-titulo">1. Columna principal</h3>
-              <p class="seg-crear-seccion-desc">Elegí qué columna querés seguir (aparecerá fija a la izquierda)</p>
-              <div style="display:flex; align-items:center; gap:8px; position:relative;">
-                <select class="field-select" id="seg-columna-principal" style="flex:1;">
-                  <option value="">Seleccionar columna...</option>
-                </select>
-                <button type="button" class="seg-col-filtro-btn" id="seg-principal-filtro-btn" title="Filtrar valores" style="display:none;">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-                </button>
-                <div class="filter-popup" id="popup-seg-col-principal"></div>
-              </div>
-            </div>
-
-            <div class="seg-crear-seccion">
-              <h3 class="seg-crear-seccion-titulo">2. Columnas adicionales</h3>
-              <p class="seg-crear-seccion-desc">Seleccioná otras columnas para agregar a la tabla</p>
+              <h3 class="seg-crear-seccion-titulo">Columnas del seguimiento</h3>
+              <p class="seg-crear-seccion-desc">Marcá las columnas que van a formar parte del seguimiento y filtrá valores en las que necesites. La columna principal se elige sola: es la que, con los filtros aplicados, termina con todos sus valores distintos (si alguna se repite, esas filas se agrupan solas).</p>
               <div class="seg-columnas-disponibles" id="seg-columnas-disponibles"></div>
             </div>
           </div>
@@ -2781,7 +2801,7 @@
                 </thead>
                 <tbody id="seg-preview-tbody">
                   <tr class="empty-row">
-                    <td colspan="10">Seleccioná una columna principal para empezar</td>
+                    <td colspan="10">Seleccioná al menos una columna para empezar</td>
                   </tr>
                 </tbody>
               </table>
@@ -2868,16 +2888,14 @@
 
   <!-- Modal gestionar columnas del seguimiento -->
   <div class="overlay" id="overlay-gestionar-columnas-seg">
-    <div class="modal" style="width:420px;">
+    <div class="modal" style="width:460px;">
       <h3>Columnas</h3>
       <p>Elegí qué columnas ver en este seguimiento. No se pueden renombrar ni eliminar desde acá, solo mostrar u ocultar.</p>
 
-      <label class="field-label" style="margin-top:12px;">Columna principal</label>
-      <div class="seg-col-row" id="seg-col-principal-row" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px;">
-        <span class="seg-col-nombre" id="seg-col-principal-display" style="flex:1; font-weight:600;"></span>
-        <button type="button" class="col-icon-btn" id="seg-col-principal-ojo" title="Ocultar columna">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
-        </button>
+      <label class="field-label" style="margin-top:12px;">Criterios de armado</label>
+      <div class="seg-criterios-bar" id="seg-criterios-bar">
+        <div class="seg-criterios-resumen" id="seg-criterios-resumen"></div>
+        <button class="btn" id="seg-criterios-editar-btn">Editar</button>
       </div>
 
       <label class="field-label" style="margin-top:16px;">Columnas adicionales</label>
@@ -3617,6 +3635,17 @@
       <div class="modal-actions modal-actions-split">
         <button class="btn" id="cancel-hacer-titular">Cancelar</button>
         <button class="btn btn-primary" id="confirmar-hacer-titular">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay-confirmar-seg-generico">
+    <div class="modal">
+      <h3 id="titulo-confirmar-seg-generico">Confirmar</h3>
+      <p id="texto-confirmar-seg-generico"></p>
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-confirmar-seg-generico">Cancelar</button>
+        <button class="btn btn-primary" id="confirm-confirmar-seg-generico">Confirmar</button>
       </div>
     </div>
   </div>
@@ -5110,9 +5139,44 @@ function filasDeSeguimiento(seg){
   });
 }
 
+// Filas "para mostrar" de un seguimiento: siempre una fila por cada valor distinto de la
+// columna principal. Cuando esa columna es TAG (que siempre es único por instrumento), da
+// exactamente el mismo resultado que antes, fila por instrumento. Cuando es una columna que
+// se repite (ej: Junction Box), varios instrumentos quedan agrupados en una sola fila. La fila
+// sintética usa TAG = el valor de la columna principal, así todo el resto del código (estado
+// OK/NO OK/VER, comentarios, fecha de modificación, exportar, filtros de tabla) sigue
+// funcionando sin cambios: quedan asociados al valor de la columna principal.
+function filasBaseSeguimientoVista(seg){
+  const filas = filasDeSeguimiento(seg);
+  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
+
+  const grupos = {}; // { valorClave: filaSintética }
+  filas.forEach(f=>{
+    const clave = (f[colPrincipal] ?? '').toString();
+    if(!clave) return; // filas sin valor en la columna principal no forman un grupo
+    if(!grupos[clave]){
+      grupos[clave] = { TAG: clave, __filasGrupo: [] };
+      grupos[clave][colPrincipal] = clave;
+    }
+    grupos[clave].__filasGrupo.push(f);
+  });
+
+  // Para cada columna adicional: si todos los instrumentos del grupo coinciden en el valor,
+  // se muestra ese valor; si hay una inconsistencia real en los datos, se muestra "Varios"
+  Object.values(grupos).forEach(g=>{
+    (seg.columnas || []).forEach(col=>{
+      if(col === colPrincipal) return;
+      const valoresDistintos = [...new Set(g.__filasGrupo.map(f => (f[col] ?? '').toString()).filter(v => v))];
+      g[col] = valoresDistintos.length === 0 ? '' : valoresDistintos.length === 1 ? valoresDistintos[0] : 'Varios';
+    });
+  });
+
+  return Object.values(grupos).sort((a,b) => a.TAG.localeCompare(b.TAG, 'es', { numeric:true, sensitivity:'base' }));
+}
+
 function contarEstadosSeguimiento(seg){
   let ok=0, nook=0, ver=0;
-  filasDeSeguimiento(seg).forEach(f=>{
+  filasBaseSeguimientoVista(seg).forEach(f=>{
     const estado = seg.estados[f.TAG] || 'VER';
     if(estado==='OK') ok++;
     else if(estado==='NO OK') nook++;
@@ -5124,7 +5188,7 @@ function contarEstadosSeguimiento(seg){
 // Cuenta estados por valores de una columna específica
 function contarEstadosPorColumna(seg, columna){
   const resultados = {};
-  filasDeSeguimiento(seg).forEach(f=>{
+  filasBaseSeguimientoVista(seg).forEach(f=>{
     const valor = (f[columna] ?? '(vacío)').toString();
     if(!resultados[valor]) resultados[valor] = { ok:0, nook:0, ver:0 };
     const estado = seg.estados[f.TAG] || 'VER';
@@ -5188,7 +5252,7 @@ function renderSeguimientos(){
   }).join('');
 
   cont.innerHTML = tarjetas + `<div class="seg-card seg-card-new" id="seg-crear-tile">+ Crear seguimiento</div>`;
-  document.getElementById('seg-crear-tile').addEventListener('click', abrirModalCrearSeguimiento);
+  document.getElementById('seg-crear-tile').addEventListener('click', () => abrirModalCrearSeguimiento());
 }
 
 // Un único listener delegado (atado una sola vez, fuera de renderSeguimientos) para que
@@ -5205,66 +5269,59 @@ document.getElementById('seguimiento-tarjetas').addEventListener('click', (e)=>{
 });
 
 // ---- Crear seguimiento - Nueva lógica ----
-let columnaPrincipalSeguimiento = null;
-let columnasAdicionalesSeguimiento = new Set();
+// ---- Crear seguimiento - Nueva lógica (también se reutiliza para "Editar criterios") ----
+let editandoSeguimientoExistente = null; // null = creando uno nuevo; si no, el seguimiento que se está editando
 
-function abrirModalCrearSeguimiento(){
-  // Cambiar a la vista de crear seguimiento
+function abrirModalCrearSeguimiento(segExistente = null){
+  editandoSeguimientoExistente = segExistente;
+
+  // Cambiar a la vista de crear/editar seguimiento (oculta las otras dos, sea cual sea
+  // la que esté visible en ese momento: el listado de tarjetas o la tabla de un seguimiento)
   document.getElementById('seguimiento-tarjetas').style.display = 'none';
+  document.getElementById('seguimiento-tabla-vista').style.display = 'none';
   document.getElementById('seguimiento-crear-vista').style.display = 'block';
 
-  document.getElementById('input-nombre-seguimiento-nuevo').value = '';
-  columnaPrincipalSeguimiento = null;
-  columnasAdicionalesSeguimiento = new Set();
-  columnasSeguimientoSeleccionadas = new Set();
-  filtrosSeguimientoTemp = {};
+  const btnConfirmar = document.getElementById('confirm-crear-seguimiento-nuevo');
 
-  // Llenar select de columna principal
-  const selectPrincipal = document.getElementById('seg-columna-principal');
-  selectPrincipal.innerHTML = '<option value="">Seleccionar columna...</option>' +
-    COLUMNAS.map(col => `<option value="${col}">${col}</option>`).join('');
-
-  selectPrincipal.addEventListener('change', (e) => {
-    columnaPrincipalSeguimiento = e.target.value || null;
-    actualizarFiltroPrincipal();
-    actualizarColumnasDisponibles();
-    actualizarPreviewSeguimiento();
-    actualizarBotonCrear();
-  });
-
-  // Event listener para el botón de filtro de la columna principal
-  const btnFiltroPrincipal = document.getElementById('seg-principal-filtro-btn');
-  btnFiltroPrincipal.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if(columnaPrincipalSeguimiento){
-      abrirFiltroSeguimientoCol(columnaPrincipalSeguimiento, btnFiltroPrincipal, true, false, true);
-    }
-  });
+  if(segExistente){
+    document.getElementById('input-nombre-seguimiento-nuevo').value = segExistente.titulo;
+    columnasSeguimientoSeleccionadas = new Set(segExistente.columnas);
+    filtrosSeguimientoTemp = {};
+    Object.entries(segExistente.filtros || {}).forEach(([col, permitidos])=>{
+      filtrosSeguimientoTemp[col] = permitidos ? new Set(permitidos) : null;
+    });
+    btnConfirmar.textContent = 'Guardar cambios';
+  } else {
+    document.getElementById('input-nombre-seguimiento-nuevo').value = '';
+    columnasSeguimientoSeleccionadas = new Set();
+    filtrosSeguimientoTemp = {};
+    btnConfirmar.textContent = 'Crear seguimiento';
+  }
 
   actualizarColumnasDisponibles();
   actualizarPreviewSeguimiento();
-  actualizarFiltroPrincipal();
-  document.getElementById('confirm-crear-seguimiento-nuevo').disabled = true;
+  actualizarBotonCrear();
 }
 
 function actualizarColumnasDisponibles(){
   const cont = document.getElementById('seg-columnas-disponibles');
-  const columnasParaMostrar = COLUMNAS.filter(col => col !== columnaPrincipalSeguimiento);
 
-  cont.innerHTML = columnasParaMostrar.map(col => `
-    <div class="seg-col-disponible ${columnasAdicionalesSeguimiento.has(col) ? 'selected' : ''}" data-col="${col}">
-      <input type="checkbox" ${columnasAdicionalesSeguimiento.has(col) ? 'checked' : ''}>
-      <span class="seg-col-disponible-nombre">${col}</span>
-      <div style="position:relative; margin-left:auto;">
-        <button type="button" class="seg-col-filtro-btn ${filtrosSeguimientoTemp[col] ? 'active' : ''}" data-seg-filtro-col="${col}" title="Filtrar valores" style="display:${columnasAdicionalesSeguimiento.has(col) || col === columnaPrincipalSeguimiento ? 'flex' : 'none'};">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-        </button>
-        <div class="filter-popup" id="popup-seg-col-nuevo-${col.replace(/[^a-zA-Z0-9]/g, '_')}"></div>
+  cont.innerHTML = COLUMNAS.map(col => {
+    const seleccionada = columnasSeguimientoSeleccionadas.has(col);
+    return `
+      <div class="seg-col-disponible ${seleccionada ? 'selected' : ''}" data-col="${col}">
+        <input type="checkbox" ${seleccionada ? 'checked' : ''}>
+        <span class="seg-col-disponible-nombre">${col}</span>
+        <div style="position:relative; margin-left:auto;">
+          <button type="button" class="seg-col-filtro-btn ${filtrosSeguimientoTemp[col] ? 'active' : ''}" data-seg-filtro-col="${col}" title="Filtrar valores" style="display:${seleccionada ? 'flex' : 'none'};">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+          </button>
+          <div class="filter-popup" id="popup-seg-col-nuevo-${col.replace(/[^a-zA-Z0-9]/g, '_')}"></div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
-  // Event listeners para checkboxes
   cont.querySelectorAll('.seg-col-disponible').forEach(div => {
     const col = div.dataset.col;
     const checkbox = div.querySelector('input[type="checkbox"]');
@@ -5273,9 +5330,10 @@ function actualizarColumnasDisponibles(){
       if(e.target.closest('.seg-col-filtro-btn') || e.target.closest('.filter-popup')) return;
       checkbox.checked = !checkbox.checked;
       if(checkbox.checked){
-        columnasAdicionalesSeguimiento.add(col);
+        columnasSeguimientoSeleccionadas.add(col);
       } else {
-        columnasAdicionalesSeguimiento.delete(col);
+        columnasSeguimientoSeleccionadas.delete(col);
+        delete filtrosSeguimientoTemp[col];
       }
       actualizarColumnasDisponibles();
       actualizarPreviewSeguimiento();
@@ -5283,7 +5341,6 @@ function actualizarColumnasDisponibles(){
     });
   });
 
-  // Event listeners para botones de filtro
   cont.querySelectorAll('[data-seg-filtro-col]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -5292,26 +5349,49 @@ function actualizarColumnasDisponibles(){
   });
 }
 
+// Entre las columnas seleccionadas, la "principal" se elige sola: es la que, ya aplicados
+// los filtros, termina con más valores distintos (típicamente la única sin repetidos, como
+// TAG). Si hay empate, gana la que se seleccionó primero. Si dos o más instrumentos comparten
+// el mismo valor en esa columna, esas filas se agrupan solas en el seguimiento.
+function calcularColumnaPrincipalAutomatica(columnas, filtros){
+  if(!columnas || !columnas.size) return null;
+  const filasFiltradas = FILAS.filter(fila => {
+    for(const col of columnas){
+      const filtro = filtros[col];
+      if(!filtro) continue;
+      if(!filtro.has((fila[col] ?? '').toString())) return false;
+    }
+    return true;
+  });
+  let mejorCol = null, mejorCantidad = -1;
+  columnas.forEach(col => {
+    const distintos = new Set(filasFiltradas.map(f => (f[col] ?? '').toString())).size;
+    if(distintos > mejorCantidad){
+      mejorCantidad = distintos;
+      mejorCol = col;
+    }
+  });
+  return mejorCol;
+}
+
 function actualizarPreviewSeguimiento(){
   const thead = document.getElementById('seg-preview-thead');
   const tbody = document.getElementById('seg-preview-tbody');
 
-  if(!columnaPrincipalSeguimiento){
+  if(!columnasSeguimientoSeleccionadas.size){
     thead.innerHTML = '';
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Seleccioná una columna principal para empezar</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Seleccioná al menos una columna para empezar</td></tr>';
     document.getElementById('seg-preview-count').textContent = '0 filas';
     return;
   }
 
-  // Construir todas las columnas seleccionadas
-  columnasSeguimientoSeleccionadas = new Set([columnaPrincipalSeguimiento, ...columnasAdicionalesSeguimiento]);
+  const colPrincipal = calcularColumnaPrincipalAutomatica(columnasSeguimientoSeleccionadas, filtrosSeguimientoTemp);
+  const colsArray = [colPrincipal, ...[...columnasSeguimientoSeleccionadas].filter(c => c !== colPrincipal)];
 
-  // Construir header
-  const colsArray = [columnaPrincipalSeguimiento, ...columnasAdicionalesSeguimiento];
   thead.innerHTML = colsArray.map((col, idx) => `
-    <th class="${idx === 0 ? 'preview-col-principal' : ''}">
+    <th class="${idx === 0 ? 'preview-col-principal' : ''}" title="${idx === 0 ? 'Columna principal (se elige sola)' : ''}">
       <div class="th-inner">
-        <span>${col}</span>
+        <span>${col}${idx === 0 ? ' ★' : ''}</span>
         <div style="position:relative;">
           <button class="th-filter ${filtrosSeguimientoTemp[col] ? 'active' : ''}" data-seg-preview-filtro="${col}">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
@@ -5363,27 +5443,31 @@ function filasDeSeguimientoTemp(){
 
 function actualizarBotonCrear(){
   const boton = document.getElementById('confirm-crear-seguimiento-nuevo');
-  boton.disabled = !columnaPrincipalSeguimiento;
+  boton.disabled = columnasSeguimientoSeleccionadas.size === 0;
 }
 
-function actualizarFiltroPrincipal(){
-  const btnFiltroPrincipal = document.getElementById('seg-principal-filtro-btn');
-  if(columnaPrincipalSeguimiento){
-    btnFiltroPrincipal.style.display = 'flex';
-    // Actualizar estado activo del botón según si hay filtro aplicado
-    if(filtrosSeguimientoTemp[columnaPrincipalSeguimiento]){
-      btnFiltroPrincipal.classList.add('active');
-    } else {
-      btnFiltroPrincipal.classList.remove('active');
+// Salir de la pantalla de crear/editar. Si se estaba editando un seguimiento existente, pide
+// confirmación (según lo que se haya tocado) y vuelve a la tabla de ese seguimiento en vez de
+// al listado de tarjetas
+async function salirDeCrearOEditarSeguimiento(){
+  if(editandoSeguimientoExistente){
+    const cambio = JSON.stringify(serializarFiltrosSeguimiento(filtrosSeguimientoTemp)) !== JSON.stringify(serializarFiltrosSeguimiento(editandoSeguimientoExistente.filtros))
+      || [...columnasSeguimientoSeleccionadas].sort().join(',') !== [...editandoSeguimientoExistente.columnas].sort().join(',');
+    if(cambio){
+      const ok = await confirmarSeguimientoGenerico('Salir sin guardar', '¿Salir sin guardar los cambios en los criterios de este seguimiento?');
+      if(!ok) return;
     }
+    const segId = editandoSeguimientoExistente.id;
+    editandoSeguimientoExistente = null;
+    document.getElementById('seguimiento-crear-vista').style.display = 'none';
+    abrirTablaSeguimiento(segId);
   } else {
-    btnFiltroPrincipal.style.display = 'none';
-    btnFiltroPrincipal.classList.remove('active');
+    abrirVistaSeguimientos();
   }
 }
 
-document.getElementById('seg-crear-volver').addEventListener('click', abrirVistaSeguimientos);
-document.getElementById('cancel-crear-seguimiento-nuevo').addEventListener('click', abrirVistaSeguimientos);
+document.getElementById('seg-crear-volver').addEventListener('click', salirDeCrearOEditarSeguimiento);
+document.getElementById('cancel-crear-seguimiento-nuevo').addEventListener('click', salirDeCrearOEditarSeguimiento);
 
 // Filtro opcional de valores para una columna puntual, mientras se arma el seguimiento
 let filtroSeguimientoColActivo = null;
@@ -5403,7 +5487,17 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
   }
   const popup = document.getElementById(popupId);
 
-  const valores = [...new Set(FILAS.map(f => (f[col] ?? '').toString()))].sort();
+  // Cascada: los valores que se ofrecen para tildar son los que quedan después de aplicar
+  // los demás filtros ya elegidos (mismo criterio que el resto de la app), no todos los que
+  // existen en la base entera
+  const filasCascada = FILAS.filter(fila => {
+    return Object.entries(filtrosSeguimientoTemp).every(([c, permitidos]) => {
+      if(c === col) return true; // excluir el filtro de esta misma columna
+      if(!permitidos) return true;
+      return permitidos.has((fila[c] ?? '').toString());
+    });
+  });
+  const valores = [...new Set(filasCascada.map(f => (f[col] ?? '').toString()))].sort();
   const seleccion = filtrosSeguimientoTemp[col] || new Set(valores);
 
   // Crear contenido del popup con el estilo estándar
@@ -5429,24 +5523,47 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
 
   filtroSeguimientoColActivo = col;
 
-  // Funcionalidad de búsqueda
-  const searchInput = popup.querySelector('.filter-search-input-seg');
-  searchInput.addEventListener('input', (e) => {
-    const busqueda = e.target.value.toLowerCase();
-    popup.querySelectorAll('.filter-option-valor-seg').forEach(opt => {
-      const texto = opt.textContent.toLowerCase();
-      opt.style.display = texto.includes(busqueda) ? '' : 'none';
-    });
-  });
-
   // Funcionalidad checkbox "todos"
   const chkTodos = popup.querySelector('.chk-todos-seg-col');
   const chksValor = () => [...popup.querySelectorAll('.chk-valor-seg-col')];
+
+  function actualizarEstadoTodosSeg(){
+    const todos = chksValor();
+    const marcados = todos.filter(c => c.checked);
+    if(marcados.length === 0){ chkTodos.checked = false; chkTodos.indeterminate = false; }
+    else if(marcados.length === todos.length){ chkTodos.checked = true; chkTodos.indeterminate = false; }
+    else { chkTodos.checked = false; chkTodos.indeterminate = true; }
+  }
+
+  // Funcionalidad de búsqueda: además de esconder lo que no coincide, marca automáticamente
+  // lo que sí coincide y desmarca el resto (mismo comportamiento que el filtro de la base de
+  // datos), por eso "Seleccionar todo" queda en estado parcial mientras hay una búsqueda activa
+  const searchInput = popup.querySelector('.filter-search-input-seg');
+  searchInput.addEventListener('input', (e) => {
+    const busqueda = e.target.value.trim().toLowerCase();
+    popup.querySelectorAll('.filter-option-valor-seg').forEach(opt => {
+      const valorTexto = (opt.dataset.valor || '').toLowerCase();
+      const coincide = valorTexto.includes(busqueda);
+      opt.style.display = coincide ? '' : 'none';
+      if(busqueda){
+        opt.querySelector('.chk-valor-seg-col').checked = coincide;
+      }
+    });
+    actualizarEstadoTodosSeg();
+  });
+
   chkTodos.checked = seleccion.size === valores.length;
-  chkTodos.addEventListener('change', () => chksValor().forEach(c => c.checked = chkTodos.checked));
-  chksValor().forEach(c => c.addEventListener('change', () => {
-    chkTodos.checked = chksValor().every(x => x.checked);
-  }));
+  let chkTodosEraParcialSeg = false;
+  chkTodos.closest('label').addEventListener('mousedown', () => { chkTodosEraParcialSeg = chkTodos.indeterminate; });
+  chkTodos.addEventListener('change', () => {
+    chksValor().forEach(c => {
+      if(c.closest('.filter-option-valor-seg').style.display !== 'none'){
+        c.checked = chkTodosEraParcialSeg ? false : chkTodos.checked;
+      }
+    });
+    actualizarEstadoTodosSeg();
+  });
+  chksValor().forEach(c => c.addEventListener('change', actualizarEstadoTodosSeg));
 
   // Evitar que los clicks dentro del popup lo cierren
   popup.addEventListener('click', (e) => {
@@ -5474,7 +5591,14 @@ function aplicarFiltroSeguimientoCol(col){
   if(!popup) return;
 
   const chksValor = [...popup.querySelectorAll('.chk-valor-seg-col')];
-  const valores = [...new Set(FILAS.map(f => (f[col] ?? '').toString()))];
+  const filasCascada = FILAS.filter(fila => {
+    return Object.entries(filtrosSeguimientoTemp).every(([c, permitidos]) => {
+      if(c === col) return true;
+      if(!permitidos) return true;
+      return permitidos.has((fila[c] ?? '').toString());
+    });
+  });
+  const valores = [...new Set(filasCascada.map(f => (f[col] ?? '').toString()))];
 
   const marcados = chksValor.filter(c=>c.checked).map(c=>c.value);
   filtrosSeguimientoTemp[col] = marcados.length === valores.length ? null : new Set(marcados);
@@ -5495,7 +5619,6 @@ function aplicarFiltroSeguimientoCol(col){
   if(document.getElementById('seguimiento-crear-vista').style.display === 'block'){
     actualizarColumnasDisponibles();
     actualizarPreviewSeguimiento();
-    actualizarFiltroPrincipal();
   }
 }
 
@@ -5518,19 +5641,49 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('click', async ()=>{
-  if(!columnaPrincipalSeguimiento) return;
+  if(!columnasSeguimientoSeleccionadas.size) return;
 
   const nombre = document.getElementById('input-nombre-seguimiento-nuevo').value.trim() || `Seguimiento ${SEGUIMIENTOS.length+1}`;
 
-  // Construir lista final de columnas: principal + adicionales
-  const columnasFinales = [columnaPrincipalSeguimiento, ...columnasAdicionalesSeguimiento];
+  // La columna principal se elige sola (ver calcularColumnaPrincipalAutomatica), y va primera
+  const colPrincipal = calcularColumnaPrincipalAutomatica(columnasSeguimientoSeleccionadas, filtrosSeguimientoTemp);
+  const columnasFinales = [colPrincipal, ...[...columnasSeguimientoSeleccionadas].filter(c => c !== colPrincipal)];
 
+  // Los filtros fijos del seguimiento se arman a partir de todas las columnas seleccionadas
   const filtrosFinal = {};
   columnasFinales.forEach(col=>{
     filtrosFinal[col] = filtrosSeguimientoTemp[col] || null;
   });
 
   const btn = document.getElementById('confirm-crear-seguimiento-nuevo');
+
+  // ---- Modo edición: actualizar un seguimiento existente en vez de crear uno nuevo ----
+  if(editandoSeguimientoExistente){
+    const ok = await confirmarSeguimientoGenerico('Guardar cambios', 'Vas a aplicar estos cambios a los criterios del seguimiento. Puede agregar o sacar instrumentos de la lista. ¿Confirmás?');
+    if(!ok) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    const seg = editandoSeguimientoExistente;
+    seg.titulo = nombre;
+    seg.columnas = columnasFinales;
+    seg.columnaPrincipal = columnasFinales[0];
+    seg.filtros = filtrosFinal;
+
+    await guardarSeguimientoEnSupabase(seg);
+
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+
+    const segId = seg.id;
+    editandoSeguimientoExistente = null;
+    document.getElementById('seguimiento-crear-vista').style.display = 'none';
+    abrirTablaSeguimiento(segId);
+    return;
+  }
+
+  // ---- Modo creación normal ----
   btn.disabled = true;
   btn.textContent = 'Creando...';
 
@@ -5628,6 +5781,65 @@ async function abrirTablaSeguimiento(id){
   renderTablaSeguimiento();
 }
 
+// ---- Confirmación genérica reutilizable (título y texto configurables) ----
+function confirmarSeguimientoGenerico(titulo, mensaje){
+  return new Promise(resolve=>{
+    document.getElementById('titulo-confirmar-seg-generico').textContent = titulo;
+    document.getElementById('texto-confirmar-seg-generico').textContent = mensaje;
+    document.getElementById('overlay-confirmar-seg-generico').classList.add('open');
+    document.getElementById('cancel-confirmar-seg-generico').onclick = ()=>{
+      document.getElementById('overlay-confirmar-seg-generico').classList.remove('open');
+      resolve(false);
+    };
+    document.getElementById('confirm-confirmar-seg-generico').onclick = ()=>{
+      document.getElementById('overlay-confirmar-seg-generico').classList.remove('open');
+      resolve(true);
+    };
+  });
+}
+
+// ---- Resumen de los criterios que arman el seguimiento (columna principal + filtros fijos) ----
+function textoValoresCriterio(setValores){
+  const arr = [...setValores];
+  if(arr.length <= 6) return arr.join(', ');
+  return arr.slice(0, 6).join(', ') + ` y ${arr.length - 6} más`;
+}
+
+function renderCriteriosSeguimiento(){
+  const seg = seguimientoActivo;
+  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
+  const cont = document.getElementById('seg-criterios-resumen');
+
+  const filasFiltros = Object.entries(seg.filtros || {})
+    .filter(([col, permitidos]) => col !== colPrincipal && permitidos && permitidos.size > 0);
+  const filtroPrincipal = seg.filtros && seg.filtros[colPrincipal];
+
+  let html = `<div class="seg-criterio-chip seg-criterio-principal">Columna principal: <b>${colPrincipal}</b></div>`;
+
+  if(filtroPrincipal && filtroPrincipal.size > 0){
+    html += `<div class="seg-criterio-chip"><span><b>${colPrincipal}:</b> ${textoValoresCriterio(filtroPrincipal)}</span></div>`;
+  }
+
+  if(!filasFiltros.length && !(filtroPrincipal && filtroPrincipal.size > 0)){
+    html += `<div class="seg-criterio-chip" style="color:var(--text-dim); background:transparent; border-style:dashed;">Sin otros criterios de armado</div>`;
+  } else {
+    html += filasFiltros.map(([col, permitidos]) => `
+      <div class="seg-criterio-chip">
+        <span><b>${col}:</b> ${textoValoresCriterio(permitidos)}</span>
+      </div>
+    `).join('');
+  }
+
+  cont.innerHTML = html;
+}
+
+document.getElementById('seg-criterios-editar-btn').addEventListener('click', async ()=>{
+  const ok = await confirmarSeguimientoGenerico('Editar criterios', 'Vas a editar los criterios que arman este seguimiento (por ejemplo, para agregar un instrumento nuevo). Esto puede cambiar qué instrumentos quedan incluidos. ¿Confirmás?');
+  if(!ok) return;
+  document.getElementById('overlay-gestionar-columnas-seg').classList.remove('open');
+  abrirModalCrearSeguimiento(seguimientoActivo);
+});
+
 document.getElementById('seg-tabla-titulo-crumb').addEventListener('click', abrirVistaSeguimientos);
 
 // Menú "Más" (Exportar / Importar / Eliminar)
@@ -5665,7 +5877,7 @@ document.getElementById('confirm-rename-seguimiento').addEventListener('click', 
 function valoresUnicosSeguimiento(seg, col){
   // Se calcula sobre las filas que ya cumplen el filtro FIJO del seguimiento y los demás
   // filtros de la tabla (los mutables), para que la cascada funcione igual que en Base de Datos
-  const base = filasDeSeguimiento(seg).filter(fila=>{
+  const base = filasBaseSeguimientoVista(seg).filter(fila=>{
     return Object.entries(seg.filtrosVista).every(([c, permitidos])=>{
       if(c === col) return true;
       if(!permitidos) return true;
@@ -5698,7 +5910,7 @@ function filasDeSeguimientoVista(seg){
   // de tabla (mutables) y el orden que el usuario haya elegido para esta vista
   const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
 
-  let filas = filasDeSeguimiento(seg).filter(fila=>{
+  let filas = filasBaseSeguimientoVista(seg).filter(fila=>{
     return Object.entries(seg.filtrosVista).every(([col, permitidos])=>{
       if(!permitidos) return true;
 
@@ -5994,6 +6206,7 @@ async function guardarSeguimientoEnSupabase(seg){
     comentarios: seg.comentarios || {},
     fechas_modificacion: seg.fechasModificacion || {},
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
+    filtros: serializarFiltrosSeguimiento(seg.filtros),
     orden_vista: seg.ordenVista || [],
   }).eq('id', seg.__id);
   if(error) console.error('Error al guardar el seguimiento en Supabase:', error);
@@ -6011,7 +6224,7 @@ function abrirFiltroSeguimientoTabla(col){
     valores = ['VER', 'OK', 'NO OK'];
   } else if(col === '__COMENTARIOS__'){
     // Valores únicos de comentarios existentes - aplicar OTROS filtros excepto comentarios
-    const filas = filasDeSeguimiento(seg).filter(fila => {
+    const filas = filasBaseSeguimientoVista(seg).filter(fila => {
       return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
         if(c === '__COMENTARIOS__') return true; // Excluir el filtro de la misma columna
         if(!permitidos) return true;
@@ -6033,7 +6246,7 @@ function abrirFiltroSeguimientoTabla(col){
     if(valores.length === 0) valores = ['(sin comentarios)'];
   } else if(col === '__FECHA__'){
     // Valores únicos de fechas - aplicar OTROS filtros excepto fecha
-    const filas = filasDeSeguimiento(seg).filter(fila => {
+    const filas = filasBaseSeguimientoVista(seg).filter(fila => {
       return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
         if(c === '__FECHA__') return true; // Excluir el filtro de la misma columna
         if(!permitidos) return true;
@@ -6057,7 +6270,7 @@ function abrirFiltroSeguimientoTabla(col){
     }))].sort();
   } else {
     // Para columnas regulares (incluida la principal), aplicar OTROS filtros excepto esta columna
-    const filas = filasDeSeguimiento(seg).filter(fila => {
+    const filas = filasBaseSeguimientoVista(seg).filter(fila => {
       return Object.entries(seg.filtrosVista).every(([c, permitidos]) => {
         if(c === col) return true; // Excluir el filtro de la misma columna
         if(!permitidos) return true;
@@ -6166,20 +6379,11 @@ document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>
   const seg = seguimientoActivo;
   const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
   if(!seg.columnaPrincipal) seg.columnaPrincipal = colPrincipal;
+  // La columna principal define qué es cada fila del seguimiento: siempre tiene que estar
+  // incluida, nunca se puede ocultar ni sacar desde acá
+  if(!seg.columnas.includes(colPrincipal)) seg.columnas.unshift(colPrincipal);
 
-  // La columna principal se muestra aparte, con su propio ojo. "seg.columnaPrincipal" siempre
-  // recuerda cuál es, aunque el ojo la saque temporalmente de seg.columnas (que es lo que
-  // decide qué se ve en la tabla)
-  document.getElementById('seg-col-principal-display').textContent = colPrincipal;
-  actualizarOjoPrincipalSeg();
-  document.getElementById('seg-col-principal-ojo').onclick = ()=>{
-    if(seg.columnas.includes(colPrincipal)){
-      seg.columnas = seg.columnas.filter(c => c !== colPrincipal);
-    } else {
-      seg.columnas.unshift(colPrincipal);
-    }
-    actualizarOjoPrincipalSeg();
-  };
+  renderCriteriosSeguimiento();
 
   // El resto de las columnas de la base, con el mismo formato de íconos que Base de Datos
   // (acá solo se puede mostrar/ocultar, no renombrar ni eliminar)
@@ -6232,16 +6436,6 @@ document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>
 
   document.getElementById('overlay-gestionar-columnas-seg').classList.add('open');
 });
-
-function actualizarOjoPrincipalSeg(){
-  const seg = seguimientoActivo;
-  const colPrincipal = seg.columnaPrincipal || seg.columnas[0];
-  const oculta = !seg.columnas.includes(colPrincipal);
-  const btn = document.getElementById('seg-col-principal-ojo');
-  btn.classList.toggle('oculta', oculta);
-  btn.title = oculta ? 'Mostrar columna' : 'Ocultar columna';
-  btn.querySelector('svg').innerHTML = iconoOjoSvg(oculta);
-}
 
 document.getElementById('cancel-gestionar-columnas-seg').addEventListener('click', ()=>{
   document.getElementById('overlay-gestionar-columnas-seg').classList.remove('open');
@@ -6392,7 +6586,7 @@ document.getElementById('btn-exportar-seg-vista').addEventListener('click', ()=>
 document.getElementById('btn-exportar-seg-todo').addEventListener('click', ()=>{
   const seg = seguimientoActivo;
   if(!seg) return;
-  descargarSeguimientoComoExcel(seg, filasDeSeguimiento(seg), `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}_completo.xlsx`);
+  descargarSeguimientoComoExcel(seg, filasBaseSeguimientoVista(seg), `seguimiento_${seg.titulo.replace(/[^a-z0-9]+/gi,'_')}_completo.xlsx`);
   document.getElementById('overlay-exportar-seguimiento').classList.remove('open');
 });
 
