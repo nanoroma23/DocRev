@@ -472,6 +472,8 @@
   .col-icon-btn:hover{ background:var(--green-soft); color:var(--green-dark); }
   .col-icon-btn.danger:hover{ background:var(--red-soft); color:var(--red); }
   .col-icon-btn.oculta{ color:var(--red); }
+  .col-icon-btn.con-categoria{ color:#B8952E; }
+  .col-icon-btn.con-categoria:hover{ background:#F2E8D0; color:#8A6D1E; }
   .col-icon-btn:disabled{ opacity:0.3; cursor:default; pointer-events:none; }
   .col-acciones-grupo{ display:flex; align-items:center; gap:12px; }
   .col-icon-btn-grande{
@@ -612,6 +614,36 @@
   }
   table.datatable thead th:first-child{ border-top-left-radius:7px; }
   table.datatable thead th:last-child{ border-right:none; }
+
+  /* ---- Fila de categorías de columnas (agrupado plegable) ---- */
+  table.datatable th.th-categoria{
+    background:#E4DCC5;
+    text-align:center;
+    cursor:pointer;
+    font-weight:700;
+    position:static;
+    top:auto;
+  }
+  table.datatable th.th-categoria:hover{ background:#D8CDAE; }
+  table.datatable th.th-categoria.colapsada{ background:#D8CDAE; }
+  table.datatable th.th-categoria-vacia{
+    background:var(--card);
+    position:static;
+    top:auto;
+  }
+  .th-categoria-inner{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    padding:7px 8px;
+    overflow:hidden;
+  }
+  .th-categoria-inner span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
   .th-inner{
     display:flex;
     align-items:center;
@@ -641,10 +673,24 @@
     min-width:40px;
     max-width:40px;
     text-align:center;
+    position:sticky;
+    left:0;
+    background:#EBE4D2;
   }
   table.datatable th.col-key, table.datatable td.col-key{
     background:#EBE4D2;
+    position:sticky;
+    left:40px;
   }
+  table.datatable th.th-categoria-esquina{
+    position:sticky;
+    left:0;
+    top:auto;
+  }
+  table.datatable tbody td.col-num, table.datatable tbody td.col-key{ position:sticky; z-index:2; }
+  table.datatable tbody td.col-num{ left:0; }
+  table.datatable tbody td.col-key{ left:40px; }
+  table.datatable tbody tr:hover td.col-num{ background:#E2DAC4; }
   table.datatable tbody tr:hover td.col-key{ background:#E2DAC4; }
   table.datatable th.col-drag-over{
     box-shadow: inset 2px 0 0 var(--green), inset -2px 0 0 var(--green);
@@ -2659,6 +2705,7 @@
       <div class="datatable-wrap" id="datatable-wrap-basedatos">
         <table class="datatable">
           <thead>
+            <tr id="thead-row-categorias"></tr>
             <tr id="thead-row"></tr>
           </thead>
           <tbody id="tags-body"></tbody>
@@ -3841,6 +3888,8 @@ let filtroAbierto = null;
 let columnasOcultas = new Set();
 let columnasAnchos = {}; // { columna: ancho en px }
 let columnasExpandidas = new Set(); // columnas con la vista "por documento" desplegada (una subcolumna por documento fuente)
+let categoriaColumnas = {}; // { columna: nombreCategoria | null } — persiste en Supabase (columna "categoria" en la tabla "columnas")
+let categoriasColapsadas = new Set(); // categorías contraídas en el vistazo rápido (solo de sesión, no persiste)
 let filtroDocumentos = null; // null = todos, o Set con las claves de documento tildadas ('__sin_documento__' incluida)
 let filtroGlobalSoloConflictos = false; // true = solo mostrar filas con alguna celda roja o amarilla (sin resolver)
 function pasaFiltroGlobalConflicto(fila){
@@ -4008,6 +4057,15 @@ async function guardarAnchoColumna(nombre, ancho){
   if(error) console.error('Error al guardar el ancho de la columna:', error);
 }
 
+// Guarda la categoría de una columna (agrupado plegable del vistazo rápido). Requiere que la
+// tabla "columnas" en Supabase tenga una columna "categoria" (text, nullable) — ver nota aparte.
+async function guardarCategoriaColumna(nombre, categoria){
+  if(!proyectoActivo) return;
+  const { error } = await supabaseClient.from('columnas')
+    .update({ categoria: categoria || null }).eq('proyecto_id', proyectoActivo.id).eq('nombre', nombre);
+  if(error) console.error('Error al guardar la categoría de la columna:', error);
+}
+
 // Renombra una columna: actualiza su nombre en "columnas", y persiste cada fila local
 // (que ya viene renombrada en memoria) usando el mismo mecanismo del resto de la app
 async function renombrarColumna(proyectoId, nombreViejo, nuevoNombre){
@@ -4082,13 +4140,16 @@ async function cargarBaseDeDatos(proyectoId){
     COLUMNAS = colsData.map(c => c.nombre);
     columnasOcultas = new Set(colsData.filter(c => c.oculta).map(c => c.nombre));
     columnasAnchos = {};
+    categoriaColumnas = {};
     colsData.forEach(c => {
       if(c.ancho) columnasAnchos[c.nombre] = c.ancho;
+      if(c.categoria) categoriaColumnas[c.nombre] = c.categoria;
     });
   } else {
     COLUMNAS = ['TAG'];
     columnasOcultas = new Set();
     columnasAnchos = {};
+    categoriaColumnas = {};
     await supabaseClient.from('columnas').insert({ proyecto_id: proyectoId, nombre:'TAG', orden:0 });
   }
 
@@ -4196,12 +4257,85 @@ function ordenarDocumentosDeColumna(setDocs){
   return ordenados;
 }
 
+// ---- Categorías de columnas (agrupado plegable en el vistazo rápido) ----
+// Recorre COLUMNAS en orden y arma grupos contiguos de columnas que comparten categoría.
+// Solo agrupa columnas ADYACENTES: si dos columnas de la misma categoría quedan separadas
+// por una de otra categoría, van a aparecer como dos grupos distintos (hay que reordenarlas
+// desde el panel de "Columnas" para que se vean juntas).
+function gruposDeColumnas(){
+  const columnasNoOcultas = COLUMNAS.filter(c => !columnasOcultas.has(c));
+  const grupos = [];
+  columnasNoOcultas.forEach(col=>{
+    const cat = categoriaColumnas[col] || null;
+    const ultimo = grupos[grupos.length-1];
+    if(ultimo && ultimo.categoria === cat){
+      ultimo.columnas.push(col);
+    } else {
+      grupos.push({ categoria: cat, columnas: [col] });
+    }
+  });
+  return grupos;
+}
+
+// Columnas realmente visibles: sin las ocultas manualmente, y sin las que caen dentro de
+// una categoría actualmente contraída
+function columnasVisiblesActuales(){
+  const resultado = [];
+  gruposDeColumnas().forEach(g=>{
+    if(g.categoria && categoriasColapsadas.has(g.categoria)) return;
+    resultado.push(...g.columnas);
+  });
+  return resultado;
+}
+
+// Fila de headers de categoría, arriba de los nombres de columna. Si ninguna columna tiene
+// categoría asignada, la fila queda oculta del todo (no ocupa espacio ni distrae)
+function renderHeadCategorias(){
+  const rowCat = document.getElementById('thead-row-categorias');
+  const hayCategorias = Object.keys(categoriaColumnas).some(col => categoriaColumnas[col] && !columnasOcultas.has(col));
+  if(!hayCategorias){
+    rowCat.style.display = 'none';
+    rowCat.innerHTML = '';
+    return;
+  }
+  rowCat.style.display = '';
+
+  let html = `<th class="th-categoria-vacia th-categoria-esquina" style="width:40px; min-width:40px;"></th>`;
+  gruposDeColumnas().forEach(g=>{
+    if(!g.categoria){
+      html += `<th class="th-categoria-vacia" colspan="${g.columnas.length}"></th>`;
+      return;
+    }
+    const colapsado = categoriasColapsadas.has(g.categoria);
+    const colspan = colapsado ? 1 : g.columnas.length;
+    html += `
+      <th class="th-categoria ${colapsado ? 'colapsada' : ''}" colspan="${colspan}" data-categoria="${g.categoria}" title="${g.categoria}">
+        <div class="th-categoria-inner">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" style="transform:rotate(${colapsado ? -90 : 0}deg); flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+          <span>${g.categoria}</span>
+        </div>
+      </th>`;
+  });
+  html += `<th class="th-categoria-vacia"></th>`;
+  rowCat.innerHTML = html;
+
+  rowCat.querySelectorAll('[data-categoria]').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const cat = th.dataset.categoria;
+      if(categoriasColapsadas.has(cat)) categoriasColapsadas.delete(cat);
+      else categoriasColapsadas.add(cat);
+      renderTabla();
+    });
+  });
+}
+
 function renderHead(){
   const row = document.getElementById('thead-row');
-  const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
+  renderHeadCategorias();
+  const columnasVisibles = columnasVisiblesActuales();
   const mapaDocsPorColumna = calcularDocumentosPorColumna();
 
-  row.innerHTML = `<th class="col-num col-key"></th>` + columnasVisibles.map(col => {
+  row.innerHTML = `<th class="col-num"></th>` + columnasVisibles.map(col => {
     const anchoStyle = columnasAnchos[col] ? `style="width:${columnasAnchos[col]}px; min-width:${columnasAnchos[col]}px;"` : '';
     const docsColumna = ordenarDocumentosDeColumna(mapaDocsPorColumna[col]);
     const esExpandible = col !== 'TAG' && docsColumna.length > 0;
@@ -4376,6 +4510,10 @@ document.getElementById('confirmar-columna-opciones').addEventListener('click', 
       FILTROS[nuevoNombre] = FILTROS[nombreViejo];
       delete FILTROS[nombreViejo];
     }
+    if(categoriaColumnas[nombreViejo]){
+      categoriaColumnas[nuevoNombre] = categoriaColumnas[nombreViejo];
+      delete categoriaColumnas[nombreViejo];
+    }
 
     // Guardar en base de datos
     await renombrarColumna(proyectoActivo.id, nombreViejo, nuevoNombre);
@@ -4431,6 +4569,7 @@ document.getElementById('confirmar-eliminar-columna').addEventListener('click', 
   COLUMNAS = COLUMNAS.filter(c => c !== nombreEliminado);
   columnasOcultas.delete(nombreEliminado);
   delete FILTROS[nombreEliminado];
+  delete categoriaColumnas[nombreEliminado];
   const filasAfectadas = [];
   FILAS.forEach(f=>{
     if(f[nombreEliminado] !== undefined) filasAfectadas.push(f);
@@ -4503,7 +4642,7 @@ function descargarComoExcel(columnas, filas, nombreArchivo){
 }
 
 document.getElementById('btn-exportar-vista').addEventListener('click', ()=>{
-  const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
+  const columnasVisibles = columnasVisiblesActuales();
   descargarComoExcel(columnasVisibles, filasFiltradas(), 'base_de_datos_vista_actual.xlsx');
   document.getElementById('overlay-exportar').classList.remove('open');
 });
@@ -4710,7 +4849,7 @@ function renderTabla(){
   actualizarBadgeFiltroDocumentos();
   actualizarBotonMostrarColumnas();
   const body = document.getElementById('tags-body');
-  const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
+  const columnasVisibles = columnasVisiblesActuales();
 
   if(cargandoBaseDeDatos){
     body.innerHTML = `<tr class="empty-row"><td colspan="${columnasVisibles.length+2}">Cargando base de datos...</td></tr>`;
@@ -4799,7 +4938,7 @@ function renderTabla(){
     const tieneHD = tieneHojaDeDatos(f);
     const celdaHojaDatos = `<td class="col-hoja-datos ${tieneHD ? 'hd-si' : 'hd-no'}">${tieneHD ? '✓' : 'Falta'}</td>`;
 
-    return `<tr data-fila-idx="${i}"><td class="col-num col-key">${i+1}</td>${celdas}${celdaHojaDatos}</tr>`;
+    return `<tr data-fila-idx="${i}"><td class="col-num">${i+1}</td>${celdas}${celdaHojaDatos}</tr>`;
   }).join('');
 
   body.querySelectorAll('.tag-clickable').forEach(td=>{
@@ -5612,7 +5751,7 @@ function renderTablaSeguimiento(){
   const thead = document.getElementById('seg-thead-row');
 
   // Columna número (más angosta)
-  let html = `<th class="col-num col-key" style="width:40px; min-width:40px;"></th>`;
+  let html = `<th class="col-num" style="width:40px; min-width:40px;"></th>`;
 
   // Columna principal (si está visible)
   if(mostrarPrincipal){
@@ -5787,7 +5926,7 @@ function renderTablaSeguimiento(){
     const fechaFormateada = fechaMod ? new Date(fechaMod).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
 
     // Columna número
-    let rowHtml = `<td class="col-num col-key">${i+1}</td>`;
+    let rowHtml = `<td class="col-num">${i+1}</td>`;
 
     // Columna principal (si está visible)
     if(mostrarPrincipal){
@@ -9002,6 +9141,10 @@ async function renombrarColumnaCompleta(nombreViejo, nuevoNombre){
     FILTROS[nuevoNombre] = FILTROS[nombreViejo];
     delete FILTROS[nombreViejo];
   }
+  if(categoriaColumnas[nombreViejo]){
+    categoriaColumnas[nuevoNombre] = categoriaColumnas[nombreViejo];
+    delete categoriaColumnas[nombreViejo];
+  }
   if(columnasOcultas.has(nombreViejo)){
     columnasOcultas.delete(nombreViejo);
     columnasOcultas.add(nuevoNombre);
@@ -9069,6 +9212,7 @@ async function unificarColumnas(colOrigen, colDestino){
   });
   delete FILTROS[colOrigen];
   columnasOcultas.delete(colOrigen);
+  delete categoriaColumnas[colOrigen];
   nivelesOrden = nivelesOrden.filter(n => n.columna !== colOrigen);
 
   const { error } = await supabaseClient.from('columnas').delete()
@@ -9245,6 +9389,78 @@ function habilitarArrastreColumnas(cont, onSoltar){
   });
 }
 
+// ---- Popup para asignar/quitar la categoría de una columna (desde el panel "Columnas") ----
+let popupCategoriaColActual = null;
+function cerrarPopupCategoriaColumna(){
+  document.querySelectorAll('.popup-categoria-col').forEach(p => p.remove());
+  popupCategoriaColActual = null;
+}
+document.addEventListener('click', cerrarPopupCategoriaColumna);
+
+function abrirPopupCategoriaColumna(col, btnEl){
+  if(popupCategoriaColActual === col){ cerrarPopupCategoriaColumna(); return; }
+  cerrarPopupCategoriaColumna();
+  popupCategoriaColActual = col;
+
+  const categoriasUnicas = [...new Set(Object.values(categoriaColumnas).filter(Boolean))].sort();
+  const popup = document.createElement('div');
+  popup.className = 'filter-popup popup-categoria-col open';
+  popup.style.width = '220px';
+  popup.innerHTML = `
+    <div class="filter-popup-head">Categoría de "${col}"</div>
+    <div style="padding:8px 9px;">
+      <input type="text" class="field-input" id="input-categoria-popup" value="${categoriaColumnas[col] || ''}" placeholder="Sin categoría" autocomplete="off" style="width:100%; box-sizing:border-box;">
+      <div id="lista-categorias-sugeridas" style="max-height:140px; overflow-y:auto; margin-top:4px;"></div>
+      <div style="display:flex; gap:6px; margin-top:8px;">
+        <button type="button" class="btn-mini danger" id="btn-quitar-categoria-popup">Quitar</button>
+        <button type="button" class="btn-mini primary" id="btn-guardar-categoria-popup" style="margin-left:auto;">Guardar</button>
+      </div>
+    </div>
+  `;
+  popup.addEventListener('click', e => e.stopPropagation());
+  btnEl.parentElement.style.position = 'relative';
+  btnEl.parentElement.appendChild(popup);
+
+  const input = popup.querySelector('#input-categoria-popup');
+  const listaSugeridas = popup.querySelector('#lista-categorias-sugeridas');
+
+  const guardar = async (valor)=>{
+    if(valor) categoriaColumnas[col] = valor;
+    else delete categoriaColumnas[col];
+    await guardarCategoriaColumna(col, valor || null);
+    cerrarPopupCategoriaColumna();
+    renderTabla();
+    renderListaColumnasBD();
+  };
+
+  // Lista propia de categorías ya usadas (en vez de un <datalist> nativo, poco confiable
+  // entre navegadores): se ve completa apenas se abre el popup, y se filtra al escribir
+  function renderSugerenciasCategoria(){
+    const q = input.value.trim().toLowerCase();
+    const coincidencias = categoriasUnicas.filter(c => c.toLowerCase().includes(q) && c !== input.value);
+    if(!coincidencias.length){ listaSugeridas.innerHTML = ''; return; }
+    listaSugeridas.innerHTML = coincidencias.map(c => `<div class="filter-option" data-sugerencia-categoria="${c}" style="cursor:pointer;"><span>${c}</span></div>`).join('');
+    listaSugeridas.querySelectorAll('[data-sugerencia-categoria]').forEach(opt=>{
+      opt.addEventListener('click', ()=>{
+        input.value = opt.dataset.sugerenciaCategoria;
+        listaSugeridas.innerHTML = '';
+        input.focus();
+      });
+    });
+  }
+  renderSugerenciasCategoria();
+  input.addEventListener('input', renderSugerenciasCategoria);
+  input.focus();
+  input.select();
+
+  popup.querySelector('#btn-quitar-categoria-popup').addEventListener('click', () => guardar(null));
+  popup.querySelector('#btn-guardar-categoria-popup').addEventListener('click', () => guardar(input.value.trim()));
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') guardar(input.value.trim());
+    if(e.key === 'Escape') cerrarPopupCategoriaColumna();
+  });
+}
+
 function renderListaColumnasBD(){
   const cont = document.getElementById('lista-columnas-bd');
   const columnasGestionables = COLUMNAS.filter(c => c !== 'TAG');
@@ -9258,6 +9474,11 @@ function renderListaColumnasBD(){
         </button>
         <span class="seg-col-nombre" id="nombre-col-${idx}" style="flex:1;">${col}</span>
         <div class="col-acciones-grupo">
+          <div style="position:relative;">
+            <button type="button" class="col-icon-btn ${categoriaColumnas[col] ? 'con-categoria' : ''}" data-accion="categoria" data-col="${col}" title="${categoriaColumnas[col] ? `Categoría: ${categoriaColumnas[col]}` : 'Asignar categoría'}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="${categoriaColumnas[col] ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l4.59-4.59a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.1" fill="${categoriaColumnas[col] ? 'var(--card)' : 'currentColor'}" stroke="none"/></svg>
+            </button>
+          </div>
           <button type="button" class="col-icon-btn ${oculta ? 'oculta':''}" data-accion="ojo" data-col="${col}" title="${oculta ? 'Mostrar columna' : 'Ocultar columna'}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconoOjoSvg(oculta)}</svg>
           </button>
@@ -9290,6 +9511,13 @@ function renderListaColumnasBD(){
       }
       renderTabla();
       renderListaColumnasBD();
+    });
+  });
+
+  cont.querySelectorAll('[data-accion="categoria"]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      abrirPopupCategoriaColumna(btn.dataset.col, btn);
     });
   });
 
