@@ -804,6 +804,13 @@
   table.datatable td.col-subdoc-celda.subdoc-igual{
     color:var(--text-dim);
   }
+  table.datatable td.col-subdoc-celda.subdoc-confirmable{
+    background:rgba(70,120,180,0.18) !important;
+    cursor:pointer;
+  }
+  table.datatable td.col-subdoc-celda.subdoc-confirmable:hover{
+    background:rgba(70,120,180,0.30) !important;
+  }
   table.datatable td.col-subdoc-celda.subdoc-vacio{
     color:var(--text-dim);
     text-align:center;
@@ -4725,6 +4732,7 @@ function renderTabla(){
       }
       const docsCol = docsPorColumnaExpandida[col];
       if(docsCol) cls.push('col-grupo-borde-izq');
+      const enConflictoCol = f.__conflictos && f.__conflictos.has(col);
       const tieneComentario = f.__comentarios && f.__comentarios[col];
       if(tieneComentario) cls.push('celda-con-comentario');
       const valor = f[col] ?? '';
@@ -4744,7 +4752,14 @@ function renderTabla(){
           clsSub.push('subdoc-vacio');
           contenido = '—';
         } else if(valorDoc === valorTitular){
-          clsSub.push('subdoc-igual');
+          if(enConflictoCol){
+            // El valor ya coincide, pero la fila sigue marcada en conflicto (rojo): dejar
+            // clickeable para poder confirmarlo y sacarla del conflicto sin cambiar nada
+            clsSub.push('subdoc-confirmable');
+            dataAttrSub = `data-adoptar-col="${col}" data-adoptar-doc="${doc}"`;
+          } else {
+            clsSub.push('subdoc-igual');
+          }
           contenido = valorDoc;
         } else {
           clsSub.push('subdoc-distinto');
@@ -4786,7 +4801,10 @@ function renderTabla(){
 // ---- Vista "expandida" de columna: click en una subcolumna adopta ese valor solo para esa fila ----
 function adoptarValorDeDocumentoParaFila(fila, col, doc){
   const valorNuevo = (fila.__historial && fila.__historial[col] && fila.__historial[col][doc]) || '';
-  if(!valorNuevo || valorNuevo.toString() === (fila[col] ?? '').toString()) return;
+  if(!valorNuevo) return;
+  const enConflicto = fila.__conflictos && fila.__conflictos.has(col);
+  const sinCambios = valorNuevo.toString() === (fila[col] ?? '').toString();
+  if(sinCambios && !enConflicto) return; // no hay nada para hacer: ya coincide y no está en conflicto
 
   fila[col] = valorNuevo;
   fila.__conflictos = fila.__conflictos || new Set();
@@ -4805,7 +4823,12 @@ let hacerTitularDocActual = null;
 function filasAfectadasPorHacerTitular(col, doc){
   return FILAS.filter(f=>{
     const v = f.__historial && f.__historial[col] && f.__historial[col][doc];
-    return v && v.toString() !== (f[col] ?? '').toString();
+    if(!v) return false;
+    const distinto = v.toString() !== (f[col] ?? '').toString();
+    const enConflicto = f.__conflictos && f.__conflictos.has(col);
+    // cuenta tanto las filas donde el valor realmente cambia como las que ya coinciden
+    // pero siguen marcadas en conflicto (rojo) sin resolver
+    return distinto || enConflicto;
   });
 }
 
@@ -4814,8 +4837,8 @@ function abrirConfirmarHacerTitular(col, doc){
   hacerTitularDocActual = doc;
   const filasAfectadas = filasAfectadasPorHacerTitular(col, doc);
   document.getElementById('texto-hacer-titular').textContent = filasAfectadas.length
-    ? `Vas a reemplazar la columna "${col}" con los valores de "${doc}" en ${filasAfectadas.length} fila${filasAfectadas.length===1?'':'s'}. El resto de las filas no cambia. Esta acción no se puede deshacer automáticamente. ¿Confirmás?`
-    : `Todas las filas ya coinciden con "${doc}" en la columna "${col}". No hay nada para cambiar.`;
+    ? `Vas a usar los valores de "${doc}" en la columna "${col}" para ${filasAfectadas.length} fila${filasAfectadas.length===1?'':'s'} (incluye filas que ya coincidían pero seguían marcadas en conflicto). El resto de las filas no cambia. Esta acción no se puede deshacer automáticamente. ¿Confirmás?`
+    : `Todas las filas ya coinciden con "${doc}" en la columna "${col}" y no quedan conflictos pendientes. No hay nada para cambiar.`;
   document.getElementById('confirmar-hacer-titular').disabled = filasAfectadas.length === 0;
   document.getElementById('overlay-hacer-titular').classList.add('open');
 }
