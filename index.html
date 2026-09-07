@@ -2780,6 +2780,7 @@
     </div>
     <div id="vista-seguimiento" style="display:none;">
       <div id="seguimiento-tarjetas" class="seg-grid"></div>
+      <input type="file" id="seg-importar-input" accept=".xlsx,.xls" style="display:none;">
 
       <!-- Vista crear nuevo seguimiento - Layout dividido -->
       <div id="seguimiento-crear-vista" style="display:none;">
@@ -2848,11 +2849,9 @@
             <div class="menu-dropdown" id="seg-mas-dropdown">
               <div class="menu-item" id="seg-renombrar-btn">Renombrar</div>
               <div class="menu-item" id="seg-exportar">Exportar</div>
-              <div class="menu-item" id="seg-importar">Importar</div>
               <div class="menu-item danger" id="seg-eliminar">Eliminar</div>
             </div>
           </div>
-          <input type="file" id="seg-importar-input" accept=".xlsx,.xls" style="display:none;">
         </div>
         <div class="datatable-wrap" id="datatable-wrap-seguimiento">
           <table class="datatable">
@@ -5267,8 +5266,9 @@ function renderSeguimientos(){
     `;
   }).join('');
 
-  cont.innerHTML = tarjetas + `<div class="seg-card seg-card-new" id="seg-crear-tile">+ Crear seguimiento</div>`;
+  cont.innerHTML = tarjetas + `<div class="seg-card seg-card-new" id="seg-crear-tile">+ Crear seguimiento</div>` + `<div class="seg-card seg-card-new" id="seg-importar-tile">⇪ Importar seguimiento</div>`;
   document.getElementById('seg-crear-tile').addEventListener('click', () => abrirModalCrearSeguimiento());
+  document.getElementById('seg-importar-tile').addEventListener('click', () => document.getElementById('seg-importar-input').click());
 }
 
 // Un único listener delegado (atado una sola vez, fuera de renderSeguimientos) para que
@@ -6609,45 +6609,148 @@ document.getElementById('btn-exportar-seg-todo').addEventListener('click', ()=>{
   document.getElementById('overlay-exportar-seguimiento').classList.remove('open');
 });
 
-document.getElementById('seg-importar').addEventListener('click', ()=>{
-  document.getElementById('seg-importar-input').click();
-});
+// ---- Importar seguimiento (crea uno nuevo o actualiza uno existente) ----
+// El archivo esperado es el que genera el botón "Exportar" de un seguimiento: siempre trae
+// las columnas "Estado", "Comentarios" y "Última modificación" además de las columnas propias
+// del seguimiento. En vez de pedirle al usuario una convención frágil (ej: "poné el estado a
+// la izquierda"), se detecta el seguimiento correspondiente comparando el conjunto de columnas
+// del archivo contra el de cada seguimiento existente — es más robusto porque no depende de
+// dónde estén ubicadas las columnas ni de que la persona haga algo especial al exportar.
+
+const COLUMNAS_ESPECIALES_IMPORTACION = ['Estado', 'Comentarios', 'Última modificación'];
+
+function parsearFechaExcel(fechaTexto){
+  if(!fechaTexto) return null;
+  let fechaParseada = null;
+  if(typeof fechaTexto === 'number'){
+    const f = XLSX.SSF.parse_date_code(fechaTexto);
+    if(f) fechaParseada = new Date(f.y, f.m - 1, f.d);
+  } else {
+    const partes = String(fechaTexto).split('/');
+    if(partes.length === 3) fechaParseada = new Date(+partes[2], +partes[1] - 1, +partes[0]);
+  }
+  return (fechaParseada && !isNaN(fechaParseada)) ? fechaParseada : null;
+}
+
+// Misma lógica que calcularColumnaPrincipalAutomatica, pero sobre las filas de un archivo
+// importado en vez de sobre FILAS del proyecto
+function calcularColumnaPrincipalDesdeFilas(filas, columnas){
+  let mejorCol = columnas[0], mejorCantidad = -1;
+  columnas.forEach(col=>{
+    const distintos = new Set(filas.map(f => String(f[col] ?? ''))).size;
+    if(distintos > mejorCantidad){
+      mejorCantidad = distintos;
+      mejorCol = col;
+    }
+  });
+  return mejorCol;
+}
+
+async function crearSeguimientoDesdeImportacion(nombreHoja, columnasDeDatos, filasImportadas){
+  const colPrincipal = calcularColumnaPrincipalDesdeFilas(filasImportadas, columnasDeDatos);
+
+  const ok = await confirmarSeguimientoGenerico('Crear seguimiento', `Se va a crear un seguimiento nuevo a partir de este archivo, con columna principal "${colPrincipal}" y ${filasImportadas.length} fila(s). ¿Confirmás?`);
+  if(!ok) return;
+
+  const columnasFinales = [colPrincipal, ...columnasDeDatos.filter(c => c !== colPrincipal)];
+
+  // El filtro fijo reconstruye estas mismas filas a partir de la base actual: solo entran los
+  // valores de la columna principal que efectivamente vinieron en el archivo importado
+  const valoresPrincipal = new Set(filasImportadas.map(f => String(f[colPrincipal] ?? '')).filter(v => v));
+  const filtrosFinal = {};
+  columnasFinales.forEach(col => { filtrosFinal[col] = null; });
+  filtrosFinal[colPrincipal] = valoresPrincipal;
+
+  const estados = {}, comentarios = {}, fechasModificacion = {};
+  filasImportadas.forEach(fila=>{
+    const clave = fila[colPrincipal];
+    if(clave === undefined || clave === '') return;
+    const claveStr = String(clave);
+    if(fila['Estado']) estados[claveStr] = fila['Estado'];
+    if(fila['Comentarios'] !== undefined) comentarios[claveStr] = String(fila['Comentarios']);
+    const fechaParseada = parsearFechaExcel(fila['Última modificación']);
+    if(fechaParseada) fechasModificacion[claveStr] = fechaParseada.toISOString();
+  });
+
+  const titulo = (nombreHoja || '').trim() || `Seguimiento importado ${SEGUIMIENTOS.length + 1}`;
+
+  const { data, error } = await supabaseClient.from('seguimientos').insert({
+    proyecto_id: proyectoActivo.id,
+    titulo,
+    columnas: columnasFinales,
+    columna_principal: colPrincipal,
+    filtros: serializarFiltrosSeguimiento(filtrosFinal),
+    filtros_vista: {},
+    orden_vista: [],
+    estados,
+    comentarios,
+    fechas_modificacion: fechasModificacion,
+    graficos_favoritos: [],
+  }).select().single();
+
+  if(error){
+    console.error('Error al crear el seguimiento importado:', error);
+    alert('No se pudo crear el seguimiento. Revisá la consola para más detalle.');
+    return;
+  }
+
+  SEGUIMIENTOS.push({
+    __id: data.id,
+    id: data.id,
+    titulo,
+    columnas: columnasFinales,
+    columnaPrincipal: colPrincipal,
+    filtros: filtrosFinal,
+    filtrosVista: {},
+    ordenVista: [],
+    estados,
+    comentarios,
+    fechasModificacion,
+    graficosFavoritos: [],
+  });
+
+  renderSeguimientos();
+}
+
 document.getElementById('seg-importar-input').addEventListener('change', ()=>{
   const input = document.getElementById('seg-importar-input');
   const file = input.files[0];
-  const seg = seguimientoActivo;
-  if(!file || !seg) return;
+  if(!file) return;
 
   const lector = new FileReader();
-  lector.onload = (e)=>{
+  lector.onload = async (e)=>{
     try{
       const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-      const hoja = wb.Sheets[wb.SheetNames[0]];
-      const filasImportadas = XLSX.utils.sheet_to_json(hoja);
-      seg.fechasModificacion = seg.fechasModificacion || {};
-      filasImportadas.forEach(fila=>{
-        const tag = fila['TAG'] ?? fila['Tag'] ?? fila['tag'];
-        if(!tag) return;
-        if(fila['Estado']) seg.estados[tag] = fila['Estado'];
-        if(fila['Comentarios'] !== undefined) seg.comentarios[tag] = String(fila['Comentarios']);
-        const fechaTexto = fila['Última modificación'];
-        if(fechaTexto){
-          // Excel puede traer la fecha como texto (dd/mm/yyyy) o como número de serie de fecha
-          let fechaParseada = null;
-          if(typeof fechaTexto === 'number'){
-            fechaParseada = XLSX.SSF.parse_date_code(fechaTexto);
-            if(fechaParseada) fechaParseada = new Date(fechaParseada.y, fechaParseada.m - 1, fechaParseada.d);
-          } else {
-            const partes = String(fechaTexto).split('/');
-            if(partes.length === 3) fechaParseada = new Date(+partes[2], +partes[1] - 1, +partes[0]);
-          }
-          if(fechaParseada && !isNaN(fechaParseada)) seg.fechasModificacion[tag] = fechaParseada.toISOString();
-        }
-      });
-      renderTablaSeguimiento();
-      guardarSeguimientoEnSupabase(seg);
+      const nombreHoja = wb.SheetNames[0];
+      const hoja = wb.Sheets[nombreHoja];
+
+      // Los encabezados se sacan de la fila 1 tal cual (no de las filas de datos), para que
+      // una celda vacía en la primera fila no termine recortando el conjunto de columnas
+      const encabezados = (XLSX.utils.sheet_to_json(hoja, { header: 1 })[0] || []).map(h => String(h ?? '').trim());
+      const filasImportadas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+
+      if(!filasImportadas.length){
+        alert('El archivo no tiene filas de datos.');
+        return;
+      }
+
+      const tieneEspeciales = COLUMNAS_ESPECIALES_IMPORTACION.every(c => encabezados.includes(c));
+      if(!tieneEspeciales){
+        alert('Este archivo no tiene el formato de un seguimiento exportado por DocRev.\n\nTiene que incluir las columnas "Estado", "Comentarios" y "Última modificación", tal como las genera el botón Exportar de un seguimiento.');
+        return;
+      }
+
+      const columnasDeDatos = encabezados.filter(c => c && !COLUMNAS_ESPECIALES_IMPORTACION.includes(c));
+      if(!columnasDeDatos.length){
+        alert('El archivo no tiene columnas de datos además de Estado, Comentarios y Última modificación.');
+        return;
+      }
+
+      // Importar siempre crea un seguimiento nuevo: nunca pisa uno ya existente
+      await crearSeguimientoDesdeImportacion(nombreHoja, columnasDeDatos, filasImportadas);
     } catch(err){
       console.error('No se pudo leer el archivo de seguimiento:', err);
+      alert('No se pudo leer el archivo. Revisá que sea un Excel válido.');
     }
     input.value = '';
   };
