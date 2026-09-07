@@ -742,6 +742,82 @@
   table.datatable td.celda-editable{ cursor:pointer; }
   table.datatable td.celda-editable:hover{ background:#F0ECE0; }
 
+  /* ---- Vista "expandida" de columna: una subcolumna por documento fuente ---- */
+  .th-expandir{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:18px; height:18px;
+    border-radius:3px;
+    cursor:pointer;
+    color:var(--text-dim);
+    flex-shrink:0;
+  }
+  .th-expandir:hover{ background:#E9DFC5; color:#8A6D1E; }
+  .th-expandir.active{ color:#fff; background:#B8952E; }
+  .th-expandir.active:hover{ background:#96771E; }
+  .th-expandir.disabled{ opacity:0.25; cursor:default; }
+  .th-expandir.disabled:hover{ background:none; color:var(--text-dim); }
+
+  table.datatable th.col-grupo-borde-izq, table.datatable td.col-grupo-borde-izq{
+    border-left:3px solid #B8952E !important;
+  }
+  table.datatable th.col-grupo-borde-der, table.datatable td.col-grupo-borde-der{
+    border-right:3px solid #B8952E !important;
+  }
+  table.datatable th.col-subdoc{
+    background:#EDE3C8 !important;
+    padding:0;
+  }
+  .th-inner-sub{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    padding:9px 10px;
+  }
+  .th-subdoc-nombre{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:10.5px;
+  }
+  .btn-hacer-titular{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:18px; height:18px;
+    border-radius:3px;
+    border:none;
+    cursor:pointer;
+    background:transparent;
+    color:#8A6D1E;
+    flex-shrink:0;
+    font-size:12px;
+    line-height:1;
+  }
+  .btn-hacer-titular:hover{ background:#B8952E; color:#fff; }
+
+  table.datatable td.col-subdoc-celda{
+    background:#F7F1E1;
+  }
+  table.datatable td.col-subdoc-celda.subdoc-igual{
+    color:var(--text-dim);
+  }
+  table.datatable td.col-subdoc-celda.subdoc-vacio{
+    color:var(--text-dim);
+    text-align:center;
+    font-style:italic;
+  }
+  table.datatable td.col-subdoc-celda.subdoc-distinto{
+    background:rgba(255,193,7,0.28) !important;
+    cursor:pointer;
+    font-weight:600;
+  }
+  table.datatable td.col-subdoc-celda.subdoc-distinto:hover{
+    background:rgba(255,193,7,0.42) !important;
+  }
+
   table.datatable td.celda-con-comentario{ position:relative; }
   table.datatable td.celda-con-comentario::before{
     content:'';
@@ -3475,6 +3551,17 @@
     </div>
   </div>
 
+  <div class="overlay" id="overlay-hacer-titular">
+    <div class="modal">
+      <h3>Hacer titular</h3>
+      <p id="texto-hacer-titular"></p>
+      <div class="modal-actions modal-actions-split">
+        <button class="btn" id="cancel-hacer-titular">Cancelar</button>
+        <button class="btn btn-primary" id="confirmar-hacer-titular">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal mostrar columnas ocultas -->
   <div class="overlay" id="overlay-mostrar-columnas">
     <div class="modal" style="width:320px;">
@@ -3736,6 +3823,7 @@ function pasaFiltroComentarioColumna(fila, col){
 let filtroAbierto = null;
 let columnasOcultas = new Set();
 let columnasAnchos = {}; // { columna: ancho en px }
+let columnasExpandidas = new Set(); // columnas con la vista "por documento" desplegada (una subcolumna por documento fuente)
 let filtroDocumentos = null; // null = todos, o Set con las claves de documento tildadas ('__sin_documento__' incluida)
 let filtroGlobalSoloConflictos = false; // true = solo mostrar filas con alguna celda roja, azul o amarilla
 function pasaFiltroGlobalConflicto(fila){
@@ -4056,23 +4144,77 @@ function filasFiltradas(){
   });
 }
 
+// Para cada columna, qué documentos aportaron al menos un valor real (no el "Creado en la
+// base de datos" manual) en __historial, en alguna fila. Se usa para la vista "expandida"
+// de una columna (una subcolumna por documento fuente).
+function calcularDocumentosPorColumna(){
+  const mapa = {}; // { columna: Set(nombreDocumento) }
+  FILAS.forEach(f=>{
+    if(!f.__historial) return;
+    Object.entries(f.__historial).forEach(([col, porDoc])=>{
+      Object.entries(porDoc || {}).forEach(([doc, valor])=>{
+        if(doc === 'Creado en la base de datos' || !valor) return;
+        if(!mapa[col]) mapa[col] = new Set();
+        mapa[col].add(doc);
+      });
+    });
+  });
+  return mapa;
+}
+
+// Ordena los documentos de una columna según el orden de subida del proyecto (más prolijo
+// y estable que el orden de iteración de un Set)
+function ordenarDocumentosDeColumna(setDocs){
+  if(!setDocs || !setDocs.size) return [];
+  const ordenados = DOCUMENTOS_PROYECTO.map(d => d.nombre).filter(n => setDocs.has(n));
+  setDocs.forEach(n => { if(!ordenados.includes(n)) ordenados.push(n); });
+  return ordenados;
+}
+
 function renderHead(){
   const row = document.getElementById('thead-row');
   const columnasVisibles = COLUMNAS.filter(c => !columnasOcultas.has(c));
+  const mapaDocsPorColumna = calcularDocumentosPorColumna();
+
   row.innerHTML = `<th class="col-num col-key"></th>` + columnasVisibles.map(col => {
     const anchoStyle = columnasAnchos[col] ? `style="width:${columnasAnchos[col]}px; min-width:${columnasAnchos[col]}px;"` : '';
-    return `
-      <th data-col="${col}" class="${col==='TAG' ? 'col-key' : 'col-draggable'}" ${anchoStyle}>
+    const docsColumna = ordenarDocumentosDeColumna(mapaDocsPorColumna[col]);
+    const esExpandible = col !== 'TAG' && docsColumna.length > 0;
+    const expandido = esExpandible && columnasExpandidas.has(col);
+
+    const btnExpandir = col === 'TAG' ? '' : `
+          <span class="th-expandir ${expandido ? 'active' : ''} ${esExpandible ? '' : 'disabled'}" ${esExpandible ? `data-col-expandir="${col}"` : ''} title="${esExpandible ? (expandido ? 'Contraer' : 'Ver columna por documento') : 'No hay documentos para desplegar'}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="7 8 3 12 7 16"/><polyline points="17 8 21 12 17 16"/></svg>
+          </span>`;
+
+    const thTitular = `
+      <th data-col="${col}" class="${col==='TAG' ? 'col-key' : 'col-draggable'} ${expandido ? 'col-grupo-borde-izq' : ''}" ${anchoStyle}>
         <div class="th-inner">
           <span>${col}</span>
-          <span class="th-filter ${(FILTROS[col] || FILTROS_CONFLICTO_COL[col] || FILTROS_COMENTARIO_COL[col]) ? 'active' : ''}" data-col-filter="${col}">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
-          </span>
+          <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+            ${btnExpandir}
+            <span class="th-filter ${(FILTROS[col] || FILTROS_CONFLICTO_COL[col] || FILTROS_COMENTARIO_COL[col]) ? 'active' : ''}" data-col-filter="${col}">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
+            </span>
+          </div>
         </div>
         <div class="resize-handle"></div>
         <div class="filter-popup" id="popup-${col}"></div>
       </th>
     `;
+
+    if(!expandido) return thTitular;
+
+    const thsSub = docsColumna.map((doc, i) => `
+      <th class="col-subdoc ${i === docsColumna.length-1 ? 'col-grupo-borde-der' : ''}" data-col-sub="${col}" data-doc-sub="${doc}" style="width:150px; min-width:150px;">
+        <div class="th-inner-sub">
+          <span class="th-subdoc-nombre" title="${doc}">${doc}</span>
+          <button type="button" class="btn-hacer-titular" data-col-sub-titular="${col}" data-doc-sub-titular="${doc}" title="Hacer titular: esta columna pasa a usar los valores de &quot;${doc}&quot;">★</button>
+        </div>
+      </th>
+    `).join('');
+
+    return thTitular + thsSub;
   }).join('') + `<th class="col-hoja-datos" title="Se completa sola cuando subís un documento de tipo 'Hoja de Datos' que incluya este TAG">Hoja de Datos</th>`;
 
   row.querySelectorAll('.th-filter').forEach(el=>{
@@ -4084,6 +4226,23 @@ function renderHead(){
       } else {
         abrirFiltro(col);
       }
+    });
+  });
+
+  row.querySelectorAll('[data-col-expandir]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const col = el.dataset.colExpandir;
+      if(columnasExpandidas.has(col)) columnasExpandidas.delete(col);
+      else columnasExpandidas.add(col);
+      renderTabla();
+    });
+  });
+
+  row.querySelectorAll('[data-col-sub-titular]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      abrirConfirmarHacerTitular(btn.dataset.colSubTitular, btn.dataset.docSubTitular);
     });
   });
 
@@ -4535,6 +4694,12 @@ function renderTabla(){
     return;
   }
 
+  const mapaDocsPorColumna = calcularDocumentosPorColumna();
+  const docsPorColumnaExpandida = {}; // solo para las columnas efectivamente expandidas, calculado una vez
+  columnasVisibles.forEach(col=>{
+    if(columnasExpandidas.has(col)) docsPorColumnaExpandida[col] = ordenarDocumentosDeColumna(mapaDocsPorColumna[col]);
+  });
+
   body.innerHTML = filas.map((f,i) => {
     const celdas = columnasVisibles.map(col => {
       const cls = ['col-tag'];
@@ -4558,11 +4723,39 @@ function renderTabla(){
         cls.push('celda-editable');
         dataAttr = `data-col-editable="${col}"`;
       }
+      const docsCol = docsPorColumnaExpandida[col];
+      if(docsCol) cls.push('col-grupo-borde-izq');
       const tieneComentario = f.__comentarios && f.__comentarios[col];
       if(tieneComentario) cls.push('celda-con-comentario');
       const valor = f[col] ?? '';
       const valorEscapado = String(valor).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
+      const tdTitular = `<td class="${cls.join(' ')}" ${dataAttr} title="${valorEscapado}">${valor}</td>`;
+
+      if(!docsCol) return tdTitular;
+
+      const valorTitular = valor.toString();
+      const subTds = docsCol.map((doc, idx) => {
+        const valorDocRaw = (f.__historial && f.__historial[col] && f.__historial[col][doc]) || '';
+        const valorDoc = valorDocRaw.toString();
+        const clsSub = ['col-subdoc-celda'];
+        if(idx === docsCol.length-1) clsSub.push('col-grupo-borde-der');
+        let contenido, dataAttrSub = '';
+        if(!valorDoc){
+          clsSub.push('subdoc-vacio');
+          contenido = '—';
+        } else if(valorDoc === valorTitular){
+          clsSub.push('subdoc-igual');
+          contenido = valorDoc;
+        } else {
+          clsSub.push('subdoc-distinto');
+          dataAttrSub = `data-adoptar-col="${col}" data-adoptar-doc="${doc}"`;
+          contenido = valorDoc;
+        }
+        const valorEscapadoSub = valorDoc ? valorDoc.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+        return `<td class="${clsSub.join(' ')}" ${dataAttrSub} title="${valorEscapadoSub}">${contenido}</td>`;
+      }).join('');
+
+      return tdTitular + subTds;
     }).join('');
 
     const tieneHD = tieneHojaDeDatos(f);
@@ -4580,7 +4773,90 @@ function renderTabla(){
     const i = Number(td.closest('tr').dataset.filaIdx);
     td.addEventListener('click', ()=> abrirEditarCelda(filas[i], td.dataset.colEditable));
   });
+
+  body.querySelectorAll('[data-adoptar-col]').forEach(td=>{
+    const i = Number(td.closest('tr').dataset.filaIdx);
+    td.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      adoptarValorDeDocumentoParaFila(filas[i], td.dataset.adoptarCol, td.dataset.adoptarDoc);
+    });
+  });
 }
+
+// ---- Vista "expandida" de columna: click en una subcolumna adopta ese valor solo para esa fila ----
+function adoptarValorDeDocumentoParaFila(fila, col, doc){
+  const valorNuevo = (fila.__historial && fila.__historial[col] && fila.__historial[col][doc]) || '';
+  if(!valorNuevo || valorNuevo.toString() === (fila[col] ?? '').toString()) return;
+
+  fila[col] = valorNuevo;
+  fila.__conflictos = fila.__conflictos || new Set();
+  fila.__resueltos = fila.__resueltos || new Set();
+  fila.__conflictos.delete(col);
+  fila.__resueltos.add(col); // queda marcada como decisión manual, igual que cualquier otra edición de celda
+
+  renderTabla();
+  guardarFilaEnSupabase(fila);
+}
+
+// ---- "Hacer titular": la columna completa pasa a usar los valores de un documento puntual ----
+let hacerTitularColActual = null;
+let hacerTitularDocActual = null;
+
+function filasAfectadasPorHacerTitular(col, doc){
+  return FILAS.filter(f=>{
+    const v = f.__historial && f.__historial[col] && f.__historial[col][doc];
+    return v && v.toString() !== (f[col] ?? '').toString();
+  });
+}
+
+function abrirConfirmarHacerTitular(col, doc){
+  hacerTitularColActual = col;
+  hacerTitularDocActual = doc;
+  const filasAfectadas = filasAfectadasPorHacerTitular(col, doc);
+  document.getElementById('texto-hacer-titular').textContent = filasAfectadas.length
+    ? `Vas a reemplazar la columna "${col}" con los valores de "${doc}" en ${filasAfectadas.length} fila${filasAfectadas.length===1?'':'s'}. El resto de las filas no cambia. Esta acción no se puede deshacer automáticamente. ¿Confirmás?`
+    : `Todas las filas ya coinciden con "${doc}" en la columna "${col}". No hay nada para cambiar.`;
+  document.getElementById('confirmar-hacer-titular').disabled = filasAfectadas.length === 0;
+  document.getElementById('overlay-hacer-titular').classList.add('open');
+}
+
+document.getElementById('cancel-hacer-titular').addEventListener('click', ()=>{
+  document.getElementById('overlay-hacer-titular').classList.remove('open');
+  hacerTitularColActual = null;
+  hacerTitularDocActual = null;
+});
+
+document.getElementById('confirmar-hacer-titular').addEventListener('click', async ()=>{
+  const col = hacerTitularColActual, doc = hacerTitularDocActual;
+  if(!col || !doc) return;
+  const btn = document.getElementById('confirmar-hacer-titular');
+  btn.disabled = true;
+  btn.textContent = 'Aplicando...';
+
+  const filasAfectadas = filasAfectadasPorHacerTitular(col, doc);
+  filasAfectadas.forEach(f=>{
+    const valorNuevo = f.__historial[col][doc];
+    f[col] = valorNuevo;
+    f.__conflictos = f.__conflictos || new Set();
+    f.__resueltos = f.__resueltos || new Set();
+    f.__conflictos.delete(col);
+    f.__resueltos.add(col);
+  });
+
+  const resultados = await Promise.all(filasAfectadas.map(f => guardarFilaEnSupabase(f)));
+  const fallidas = resultados.filter(r => !r.ok).length;
+
+  btn.disabled = false;
+  btn.textContent = 'Confirmar';
+  document.getElementById('overlay-hacer-titular').classList.remove('open');
+  hacerTitularColActual = null;
+  hacerTitularDocActual = null;
+
+  if(fallidas){
+    alert(`${fallidas} fila(s) no se pudieron actualizar. Revisá la consola para más detalle.`);
+  }
+  renderTabla();
+});
 
 // ==== Pestaña Seguimiento ====
 let SEGUIMIENTOS = [];
