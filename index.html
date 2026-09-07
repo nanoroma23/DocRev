@@ -3444,6 +3444,11 @@
       </label>
 
       <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px; margin-top:8px; align-items:center;">
+        <input type="checkbox" id="chk-solo-solucionados-global" style="margin:0;">
+        <span style="color:#4678B4; font-weight:600;">Solo celdas solucionadas</span>
+      </label>
+
+      <label class="filter-option" style="border:1px solid var(--line); border-radius:6px; padding:9px 10px; margin-top:8px; align-items:center;">
         <input type="checkbox" id="chk-solo-comentarios-global" style="margin:0;">
         <span style="color:#4E9A5C; font-weight:600;">Solo celdas con comentario</span>
       </label>
@@ -3819,9 +3824,14 @@ let FILTROS_CONFLICTO_COL = {}; // { columna: true | null } — mostrar solo fil
 let FILTROS_COMENTARIO_COL = {}; // { columna: true | null } — mostrar solo filas con comentario en esa columna puntual
 function pasaFiltroConflictoColumna(fila, col){
   if(!FILTROS_CONFLICTO_COL[col]) return true;
-  const rojoOAzul = (fila.__conflictos && fila.__conflictos.has(col)) || (fila.__resueltos && fila.__resueltos.has(col));
+  const rojo = fila.__conflictos && fila.__conflictos.has(col);
   const amarillo = col === 'TAG' && fila.__duplicados && Object.keys(fila.__duplicados).length > 0;
-  return !!(rojoOAzul || amarillo);
+  return !!(rojo || amarillo);
+}
+let FILTROS_SOLUCIONADO_COL = {}; // { columna: true | null } — mostrar solo filas ya solucionadas (azul) en esa columna puntual
+function pasaFiltroSolucionadoColumna(fila, col){
+  if(!FILTROS_SOLUCIONADO_COL[col]) return true;
+  return !!(fila.__resueltos && fila.__resueltos.has(col));
 }
 function pasaFiltroComentarioColumna(fila, col){
   if(!FILTROS_COMENTARIO_COL[col]) return true;
@@ -3832,12 +3842,18 @@ let columnasOcultas = new Set();
 let columnasAnchos = {}; // { columna: ancho en px }
 let columnasExpandidas = new Set(); // columnas con la vista "por documento" desplegada (una subcolumna por documento fuente)
 let filtroDocumentos = null; // null = todos, o Set con las claves de documento tildadas ('__sin_documento__' incluida)
-let filtroGlobalSoloConflictos = false; // true = solo mostrar filas con alguna celda roja, azul o amarilla
+let filtroGlobalSoloConflictos = false; // true = solo mostrar filas con alguna celda roja o amarilla (sin resolver)
 function pasaFiltroGlobalConflicto(fila){
   if(!filtroGlobalSoloConflictos) return true;
-  const tieneRojoOAzul = (fila.__conflictos && fila.__conflictos.size > 0) || (fila.__resueltos && fila.__resueltos.size > 0);
+  const tieneRojo = fila.__conflictos && fila.__conflictos.size > 0;
   const tieneAmarillo = fila.__duplicados && Object.keys(fila.__duplicados).length > 0;
-  return !!(tieneRojoOAzul || tieneAmarillo);
+  return !!(tieneRojo || tieneAmarillo);
+}
+
+let filtroGlobalSoloSolucionados = false; // true = solo mostrar filas con alguna celda azul (ya solucionada)
+function pasaFiltroGlobalSolucionado(fila){
+  if(!filtroGlobalSoloSolucionados) return true;
+  return !!(fila.__resueltos && fila.__resueltos.size > 0);
 }
 
 let filtroGlobalSoloComentarios = false; // true = solo mostrar filas con algún comentario cargado
@@ -4139,10 +4155,12 @@ function filasFiltradas(){
   return FILAS.filter(fila => {
     if(!pasaFiltroDocumento(fila)) return false;
     if(!pasaFiltroGlobalConflicto(fila)) return false;
+    if(!pasaFiltroGlobalSolucionado(fila)) return false;
     if(!pasaFiltroGlobalComentario(fila)) return false;
     if(!pasaFiltroComparador(fila)) return false;
     return COLUMNAS.every(col => {
       if(!pasaFiltroConflictoColumna(fila, col)) return false;
+      if(!pasaFiltroSolucionadoColumna(fila, col)) return false;
       if(!pasaFiltroComentarioColumna(fila, col)) return false;
       const permitidos = FILTROS[col];
       if(!permitidos) return true;
@@ -4200,7 +4218,7 @@ function renderHead(){
           <span>${col}</span>
           <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
             ${btnExpandir}
-            <span class="th-filter ${(FILTROS[col] || FILTROS_CONFLICTO_COL[col] || FILTROS_COMENTARIO_COL[col]) ? 'active' : ''}" data-col-filter="${col}">
+            <span class="th-filter ${(FILTROS[col] || FILTROS_CONFLICTO_COL[col] || FILTROS_SOLUCIONADO_COL[col] || FILTROS_COMENTARIO_COL[col]) ? 'active' : ''}" data-col-filter="${col}">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>
             </span>
           </div>
@@ -4548,6 +4566,10 @@ function abrirFiltro(col){
         <span style="color:var(--red);">Solo con conflicto</span>
       </label>
       <label class="filter-option" style="border-bottom:1px solid var(--line);">
+        <input type="checkbox" class="chk-solo-solucionado-popup" ${FILTROS_SOLUCIONADO_COL[col] ? 'checked':''}>
+        <span style="color:#4678B4;">Solo solucionado</span>
+      </label>
+      <label class="filter-option" style="border-bottom:1px solid var(--line);">
         <input type="checkbox" class="chk-solo-comentario-popup" ${FILTROS_COMENTARIO_COL[col] ? 'checked':''}>
         <span style="color:#4E9A5C;">Solo con comentario</span>
       </label>
@@ -4614,6 +4636,7 @@ function abrirFiltro(col){
     const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
     FILTROS_CONFLICTO_COL[col] = popup.querySelector('.chk-solo-conflicto-popup').checked || null;
+    FILTROS_SOLUCIONADO_COL[col] = popup.querySelector('.chk-solo-solucionado-popup').checked || null;
     FILTROS_COMENTARIO_COL[col] = popup.querySelector('.chk-solo-comentario-popup').checked || null;
     cerrarFiltros();
     renderTabla();
@@ -7633,7 +7656,7 @@ document.getElementById('aplicar-ordenar-docs').addEventListener('click', ()=>{
 
 // ---- Filtro por documento de origen ----
 function actualizarBadgeFiltroDocumentos(){
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroComparadorTags));
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroDocumentos || filtroGlobalSoloConflictos || filtroGlobalSoloSolucionados || filtroGlobalSoloComentarios || filtroComparadorTags));
 }
 
 // ---- Modal "Otros filtros": conflictos globales, filtrar por documento, comparador ----
@@ -7740,6 +7763,7 @@ document.getElementById('comparar-doc-a').addEventListener('change', poblarCompa
 
 document.getElementById('btn-otros-filtros').addEventListener('click', ()=>{
   document.getElementById('chk-solo-conflictos-global').checked = filtroGlobalSoloConflictos;
+  document.getElementById('chk-solo-solucionados-global').checked = filtroGlobalSoloSolucionados;
   document.getElementById('chk-solo-comentarios-global').checked = filtroGlobalSoloComentarios;
   document.getElementById('btn-doc-otros-filtros').classList.toggle('active', !!filtroDocumentos);
   poblarComparadorDocumentos();
@@ -7750,6 +7774,7 @@ document.getElementById('cancelar-otros-filtros').addEventListener('click', ()=>
 });
 document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
   filtroGlobalSoloConflictos = document.getElementById('chk-solo-conflictos-global').checked;
+  filtroGlobalSoloSolucionados = document.getElementById('chk-solo-solucionados-global').checked;
   filtroGlobalSoloComentarios = document.getElementById('chk-solo-comentarios-global').checked;
 
   const docA = document.getElementById('comparar-doc-a').value;
@@ -7766,7 +7791,7 @@ document.getElementById('aplicar-otros-filtros').addEventListener('click', ()=>{
     filtroComparadorTags = null;
   }
 
-  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroGlobalSoloComentarios || filtroDocumentos || filtroComparadorTags));
+  document.getElementById('btn-otros-filtros').classList.toggle('btn-filtro-activo', !!(filtroGlobalSoloConflictos || filtroGlobalSoloSolucionados || filtroGlobalSoloComentarios || filtroDocumentos || filtroComparadorTags));
   document.getElementById('overlay-otros-filtros').classList.remove('open');
   renderTabla();
 });
