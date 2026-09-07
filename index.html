@@ -474,6 +474,19 @@
   .col-icon-btn.oculta{ color:var(--red); }
   .col-icon-btn.con-categoria{ color:#B8952E; }
   .col-icon-btn.con-categoria:hover{ background:#F2E8D0; color:#8A6D1E; }
+  .col-icon-btn.favorito-activo{ color:#B8952E; }
+  .col-icon-btn.favorito-activo:hover{ background:#F2E8D0; color:#8A6D1E; }
+
+  .grafico-tarjeta{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+  }
+  .grafico-tarjeta-clickeable:hover{
+    text-decoration:underline;
+    color:var(--green-dark) !important;
+  }
   .col-icon-btn:disabled{ opacity:0.3; cursor:default; pointer-events:none; }
   .col-acciones-grupo{ display:flex; align-items:center; gap:12px; }
   .col-icon-btn-grande{
@@ -2971,12 +2984,14 @@
   <div class="overlay" id="overlay-graficos-adicionales">
     <div class="modal" style="width:700px; max-width:90vw; max-height:85vh; overflow-y:auto;">
       <h3 id="graficos-adicionales-titulo">Gráficos adicionales</h3>
-      <p style="margin-bottom:16px;">Seleccioná una columna para ver la distribución de estados por sus valores.</p>
-      <label class="field-label">Columna a graficar</label>
-      <select class="field-select" id="graficos-columna-select" style="margin-bottom:16px;">
-        <option value="">Seleccionar columna...</option>
-      </select>
-      <div id="graficos-adicionales-container" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px;"></div>
+      <p style="margin-bottom:16px;">Los favoritos aparecen apenas abrís esta ventana. Elegí otra columna para verla también, y tildá la estrella si querés que quede fija.</p>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label class="field-label" style="margin:0; flex-shrink:0;">Ver otra columna</label>
+        <select class="field-select" id="graficos-columna-select" style="flex:1;">
+          <option value="">Seleccionar columna...</option>
+        </select>
+      </div>
+      <div id="graficos-adicionales-container" style="margin-top:8px;"></div>
       <div class="modal-actions" style="margin-top:20px;">
         <button class="btn" id="cerrar-graficos-adicionales">Cerrar</button>
       </div>
@@ -5095,6 +5110,7 @@ async function cargarSeguimientos(proyectoId){
     estados: row.estados || {},
     comentarios: row.comentarios || {},
     fechasModificacion: row.fechas_modificacion || {},
+    graficosFavoritos: row.graficos_favoritos || [],
   }));
   if(tabActiva === 'seguimiento' && vista === 'project') abrirVistaSeguimientos();
 }
@@ -5698,6 +5714,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     estados: {},
     comentarios: {},
     fechas_modificacion: {},
+    graficos_favoritos: [],
   }).select().single();
 
   btn.disabled = false;
@@ -5721,6 +5738,7 @@ document.getElementById('confirm-crear-seguimiento-nuevo').addEventListener('cli
     estados: {},
     comentarios: {},
     fechasModificacion: {},
+    graficosFavoritos: [],
   });
 
   // Volver a la vista de tarjetas
@@ -6208,6 +6226,7 @@ async function guardarSeguimientoEnSupabase(seg){
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
     filtros: serializarFiltrosSeguimiento(seg.filtros),
     orden_vista: seg.ordenVista || [],
+    graficos_favoritos: seg.graficosFavoritos || [],
   }).eq('id', seg.__id);
   if(error) console.error('Error al guardar el seguimiento en Supabase:', error);
 }
@@ -6635,7 +6654,7 @@ document.getElementById('seg-importar-input').addEventListener('change', ()=>{
   lector.readAsArrayBuffer(file);
 });
 
-// ---- Gráficos adicionales por columna ----
+// ---- Gráficos adicionales por columna, con favoritos y click-para-filtrar ----
 let seguimientoGraficosActivo = null;
 
 function abrirGraficosAdicionales(segId){
@@ -6645,66 +6664,260 @@ function abrirGraficosAdicionales(segId){
   seguimientoGraficosActivo = seg;
   document.getElementById('graficos-adicionales-titulo').textContent = `Gráficos adicionales - ${seg.titulo}`;
 
-  // Llenar select con columnas del seguimiento (excepto la principal)
   const select = document.getElementById('graficos-columna-select');
   const columnasParaGraficar = seg.columnas.filter(c => c !== seg.columnaPrincipal);
+  select.value = '';
   select.innerHTML = '<option value="">Seleccionar columna...</option>' +
     columnasParaGraficar.map(col => `<option value="${col}">${col}</option>`).join('');
 
-  // Limpiar contenedor de gráficos
-  document.getElementById('graficos-adicionales-container').innerHTML = '';
-
+  renderGraficosAdicionales();
   document.getElementById('overlay-graficos-adicionales').classList.add('open');
 }
 
-document.getElementById('graficos-columna-select').addEventListener('change', (e) => {
-  const columna = e.target.value;
-  const container = document.getElementById('graficos-adicionales-container');
+// Arma UNA tarjeta (una columna + un valor puntual de esa columna). Cada tarjeta tiene:
+// - un pin para fijarla (que quede siempre visible la próxima vez que se abra esta ventana)
+// - un botón para copiarla como imagen (para pegarla en un informe)
+// - el cuerpo clickeable, que lleva al seguimiento filtrado por ese valor puntual
+function tarjetaGraficoHTML(columna, valor, counts, favoritos, mostrarColumnaEnTitulo){
+  const total = counts.ok + counts.nook + counts.ver;
+  const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
+  const svg = generarSvgTorta([
+    { count:counts.ok, color:'#5CA378' },
+    { count:counts.nook, color:'#A6483B' },
+    { count:counts.ver, color:'#A39B87' },
+  ]);
+  const valorEscapado = valor.replace(/"/g, '&quot;');
+  const esFavorito = favoritos.some(f => f.columna === columna && f.valor === valor);
+  const titulo = mostrarColumnaEnTitulo ? `${columna}: ${valor}` : valor;
 
-  if(!columna || !seguimientoGraficosActivo){
-    container.innerHTML = '';
-    return;
-  }
-
-  const seg = seguimientoGraficosActivo;
-  const estadosPorValor = contarEstadosPorColumna(seg, columna);
-
-  // Generar una tarjeta por cada valor de la columna
-  const tarjetas = Object.entries(estadosPorValor).map(([valor, counts]) => {
-    const total = counts.ok + counts.nook + counts.ver;
-    const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
-    const svg = generarSvgTorta([
-      { count:counts.ok, color:'#5CA378' },
-      { count:counts.nook, color:'#A6483B' },
-      { count:counts.ver, color:'#A39B87' },
-    ]);
-
-    return `
-      <div style="background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px;">
-        <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${valor}</div>
-        <div style="display:flex; align-items:center; justify-content:center; gap:22px;">
-          <div style="display:flex; flex-direction:column; gap:7px; min-width:0;">
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
-              <span class="seg-dot" style="background:#5CA378;"></span>OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ok}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ok)}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
-              <span class="seg-dot" style="background:#A6483B;"></span>NO OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.nook}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.nook)}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
-              <span class="seg-dot" style="background:#A39B87;"></span>VER <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ver}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ver)}</span>
-            </div>
-            <div style="margin-top:4px; padding-top:4px; border-top:1px solid var(--line); display:flex; align-items:center; gap:6px; font-size:12px;">
-              <span style="font-weight:600;">TOTAL</span> <b style="margin-left:auto; font-family:var(--font-mono);">${total}</b>
-            </div>
-          </div>
-          <div style="flex-shrink:0;">${svg}</div>
+  return `
+    <div class="grafico-tarjeta">
+      <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:10px;">
+        <div class="grafico-tarjeta-clickeable" data-grafico-col="${columna}" data-grafico-valor="${valorEscapado}" title="Ver estos instrumentos en el seguimiento" style="flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;">${titulo}</div>
+        <div style="display:flex; gap:2px; flex-shrink:0;">
+          <button type="button" class="col-icon-btn ${esFavorito ? 'favorito-activo' : ''}" data-toggle-favorito data-fav-col="${columna}" data-fav-valor="${valorEscapado}" title="${esFavorito ? 'Sacar de fijados' : 'Fijar'}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="${esFavorito ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l1.8 5.7H20l-4.8 3.6 1.8 5.7L12 13.4l-5 3.6 1.8-5.7L4 7.7h6.2z"/></svg>
+          </button>
+          <button type="button" class="col-icon-btn" data-copiar-tarjeta data-copiar-col="${columna}" data-copiar-valor="${valorEscapado}" title="Copiar como imagen">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
         </div>
       </div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:22px;">
+        <div style="display:flex; flex-direction:column; gap:7px; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#5CA378;"></span>OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ok}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ok)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#A6483B;"></span>NO OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.nook}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.nook)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#A39B87;"></span>VER <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ver}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ver)}</span>
+          </div>
+          <div style="margin-top:4px; padding-top:4px; border-top:1px solid var(--line); display:flex; align-items:center; gap:6px; font-size:12px;">
+            <span style="font-weight:600;">TOTAL</span> <b style="margin-left:auto; font-family:var(--font-mono);">${total}</b>
+          </div>
+        </div>
+        <div style="flex-shrink:0;">${svg}</div>
+      </div>
+    </div>
+  `;
+}
+
+function tarjetasParaColumna(seg, columna, favoritos){
+  const estadosPorValor = contarEstadosPorColumna(seg, columna);
+  return Object.entries(estadosPorValor)
+    .map(([valor, counts]) => tarjetaGraficoHTML(columna, valor, counts, favoritos, false))
+    .join('');
+}
+
+function renderGraficosAdicionales(){
+  const seg = seguimientoGraficosActivo;
+  const container = document.getElementById('graficos-adicionales-container');
+  if(!seg){ container.innerHTML = ''; return; }
+
+  const colSeleccionada = document.getElementById('graficos-columna-select').value;
+  const favoritos = seg.graficosFavoritos || [];
+
+  let html = '';
+
+  if(colSeleccionada){
+    html += `
+      <div class="graficos-seccion" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:12px;">
+        ${tarjetasParaColumna(seg, colSeleccionada, favoritos)}
+      </div>
+    `;
+  }
+
+  html += `
+    <div class="graficos-seccion" style="margin-top:${colSeleccionada ? '22' : '10'}px;">
+      <h4 style="margin:0 0 8px; font-size:13px; color:var(--text-muted);">📌 Fijados</h4>
+      ${favoritos.length ? `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+          ${favoritos.map(fav => {
+            const estados = contarEstadosPorColumna(seg, fav.columna);
+            const counts = estados[fav.valor] || { ok:0, nook:0, ver:0 };
+            return tarjetaGraficoHTML(fav.columna, fav.valor, counts, favoritos, true);
+          }).join('')}
+        </div>
+      ` : `<p style="color:var(--text-dim); font-size:13px; margin:0;">Todavía no fijaste ningún gráfico. Elegí una columna arriba y tocá el pin de la tarjeta que quieras ver siempre acá.</p>`}
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('[data-toggle-favorito]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const columna = btn.dataset.favCol, valor = btn.dataset.favValor;
+      seg.graficosFavoritos = seg.graficosFavoritos || [];
+      const idx = seg.graficosFavoritos.findIndex(f => f.columna === columna && f.valor === valor);
+      if(idx >= 0) seg.graficosFavoritos.splice(idx, 1);
+      else seg.graficosFavoritos.push({ columna, valor });
+      await guardarSeguimientoEnSupabase(seg);
+      renderGraficosAdicionales();
+    });
+  });
+
+  container.querySelectorAll('[data-copiar-tarjeta]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const columna = btn.dataset.copiarCol, valor = btn.dataset.copiarValor;
+      const estados = contarEstadosPorColumna(seg, columna);
+      const counts = estados[valor] || { ok:0, nook:0, ver:0 };
+      await copiarTarjetaComoImagen(valor, counts, btn);
+    });
+  });
+
+  container.querySelectorAll('.grafico-tarjeta-clickeable').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      irAlSeguimientoFiltradoDesdeGrafico(seg, el.dataset.graficoCol, el.dataset.graficoValor);
+    });
+  });
+}
+
+document.getElementById('graficos-columna-select').addEventListener('change', renderGraficosAdicionales);
+
+// Lleva a la tabla del propio seguimiento, filtrada por el valor puntual que se clickeó
+// (mismo mecanismo que el filtro de columna de la tabla del seguimiento)
+function irAlSeguimientoFiltradoDesdeGrafico(seg, columna, valor){
+  const valorReal = valor === '(vacío)' ? '' : valor;
+  seg.filtrosVista = seg.filtrosVista || {};
+  seg.filtrosVista[columna] = new Set([valorReal]);
+  guardarSeguimientoEnSupabase(seg);
+
+  document.getElementById('overlay-graficos-adicionales').classList.remove('open');
+  seguimientoGraficosActivo = null;
+  renderTablaSeguimiento();
+}
+
+// Arma un SVG autocontenido (título + referencias + torta) para poder copiarlo como imagen,
+// ya que el gráfico chico de la tarjeta no tiene los textos ni referencias por separado
+function construirSvgReporteTarjeta(valor, counts){
+  const total = counts.ok + counts.nook + counts.ver;
+  const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
+  const cx = 270, cy = 72, r = 52;
+  const datos = [
+    { count:counts.ok, color:'#5CA378' },
+    { count:counts.nook, color:'#A6483B' },
+    { count:counts.ver, color:'#A39B87' },
+  ];
+
+  let pieSvg;
+  if(total === 0){
+    pieSvg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#EBE4D2" stroke="#E1DACB" stroke-width="1"/>`;
+  } else {
+    const activos = datos.filter(d => d.count > 0);
+    if(activos.length === 1){
+      pieSvg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${activos[0].color}"/>`;
+    } else {
+      let acumulado = 0;
+      pieSvg = activos.map(d=>{
+        const inicio = (acumulado/total) * 2*Math.PI;
+        acumulado += d.count;
+        const fin = (acumulado/total) * 2*Math.PI;
+        const x1 = (cx + r*Math.sin(inicio)).toFixed(2), y1 = (cy - r*Math.cos(inicio)).toFixed(2);
+        const x2 = (cx + r*Math.sin(fin)).toFixed(2), y2 = (cy - r*Math.cos(fin)).toFixed(2);
+        const largeArc = (fin-inicio) > Math.PI ? 1 : 0;
+        return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z" fill="${d.color}"/>`;
+      }).join('');
+    }
+  }
+
+  const filas = [
+    { label:'OK', color:'#5CA378', count:counts.ok },
+    { label:'NO OK', color:'#A6483B', count:counts.nook },
+    { label:'VER', color:'#A39B87', count:counts.ver },
+  ];
+  const filasSvg = filas.map((f, i) => {
+    const y = 58 + i*24;
+    return `
+      <circle cx="20" cy="${y-5}" r="5" fill="${f.color}"/>
+      <text x="34" y="${y}" font-family="Arial, sans-serif" font-size="13" fill="#4B4A43">${f.label}</text>
+      <text x="150" y="${y}" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#2B2A25" text-anchor="end">${f.count}</text>
+      <text x="185" y="${y}" font-family="Arial, sans-serif" font-size="11" fill="#A39B87" text-anchor="end">${pct(f.count)}</text>
     `;
   }).join('');
 
-  container.innerHTML = tarjetas;
-});
+  const tituloEscapado = valor.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="380" height="150" viewBox="0 0 380 150">
+    <rect width="380" height="150" fill="#FBF9F4"/>
+    <text x="16" y="26" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#2B2A25">${tituloEscapado}</text>
+    <line x1="16" y1="36" x2="364" y2="36" stroke="#E1DACB" stroke-width="1"/>
+    ${filasSvg}
+    <line x1="16" y1="129" x2="185" y2="129" stroke="#E1DACB" stroke-width="1"/>
+    <text x="16" y="146" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#2B2A25">TOTAL</text>
+    <text x="185" y="146" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#2B2A25" text-anchor="end">${total}</text>
+    ${pieSvg}
+  </svg>`;
+}
+
+// Convierte la tarjeta a PNG y la copia al portapapeles, lista para pegar en un informe
+async function copiarTarjetaComoImagen(valor, counts, btnEl){
+  const svgString = construirSvgReporteTarjeta(valor, counts);
+  const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+
+  const iconoOriginal = btnEl.innerHTML;
+  const marcarResultado = (ok) => {
+    btnEl.innerHTML = ok
+      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    setTimeout(()=>{ btnEl.innerHTML = iconoOriginal; }, 1400);
+  };
+
+  img.onload = async () => {
+    try{
+      const escala = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = 380 * escala;
+      canvas.height = 150 * escala;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(escala, escala);
+      ctx.fillStyle = '#FBF9F4';
+      ctx.fillRect(0, 0, 380, 150);
+      ctx.drawImage(img, 0, 0, 380, 150);
+      URL.revokeObjectURL(url);
+
+      canvas.toBlob(async (blob) => {
+        try{
+          await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+          marcarResultado(true);
+        }catch(err){
+          console.error('No se pudo copiar la imagen al portapapeles:', err);
+          marcarResultado(false);
+        }
+      }, 'image/png');
+    }catch(err){
+      console.error('Error al generar la imagen de la tarjeta:', err);
+      marcarResultado(false);
+    }
+  };
+  img.onerror = () => { marcarResultado(false); };
+  img.src = url;
+}
 
 document.getElementById('cerrar-graficos-adicionales').addEventListener('click', () => {
   document.getElementById('overlay-graficos-adicionales').classList.remove('open');
