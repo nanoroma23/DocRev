@@ -3831,6 +3831,8 @@
     <div class="modal">
       <h3>Eliminar proyecto</h3>
       <p id="delete-text">Esta acción no se puede deshacer. Se eliminarán todos los documentos asociados.</p>
+      <input type="password" class="field-input" id="input-password-delete" placeholder="Contraseña" style="margin-bottom:8px;" autocomplete="off">
+      <p id="delete-password-error" style="display:none; color:var(--red); font-size:12.5px; margin:-4px 0 10px;">Contraseña incorrecta.</p>
       <div class="modal-actions modal-actions-split">
         <button class="btn" id="cancel-delete">Cancelar</button>
         <button class="btn btn-danger" id="confirm-delete">Eliminar</button>
@@ -6217,16 +6219,18 @@ function renderTablaSeguimiento(){
   });
 }
 
-// Guarda estados/comentarios (y filtros/orden de vista) de un seguimiento contra Supabase
+// Guarda cambios "estructurales" del seguimiento (nombre, columnas, criterios de armado,
+// filtros de vista, orden, favoritos de gráficos). A propósito NO manda estados/comentarios/
+// fecha de modificación: esos se guardan aparte con guardarCampoFilaSeguimiento, que relee
+// antes de escribir. Si esta función también los mandara, cualquier acción "estructural" hecha
+// desde una pestaña con una foto vieja en memoria pisaría por encima estados/comentarios más
+// nuevos guardados por otro dispositivo mientras tanto — por eso quedan afuera del todo.
 async function guardarSeguimientoEnSupabase(seg){
   if(!seg.__id) return;
   const { error } = await supabaseClient.from('seguimientos').update({
     titulo: seg.titulo,
     columnas: seg.columnas || [],
     columna_principal: seg.columnaPrincipal || (seg.columnas && seg.columnas[0]) || null,
-    estados: seg.estados || {},
-    comentarios: seg.comentarios || {},
-    fechas_modificacion: seg.fechasModificacion || {},
     filtros_vista: serializarFiltrosSeguimiento(seg.filtrosVista),
     filtros: serializarFiltrosSeguimiento(seg.filtros),
     orden_vista: seg.ordenVista || [],
@@ -10318,16 +10322,31 @@ document.getElementById('confirm-rename').addEventListener('click', async ()=>{
 
 // ---- Modal eliminar ----
 const overlayDelete = document.getElementById('overlay-delete');
+const PASSWORD_ELIMINAR_PROYECTO = 'admin123'; // solo la sabe Mariano; es un freno, no seguridad real (esto es código de cliente, visible para cualquiera que abra las devtools)
 document.getElementById('menu-delete').addEventListener('click', ()=>{
   cerrarMenu();
   document.getElementById('delete-text').textContent =
     `Vas a eliminar "${proyectoActivo.nombre}" y todos sus documentos asociados. Esta acción no se puede deshacer.`;
+  document.getElementById('input-password-delete').value = '';
+  document.getElementById('delete-password-error').style.display = 'none';
   overlayDelete.classList.add('open');
 });
 document.getElementById('cancel-delete').addEventListener('click', ()=>{
   overlayDelete.classList.remove('open');
 });
+document.getElementById('input-password-delete').addEventListener('input', ()=>{
+  document.getElementById('delete-password-error').style.display = 'none';
+});
+document.getElementById('input-password-delete').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('confirm-delete').click();
+});
 document.getElementById('confirm-delete').addEventListener('click', async ()=>{
+  const passwordIngresada = document.getElementById('input-password-delete').value;
+  if(passwordIngresada !== PASSWORD_ELIMINAR_PROYECTO){
+    document.getElementById('delete-password-error').style.display = 'block';
+    return;
+  }
+
   const { error } = await supabaseClient.from('proyectos').delete().eq('id', proyectoActivo.id);
   if(error){
     console.error('Error al eliminar el proyecto:', error);
