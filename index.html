@@ -6190,25 +6190,29 @@ function renderTablaSeguimiento(){
 
   tbody.querySelectorAll('.seg-estado-select').forEach(sel=>{
     sel.addEventListener('change', ()=>{
-      seg.estados[sel.dataset.key] = sel.value;
+      const clave = sel.dataset.key;
+      const nuevaFecha = new Date().toISOString();
+      seg.estados[clave] = sel.value;
       if(!seg.fechasModificacion) seg.fechasModificacion = {};
-      seg.fechasModificacion[sel.dataset.key] = new Date().toISOString();
+      seg.fechasModificacion[clave] = nuevaFecha;
       // Actualizar clase según el nuevo estado
       sel.classList.remove('estado-ok', 'estado-no-ok', 'estado-ver');
       if(sel.value === 'OK') sel.classList.add('estado-ok');
       else if(sel.value === 'NO OK') sel.classList.add('estado-no-ok');
       else sel.classList.add('estado-ver');
       renderTablaSeguimiento();
-      guardarSeguimientoEnSupabase(seg);
+      guardarCampoFilaSeguimiento(seg, clave, { estado: sel.value, fecha: nuevaFecha });
     });
   });
   tbody.querySelectorAll('.seg-comentario-input').forEach(inp=>{
     inp.addEventListener('change', ()=>{
-      seg.comentarios[inp.dataset.key] = inp.value;
+      const clave = inp.dataset.key;
+      const nuevaFecha = new Date().toISOString();
+      seg.comentarios[clave] = inp.value;
       if(!seg.fechasModificacion) seg.fechasModificacion = {};
-      seg.fechasModificacion[inp.dataset.key] = new Date().toISOString();
+      seg.fechasModificacion[clave] = nuevaFecha;
       renderTablaSeguimiento();
-      guardarSeguimientoEnSupabase(seg);
+      guardarCampoFilaSeguimiento(seg, clave, { comentario: inp.value, fecha: nuevaFecha });
     });
   });
 }
@@ -6229,6 +6233,50 @@ async function guardarSeguimientoEnSupabase(seg){
     graficos_favoritos: seg.graficosFavoritos || [],
   }).eq('id', seg.__id);
   if(error) console.error('Error al guardar el seguimiento en Supabase:', error);
+}
+
+// Guarda el estado y/o comentario de UNA sola fila sin pisar lo que haya cambiado otro
+// dispositivo en otras filas mientras tanto: relee lo que hay en el servidor justo antes de
+// escribir, y aplica encima solo el cambio puntual de esta fila (no la copia completa que
+// este dispositivo tiene en memoria, que puede estar desactualizada).
+async function guardarCampoFilaSeguimiento(seg, clave, cambios){
+  if(!seg.__id) return;
+
+  const { data, error: errorLectura } = await supabaseClient
+    .from('seguimientos')
+    .select('estados, comentarios, fechas_modificacion')
+    .eq('id', seg.__id)
+    .single();
+
+  if(errorLectura){
+    console.error('Error al releer el seguimiento antes de guardar:', errorLectura);
+    return;
+  }
+
+  const estados = { ...(data.estados || {}) };
+  const comentarios = { ...(data.comentarios || {}) };
+  const fechasModificacion = { ...(data.fechas_modificacion || {}) };
+
+  if('estado' in cambios) estados[clave] = cambios.estado;
+  if('comentario' in cambios) comentarios[clave] = cambios.comentario;
+  if('fecha' in cambios) fechasModificacion[clave] = cambios.fecha;
+
+  const { error } = await supabaseClient.from('seguimientos').update({
+    estados,
+    comentarios,
+    fechas_modificacion: fechasModificacion,
+  }).eq('id', seg.__id);
+
+  if(error){
+    console.error('Error al guardar el campo del seguimiento:', error);
+    return;
+  }
+
+  // Reflejar en memoria lo que efectivamente quedó confirmado en el servidor, para que el
+  // resto de la vista (conteos, gráficos) esté al día con los cambios de otros dispositivos
+  seg.estados = estados;
+  seg.comentarios = comentarios;
+  seg.fechasModificacion = fechasModificacion;
 }
 
 // ---- Filtro por columna dentro de la tabla del seguimiento (mutable, no toca seg.filtros) ----
