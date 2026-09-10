@@ -6243,44 +6243,62 @@ async function guardarSeguimientoEnSupabase(seg){
 // dispositivo en otras filas mientras tanto: relee lo que hay en el servidor justo antes de
 // escribir, y aplica encima solo el cambio puntual de esta fila (no la copia completa que
 // este dispositivo tiene en memoria, que puede estar desactualizada).
+// Cola de guardado por seguimiento: si se tocan varios estados/comentarios rápido, cada uno
+// dispara su propio "leer del servidor -> aplicar el cambio -> escribir", y si dos de esos se
+// solapan en el tiempo, el segundo puede leer ANTES de que el primero haya terminado de
+// escribir y pisarlo sin querer. Encolando por seguimiento, cada guardado espera a que el
+// anterior termine antes de leer, así siempre parte de la última versión real.
+const colasGuardadoSeguimiento = new Map(); // segId -> Promise de la última tarea encolada
+
+function encolarGuardadoSeguimiento(segId, tarea){
+  const anterior = colasGuardadoSeguimiento.get(segId) || Promise.resolve();
+  const nueva = anterior.then(tarea, tarea); // igual se ejecuta aunque la anterior haya fallado
+  colasGuardadoSeguimiento.set(segId, nueva);
+  return nueva;
+}
+
 async function guardarCampoFilaSeguimiento(seg, clave, cambios){
   if(!seg.__id) return;
 
-  const { data, error: errorLectura } = await supabaseClient
-    .from('seguimientos')
-    .select('estados, comentarios, fechas_modificacion')
-    .eq('id', seg.__id)
-    .single();
+  return encolarGuardadoSeguimiento(seg.__id, async () => {
+    const { data, error: errorLectura } = await supabaseClient
+      .from('seguimientos')
+      .select('estados, comentarios, fechas_modificacion')
+      .eq('id', seg.__id)
+      .single();
 
-  if(errorLectura){
-    console.error('Error al releer el seguimiento antes de guardar:', errorLectura);
-    return;
-  }
+    if(errorLectura){
+      console.error('Error al releer el seguimiento antes de guardar:', errorLectura);
+      alert('No se pudo guardar el cambio (falló la lectura previa). Revisá tu conexión y volvé a intentarlo — puede que este cambio no haya quedado guardado.');
+      return;
+    }
 
-  const estados = { ...(data.estados || {}) };
-  const comentarios = { ...(data.comentarios || {}) };
-  const fechasModificacion = { ...(data.fechas_modificacion || {}) };
+    const estados = { ...(data.estados || {}) };
+    const comentarios = { ...(data.comentarios || {}) };
+    const fechasModificacion = { ...(data.fechas_modificacion || {}) };
 
-  if('estado' in cambios) estados[clave] = cambios.estado;
-  if('comentario' in cambios) comentarios[clave] = cambios.comentario;
-  if('fecha' in cambios) fechasModificacion[clave] = cambios.fecha;
+    if('estado' in cambios) estados[clave] = cambios.estado;
+    if('comentario' in cambios) comentarios[clave] = cambios.comentario;
+    if('fecha' in cambios) fechasModificacion[clave] = cambios.fecha;
 
-  const { error } = await supabaseClient.from('seguimientos').update({
-    estados,
-    comentarios,
-    fechas_modificacion: fechasModificacion,
-  }).eq('id', seg.__id);
+    const { error } = await supabaseClient.from('seguimientos').update({
+      estados,
+      comentarios,
+      fechas_modificacion: fechasModificacion,
+    }).eq('id', seg.__id);
 
-  if(error){
-    console.error('Error al guardar el campo del seguimiento:', error);
-    return;
-  }
+    if(error){
+      console.error('Error al guardar el campo del seguimiento:', error);
+      alert('No se pudo guardar este cambio. Revisá tu conexión y volvé a intentarlo.');
+      return;
+    }
 
-  // Reflejar en memoria lo que efectivamente quedó confirmado en el servidor, para que el
-  // resto de la vista (conteos, gráficos) esté al día con los cambios de otros dispositivos
-  seg.estados = estados;
-  seg.comentarios = comentarios;
-  seg.fechasModificacion = fechasModificacion;
+    // Reflejar en memoria lo que efectivamente quedó confirmado en el servidor, para que el
+    // resto de la vista (conteos, gráficos) esté al día con los cambios de otros dispositivos
+    seg.estados = estados;
+    seg.comentarios = comentarios;
+    seg.fechasModificacion = fechasModificacion;
+  });
 }
 
 // ---- Filtro por columna dentro de la tabla del seguimiento (mutable, no toca seg.filtros) ----
