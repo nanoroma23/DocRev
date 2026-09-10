@@ -5882,14 +5882,13 @@ document.getElementById('seg-mas-btn').addEventListener('click', (e)=>{
   e.stopPropagation();
   document.getElementById('seg-mas-dropdown').classList.toggle('open');
 });
-// Enter dentro del buscador de cualquier popup de filtro (base de datos, seguimientos, etc.)
-// hace lo mismo que tocar "Aplicar" - así no hace falta ir al mouse después de tildar valores
+// Enter en cualquier parte de un popup de filtro abierto (escribiendo en el buscador, o con
+// foco en un checkbox) hace lo mismo que tocar "Aplicar" - así no hace falta ir al mouse
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Enter') return;
-  if(!e.target.classList || (!e.target.classList.contains('input-buscar-popup') && !e.target.classList.contains('filter-search-input-seg'))) return;
-  const popup = e.target.closest('.filter-popup');
+  const popup = e.target.closest && e.target.closest('.filter-popup.open');
   if(!popup) return;
-  const btnAplicar = popup.querySelector('.btn-aplicar-popup, #apply-seg-tabla, .btn-mini.primary');
+  const btnAplicar = popup.querySelector('.btn-aplicar-popup, #apply-seg-tabla, #btn-aplicar-valores-filtro-general, .btn-mini.primary');
   if(btnAplicar){
     e.preventDefault();
     btnAplicar.click();
@@ -7039,7 +7038,6 @@ function abrirValoresFiltroGeneral(seg, col){
     renderTarjetaGeneral(seg);
   };
   popup.querySelector('#btn-aplicar-valores-filtro-general').addEventListener('click', aplicar);
-  popup.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') aplicar(); });
 }
 
 // Arma UNA tarjeta (una columna + un valor puntual de esa columna). Cada tarjeta tiene:
