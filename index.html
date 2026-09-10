@@ -5883,17 +5883,18 @@ document.getElementById('seg-mas-btn').addEventListener('click', (e)=>{
   document.getElementById('seg-mas-dropdown').classList.toggle('open');
 });
 // Enter en cualquier parte de un popup de filtro abierto (escribiendo en el buscador, o con
-// foco en un checkbox) hace lo mismo que tocar "Aplicar" - así no hace falta ir al mouse
+// foco en un checkbox) hace lo mismo que tocar "Aplicar" - así no hace falta ir al mouse.
+// Se escucha en fase de "captura" (el 'true' del final) para adelantarse a que el navegador
+// tilde el checkbox con el propio Enter antes de que llegue acá.
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Enter') return;
   const popup = e.target.closest && e.target.closest('.filter-popup.open');
   if(!popup) return;
+  e.preventDefault();
+  e.stopPropagation();
   const btnAplicar = popup.querySelector('.btn-aplicar-popup, #apply-seg-tabla, #btn-aplicar-valores-filtro-general, .btn-mini.primary');
-  if(btnAplicar){
-    e.preventDefault();
-    btnAplicar.click();
-  }
-});
+  if(btnAplicar) btnAplicar.click();
+}, true);
 
 document.addEventListener('click', ()=>{
   document.getElementById('seg-mas-dropdown').classList.remove('open');
