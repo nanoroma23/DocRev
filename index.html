@@ -2983,7 +2983,22 @@
   <div class="overlay" id="overlay-graficos-adicionales">
     <div class="modal" style="width:700px; max-width:90vw; max-height:85vh; overflow-y:auto;">
       <h3 id="graficos-adicionales-titulo">Gráficos adicionales</h3>
-      <p style="margin-bottom:16px;">Los favoritos aparecen apenas abrís esta ventana. Elegí otra columna para verla también, y tildá la estrella si querés que quede fija.</p>
+
+      <div class="graficos-seccion" id="grafico-general-seccion" style="margin-bottom:22px;">
+        <h4 style="margin:0 0 8px; font-size:13px; color:var(--text-muted);">General</h4>
+        <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+          <div id="grafico-general-tarjeta" style="flex:0 0 280px;"></div>
+          <div style="flex:1; min-width:180px;">
+            <div id="grafico-general-filtros-chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+            <div style="position:relative; display:inline-block;">
+              <button type="button" class="btn" id="btn-agregar-filtro-general" style="font-size:12px; padding:6px 10px;">+ Agregar filtro</button>
+              <div class="filter-popup" id="popup-agregar-filtro-general" style="width:200px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-bottom:16px;">Los favoritos aparecen apenas abrís esta ventana. Elegí otra columna para verla también, y tildá el pin de la tarjeta que quieras dejar fija.</p>
       <div style="display:flex; align-items:center; gap:8px;">
         <label class="field-label" style="margin:0; flex-shrink:0;">Ver otra columna</label>
         <select class="field-select" id="graficos-columna-select" style="flex:1;">
@@ -5867,6 +5882,20 @@ document.getElementById('seg-mas-btn').addEventListener('click', (e)=>{
   e.stopPropagation();
   document.getElementById('seg-mas-dropdown').classList.toggle('open');
 });
+// Enter dentro del buscador de cualquier popup de filtro (base de datos, seguimientos, etc.)
+// hace lo mismo que tocar "Aplicar" - así no hace falta ir al mouse después de tildar valores
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Enter') return;
+  if(!e.target.classList || (!e.target.classList.contains('input-buscar-popup') && !e.target.classList.contains('filter-search-input-seg'))) return;
+  const popup = e.target.closest('.filter-popup');
+  if(!popup) return;
+  const btnAplicar = popup.querySelector('.btn-aplicar-popup, #apply-seg-tabla, .btn-mini.primary');
+  if(btnAplicar){
+    e.preventDefault();
+    btnAplicar.click();
+  }
+});
+
 document.addEventListener('click', ()=>{
   document.getElementById('seg-mas-dropdown').classList.remove('open');
 });
@@ -6331,8 +6360,7 @@ function abrirFiltroSeguimientoTabla(col){
         return permitidos.has((fila[c] ?? '').toString());
       });
     });
-    valores = [...new Set(filas.map(f => seg.comentarios[f.TAG] || ''))].filter(v => v).sort();
-    if(valores.length === 0) valores = ['(sin comentarios)'];
+    valores = [...new Set(filas.map(f => seg.comentarios[f.TAG] || '(sin comentarios)'))].sort();
   } else if(col === '__FECHA__'){
     // Valores únicos de fechas - aplicar OTROS filtros excepto fecha
     const filas = filasBaseSeguimientoVista(seg).filter(fila => {
@@ -6829,12 +6857,14 @@ document.getElementById('seg-importar-input').addEventListener('change', ()=>{
 
 // ---- Gráficos adicionales por columna, con favoritos y click-para-filtrar ----
 let seguimientoGraficosActivo = null;
+let filtrosGraficoGeneral = {}; // { columna: Set(valores) } — se resetea cada vez que se abre esta ventana
 
 function abrirGraficosAdicionales(segId){
   const seg = SEGUIMIENTOS.find(s => s.id === segId);
   if(!seg) return;
 
   seguimientoGraficosActivo = seg;
+  filtrosGraficoGeneral = {};
   document.getElementById('graficos-adicionales-titulo').textContent = `Gráficos adicionales - ${seg.titulo}`;
 
   const select = document.getElementById('graficos-columna-select');
@@ -6843,8 +6873,173 @@ function abrirGraficosAdicionales(segId){
   select.innerHTML = '<option value="">Seleccionar columna...</option>' +
     columnasParaGraficar.map(col => `<option value="${col}">${col}</option>`).join('');
 
+  renderChipsFiltroGeneral(seg);
+  renderTarjetaGeneral(seg);
   renderGraficosAdicionales();
   document.getElementById('overlay-graficos-adicionales').classList.add('open');
+}
+
+// ---- Tarjeta "General": estados de todo el seguimiento, opcionalmente acotado por los
+// filtros combinables que se van agregando acá mismo (ej: Tipo de señal=AO + Zona=Sur) ----
+function renderTarjetaGeneral(seg){
+  const filasBase = filasBaseSeguimientoVista(seg);
+  const filasFiltradas = filasBase.filter(f=>{
+    return Object.entries(filtrosGraficoGeneral).every(([col, permitidos])=>{
+      if(!permitidos || !permitidos.size) return true;
+      return permitidos.has((f[col] ?? '').toString());
+    });
+  });
+
+  const counts = { ok:0, nook:0, ver:0 };
+  filasFiltradas.forEach(f=>{
+    const estado = seg.estados[f.TAG] || 'VER';
+    if(estado === 'OK') counts.ok++;
+    else if(estado === 'NO OK') counts.nook++;
+    else counts.ver++;
+  });
+
+  const total = counts.ok + counts.nook + counts.ver;
+  const pct = (n) => total ? Math.round((n/total)*100) + '%' : '—';
+  const svg = generarSvgTorta([
+    { count:counts.ok, color:'#5CA378' },
+    { count:counts.nook, color:'#A6483B' },
+    { count:counts.ver, color:'#A39B87' },
+  ]);
+  const hayFiltros = Object.values(filtrosGraficoGeneral).some(v => v && v.size);
+
+  document.getElementById('grafico-general-tarjeta').innerHTML = `
+    <div class="grafico-tarjeta">
+      <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:10px;">
+        <div class="grafico-tarjeta-clickeable" id="grafico-general-click" title="Ver estos instrumentos en el seguimiento" style="flex:1; font-size:14px; font-weight:600; color:var(--text); cursor:pointer;">General</div>
+        <button type="button" class="col-icon-btn" id="grafico-general-copiar" title="Copiar como imagen">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:22px;">
+        <div style="display:flex; flex-direction:column; gap:7px; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#5CA378;"></span>OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ok}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ok)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#A6483B;"></span>NO OK <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.nook}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.nook)}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+            <span class="seg-dot" style="background:#A39B87;"></span>VER <b style="margin-left:auto; color:var(--text); font-family:var(--font-mono); font-weight:600;">${counts.ver}</b><span style="color:var(--text-dim); font-family:var(--font-mono); font-size:11px; min-width:34px;">${pct(counts.ver)}</span>
+          </div>
+          <div style="margin-top:4px; padding-top:4px; border-top:1px solid var(--line); display:flex; align-items:center; gap:6px; font-size:12px;">
+            <span style="font-weight:600;">TOTAL</span> <b style="margin-left:auto; font-family:var(--font-mono);">${total}</b>
+          </div>
+        </div>
+        <div style="flex-shrink:0;">${svg}</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('grafico-general-click').addEventListener('click', ()=>{
+    if(hayFiltros){
+      seg.filtrosVista = seg.filtrosVista || {};
+      Object.entries(filtrosGraficoGeneral).forEach(([col, permitidos])=>{
+        if(permitidos && permitidos.size) seg.filtrosVista[col] = new Set(permitidos);
+      });
+      guardarSeguimientoEnSupabase(seg);
+    }
+    document.getElementById('overlay-graficos-adicionales').classList.remove('open');
+    seguimientoGraficosActivo = null;
+    renderTablaSeguimiento();
+  });
+
+  document.getElementById('grafico-general-copiar').addEventListener('click', ()=>{
+    copiarTarjetaComoImagen('General', counts, document.getElementById('grafico-general-copiar'));
+  });
+}
+
+function renderChipsFiltroGeneral(seg){
+  const cont = document.getElementById('grafico-general-filtros-chips');
+  const entradas = Object.entries(filtrosGraficoGeneral).filter(([, v]) => v && v.size);
+
+  cont.innerHTML = entradas.map(([col, valores]) => `
+    <div class="seg-criterio-chip">
+      <span><b>${col}:</b> ${textoValoresCriterio(valores)}</span>
+      <button type="button" class="col-icon-btn" data-quitar-filtro-general="${col}" title="Quitar filtro" style="width:18px; height:18px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  cont.querySelectorAll('[data-quitar-filtro-general]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      delete filtrosGraficoGeneral[btn.dataset.quitarFiltroGeneral];
+      renderChipsFiltroGeneral(seg);
+      renderTarjetaGeneral(seg);
+    });
+  });
+}
+
+document.getElementById('btn-agregar-filtro-general').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  if(seguimientoGraficosActivo) abrirSelectorColumnaFiltroGeneral(seguimientoGraficosActivo);
+});
+
+function abrirSelectorColumnaFiltroGeneral(seg){
+  const popup = document.getElementById('popup-agregar-filtro-general');
+  const disponibles = seg.columnas.filter(c => c !== seg.columnaPrincipal && !filtrosGraficoGeneral[c]);
+
+  popup.innerHTML = disponibles.length
+    ? disponibles.map(col => `<div class="filter-option" data-elegir-col-general="${col}" style="cursor:pointer;"><span>${col}</span></div>`).join('')
+    : `<div style="padding:10px; font-size:12px; color:var(--text-dim);">Ya agregaste todas las columnas disponibles.</div>`;
+  popup.classList.add('open');
+
+  popup.querySelectorAll('[data-elegir-col-general]').forEach(opt=>{
+    opt.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      popup.classList.remove('open');
+      abrirValoresFiltroGeneral(seg, opt.dataset.elegirColGeneral);
+    });
+  });
+}
+
+// En cascada: los valores que se ofrecen ya consideran los demás filtros generales elegidos
+function abrirValoresFiltroGeneral(seg, col){
+  document.querySelectorAll('.popup-valores-filtro-general').forEach(p => p.remove());
+
+  const filasBase = filasBaseSeguimientoVista(seg).filter(f=>{
+    return Object.entries(filtrosGraficoGeneral).every(([c, permitidos])=>{
+      if(c === col) return true;
+      if(!permitidos || !permitidos.size) return true;
+      return permitidos.has((f[c] ?? '').toString());
+    });
+  });
+  const valores = [...new Set(filasBase.map(f => (f[col] ?? '').toString()))].sort();
+
+  const popup = document.createElement('div');
+  popup.className = 'filter-popup open popup-valores-filtro-general';
+  popup.style.width = '220px';
+  popup.innerHTML = `
+    <div class="filter-popup-head">${col}</div>
+    <div class="filter-list">
+      ${valores.map(v => `
+        <label class="filter-option">
+          <input type="checkbox" class="chk-valor-filtro-general" value="${v}">
+          <span>${v || '(vacío)'}</span>
+        </label>
+      `).join('')}
+    </div>
+    <div style="padding:8px; display:flex; justify-content:flex-end;">
+      <button type="button" class="btn-mini primary" id="btn-aplicar-valores-filtro-general">Aplicar</button>
+    </div>
+  `;
+  popup.addEventListener('click', e => e.stopPropagation());
+  document.getElementById('btn-agregar-filtro-general').parentElement.appendChild(popup);
+
+  const aplicar = ()=>{
+    const marcados = [...popup.querySelectorAll('.chk-valor-filtro-general')].filter(c => c.checked).map(c => c.value);
+    if(marcados.length) filtrosGraficoGeneral[col] = new Set(marcados);
+    popup.remove();
+    renderChipsFiltroGeneral(seg);
+    renderTarjetaGeneral(seg);
+  };
+  popup.querySelector('#btn-aplicar-valores-filtro-general').addEventListener('click', aplicar);
+  popup.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') aplicar(); });
 }
 
 // Arma UNA tarjeta (una columna + un valor puntual de esa columna). Cada tarjeta tiene:
