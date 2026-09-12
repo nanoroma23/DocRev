@@ -3304,6 +3304,20 @@
     </div>
   </div>
 
+  <!-- Actualizar documento de tipo "Un TAG, una hoja": una hoja por TAG, no filas de una tabla,
+       así que usa su propio modal simple en vez del de comparación lado a lado -->
+  <div class="overlay" id="overlay-actualizar-celdas">
+    <div class="modal" style="width:820px; max-width:92vw; max-height:85vh; overflow-y:auto;">
+      <h3>Actualizar documento</h3>
+      <p id="texto-actualizar-celdas">Se va a generar un Excel con los valores de la base escritos en el documento (la base de datos no se toca). Destildá los que no quieras incluir.</p>
+      <div id="lista-cambios-celdas"></div>
+      <div class="modal-actions modal-actions-split" style="margin-top:16px;">
+        <button class="btn" id="cancelar-actualizar-celdas">Cancelar</button>
+        <button class="btn btn-primary" id="confirmar-actualizar-celdas" disabled>Generar Excel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Actualizar documento: paso 3, comparación y las dos formas de generar el archivo -->
   <div class="sheet-fullscreen" id="overlay-comparacion-actualizar">
     <div class="doc-viewer-topbar" style="flex-wrap:wrap; gap:8px; position:relative; z-index:10;">
@@ -4662,6 +4676,11 @@ async function quitarColumnaDeExtracciones(nombreEliminado){
         const originalLen = ext.mapaColumnas.length;
         ext.mapaColumnas = ext.mapaColumnas.filter(m => m.columna !== nombreEliminado);
         if(ext.mapaColumnas.length !== originalLen) cambio = true;
+      }
+      if(ext.tipo === 'celdas' && Array.isArray(ext.celdas)){
+        const originalLen = ext.celdas.length;
+        ext.celdas = ext.celdas.filter(c => c.columna !== nombreEliminado);
+        if(ext.celdas.length !== originalLen) cambio = true;
       }
     });
     if(cambio) docsAfectados.push(doc);
@@ -7325,7 +7344,10 @@ function abrirDetalleDocumento(idx){
     renderCampoDetalleDoc(campo, fila);
   });
   const hayArchivo = !!(doc.workbook || doc.archivo_path);
-  const hayMapeoGuardado = (doc.extracciones || []).some(e => e.tipo === 'rango' && e.mapaColumnas);
+  const hayMapeoGuardado = (doc.extracciones || []).some(e =>
+    (e.tipo === 'rango' && e.mapaColumnas) ||
+    (e.tipo === 'celdas' && Array.isArray(e.celdas) && e.celdas.some(c => c.columna === 'TAG'))
+  );
   document.getElementById('btn-abrir-documento').disabled = !hayArchivo;
   document.getElementById('btn-extraer-tabla').disabled = !hayArchivo;
   document.getElementById('btn-actualizar-desde-detalle').disabled = !(hayArchivo && hayMapeoGuardado);
@@ -7427,7 +7449,14 @@ document.getElementById('cancel-eliminar-documento').addEventListener('click', (
   document.getElementById('overlay-eliminar-documento').classList.remove('open');
 });
 document.getElementById('confirmar-eliminar-documento').addEventListener('click', async ()=>{
-  await eliminarDocumento(docDetalleIdx);
+  const btn = document.getElementById('confirmar-eliminar-documento');
+  if(btn.disabled) return; // ya se está procesando: ignora clicks de más (doble click, etc.)
+  btn.disabled = true;
+
+  const idxAEliminar = docDetalleIdx; // se guarda ya mismo, antes de cualquier espera
+  await eliminarDocumento(idxAEliminar);
+
+  btn.disabled = false;
   document.getElementById('overlay-eliminar-documento').classList.remove('open');
   document.getElementById('overlay-detalle-documento').classList.remove('open');
   docDetalleIdx = null;
@@ -7583,14 +7612,12 @@ let actualizacionCambios = []; // [{tag, columna, valorDocumento, valorBase, tip
 
 async function iniciarActualizacionDesdeBase(idx){
   const doc = DOCUMENTOS_PROYECTO[idx];
-  const ext = (doc.extracciones || []).slice().reverse().find(e => e.tipo === 'rango' && e.mapaColumnas);
+  const ext = (doc.extracciones || []).slice().reverse().find(e =>
+    (e.tipo === 'rango' && e.mapaColumnas) ||
+    (e.tipo === 'celdas' && Array.isArray(e.celdas) && e.celdas.some(c => c.columna === 'TAG'))
+  );
   if(!ext){
-    alert('Este documento no tiene guardado el mapeo de columnas necesario (se subió antes de esta función, o es del tipo "un TAG, una hoja"). No se puede actualizar automáticamente — probá con "Extraer datos" en su lugar.');
-    return;
-  }
-  const mapaTag = ext.mapaColumnas.find(m => m.columna === 'TAG');
-  if(!mapaTag){
-    alert('No se encontró la columna TAG en el mapeo guardado de este documento.');
+    alert('Este documento no tiene guardado el mapeo de columnas necesario (se subió antes de esta función). No se puede actualizar automáticamente — probá con "Extraer datos" en su lugar.');
     return;
   }
 
@@ -7604,6 +7631,18 @@ async function iniciarActualizacionDesdeBase(idx){
   actualizacionDoc = doc;
   actualizacionExtraccion = ext;
   actualizacionWorkbook = workbook;
+
+  if(ext.tipo === 'celdas'){
+    iniciarActualizacionDesdeCeldas(ext, workbook);
+    return;
+  }
+
+  const mapaTag = ext.mapaColumnas.find(m => m.columna === 'TAG');
+  if(!mapaTag){
+    alert('No se encontró la columna TAG en el mapeo guardado de este documento.');
+    return;
+  }
+
   actualizacionMapaColumnas = ext.mapaColumnas.map(m => ({...m}));
 
   const hoja = workbook.Sheets[ext.hoja];
@@ -7623,6 +7662,157 @@ async function iniciarActualizacionDesdeBase(idx){
 
   verificarMapeoColumnasActualizar();
 }
+
+// ---- "Un TAG, una hoja": cada hoja es un TAG, así que no hay un único rango/fila a comparar
+// como en el tipo tabla — se arma directo la lista de diferencias, hoja por hoja ----
+let cambiosCeldasActuales = [];
+
+function iniciarActualizacionDesdeCeldas(ext, workbook){
+  const camposPorHoja = {};
+  ext.celdas.forEach(cel=>{
+    if(!camposPorHoja[cel.hoja]) camposPorHoja[cel.hoja] = [];
+    camposPorHoja[cel.hoja].push(cel);
+  });
+
+  const cambios = [];
+  let hojasSinTagEnArchivo = 0;
+
+  Object.entries(camposPorHoja).forEach(([nombreHoja, campos])=>{
+    const hojaWb = workbook.Sheets[nombreHoja];
+    if(!hojaWb) return; // esa hoja ya no está en el archivo (se borró o se renombró)
+
+    const campoTag = campos.find(c => c.columna === 'TAG');
+    if(!campoTag) return;
+    const tagCellRef = XLSX.utils.encode_cell({ r: campoTag.r - 1, c: campoTag.c });
+    const tagCell = hojaWb[tagCellRef];
+    const tag = tagCell ? normalizarEspacios(XLSX.utils.format_cell(tagCell)).toUpperCase() : '';
+    if(!tag){ hojasSinTagEnArchivo++; return; }
+
+    const filaBase = FILAS.find(f => f.TAG === tag);
+    if(!filaBase) return; // TAG que no está en la base: no hay con qué actualizar el documento
+
+    campos.forEach(campo=>{
+      if(campo.columna === 'TAG') return;
+      const columnaActual = buscarColumnaExistente(campo.columna) || campo.columna;
+      if(!COLUMNAS.includes(columnaActual)) return; // la columna ya no existe en la base
+
+      const cellRef = XLSX.utils.encode_cell({ r: campo.r - 1, c: campo.c });
+      const cell = hojaWb[cellRef];
+      const valorDocumento = cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '';
+      const valorBase = filaBase[columnaActual] || '';
+      if(valorDocumento !== valorBase){
+        // r/c quedan guardados para poder escribir ahí mismo al generar el archivo final
+        cambios.push({ tag, hoja: nombreHoja, r: campo.r, c: campo.c, columna: columnaActual, valorDocumento, valorBase });
+      }
+    });
+  });
+
+  document.getElementById('texto-actualizar-celdas').textContent = hojasSinTagEnArchivo
+    ? `Se va a generar un Excel con estos valores de la base escritos en el documento (la base de datos no se toca). Destildá los que no quieras incluir. (${hojasSinTagEnArchivo} hoja(s) no tenían un TAG legible y se ignoraron.)`
+    : 'Se va a generar un Excel con estos valores de la base escritos en el documento (la base de datos no se toca). Destildá los que no quieras incluir.';
+
+  renderCambiosCeldas(cambios);
+  document.getElementById('overlay-actualizar-celdas').classList.add('open');
+}
+
+function renderCambiosCeldas(cambios){
+  cambiosCeldasActuales = cambios;
+  const cont = document.getElementById('lista-cambios-celdas');
+  document.getElementById('confirmar-actualizar-celdas').disabled = cambios.length === 0;
+
+  if(!cambios.length){
+    cont.innerHTML = '<p style="color:var(--text-dim);">El documento ya coincide con la base: no hay nada para actualizar.</p>';
+    return;
+  }
+
+  // Se agrupa por columna: el título de cada tabla es directamente el nombre de esa columna
+  // (ej. "Sistema"), en vez de repetirlo en cada fila dentro de una columna genérica "Columna"
+  const porColumna = {};
+  cambios.forEach((c, idx) => {
+    if(!porColumna[c.columna]) porColumna[c.columna] = [];
+    porColumna[c.columna].push({ ...c, idx });
+  });
+
+  // valorDocumento = lo que hoy tiene el archivo (se tacha); valorBase = lo que va a quedar
+  // escrito en el Excel nuevo (en verde), tomado de la base de datos
+  cont.innerHTML = Object.entries(porColumna).map(([columna, filas]) => `
+    <div style="margin-bottom:18px;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--line); text-align:left;">
+            <th style="padding:6px 8px; width:36px;"></th>
+            <th style="padding:6px 8px; color:var(--text); font-weight:700;">${columna}</th>
+            <th style="padding:6px 8px; color:var(--text-muted); font-weight:600;">Cambio</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filas.map(c => `
+            <tr style="border-bottom:1px solid var(--line);">
+              <td style="padding:8px;"><input type="checkbox" class="chk-cambio-celda" data-idx="${c.idx}" checked></td>
+              <td style="padding:8px; font-weight:600; font-family:var(--font-mono); white-space:nowrap;">${c.tag}</td>
+              <td style="padding:8px;">
+                <span style="text-decoration:line-through; color:var(--text-dim);">${c.valorDocumento || '(vacío)'}</span>
+                <span style="margin:0 6px; color:var(--text-dim);">→</span>
+                <span style="color:var(--green-dark); font-weight:600;">${c.valorBase || '(vacío)'}</span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+}
+
+document.getElementById('cancelar-actualizar-celdas').addEventListener('click', ()=>{
+  document.getElementById('overlay-actualizar-celdas').classList.remove('open');
+});
+
+document.getElementById('confirmar-actualizar-celdas').addEventListener('click', ()=>{
+  const marcados = [...document.querySelectorAll('.chk-cambio-celda')].filter(c => c.checked).map(c => Number(c.dataset.idx));
+  const cambiosAAplicar = marcados.map(i => cambiosCeldasActuales[i]);
+  if(!cambiosAAplicar.length) return;
+
+  // Se arma el Excel de cero, hoja por hoja (mismo criterio que "tipo tabla", más confiable
+  // que editar el archivo existente), escribiendo los valores de la base en las celdas
+  // correspondientes y marcándolas en celeste. Nada de esto toca la base de datos.
+  const nombreBase = actualizacionDoc.nombre.replace(/\.[^.]+$/, '');
+  const cambiosPorHoja = {};
+  cambiosAAplicar.forEach(c=>{
+    if(!cambiosPorHoja[c.hoja]) cambiosPorHoja[c.hoja] = [];
+    cambiosPorHoja[c.hoja].push(c);
+  });
+
+  const wbNuevo = XLSX.utils.book_new();
+
+  actualizacionWorkbook.SheetNames.forEach(nombreHoja=>{
+    const hojaOrigen = actualizacionWorkbook.Sheets[nombreHoja];
+    const ref = hojaOrigen['!ref'] || 'A1:A1';
+    const range = XLSX.utils.decode_range(ref);
+
+    const aoa = [];
+    for(let r = range.s.r; r <= range.e.r; r++){
+      const fila = [];
+      for(let c = range.s.c; c <= range.e.c; c++){
+        const cell = hojaOrigen[XLSX.utils.encode_cell({ r, c })];
+        fila.push(cell ? cell.v : '');
+      }
+      aoa.push(fila);
+    }
+
+    const hojaNueva = XLSX.utils.aoa_to_sheet(aoa);
+
+    (cambiosPorHoja[nombreHoja] || []).forEach(cm=>{
+      const cellRef = XLSX.utils.encode_cell({ r: cm.r - 1, c: cm.c });
+      hojaNueva[cellRef] = { t: 's', v: cm.valorBase };
+      hojaNueva[cellRef].s = { fill: { patternType:'solid', fgColor:{rgb:'D4ECF5'}, bgColor:{rgb:'D4ECF5'} } };
+    });
+
+    XLSX.utils.book_append_sheet(wbNuevo, hojaNueva, nombreHoja);
+  });
+
+  XLSX.writeFile(wbNuevo, `actualizado_${nombreBase}.xlsx`, { cellStyles: true });
+  document.getElementById('overlay-actualizar-celdas').classList.remove('open');
+});
 
 // ---- Paso 1: filtrar qué TAGs de la base corresponden a este documento ----
 // ---- Paso 2 (solo si hace falta): columnas del mapeo que ya no existen en la base ----
@@ -10008,6 +10198,11 @@ async function renombrarColumnaEnExtracciones(nombreViejo, nuevoNombre){
           if(m.columna === nombreViejo){ m.columna = nuevoNombre; cambio = true; }
         });
       }
+      if(ext.tipo === 'celdas' && Array.isArray(ext.celdas)){
+        ext.celdas.forEach(c=>{
+          if(c.columna === nombreViejo){ c.columna = nuevoNombre; cambio = true; }
+        });
+      }
     });
     if(cambio) docsAfectados.push(doc);
   });
@@ -10553,7 +10748,12 @@ document.getElementById('confirm-delete').addEventListener('click', async ()=>{
     return;
   }
 
+  const btn = document.getElementById('confirm-delete');
+  if(btn.disabled) return;
+  btn.disabled = true;
+
   const { error } = await supabaseClient.from('proyectos').delete().eq('id', proyectoActivo.id);
+  btn.disabled = false;
   if(error){
     console.error('Error al eliminar el proyecto:', error);
     alert('No se pudo eliminar el proyecto. Revisá la consola para más detalle.');
@@ -12558,8 +12758,10 @@ function fusionarFilaConDocumento(filaExistente, datosNuevos, documento){
 // Arma el registro de qué se extrajo (hoja + rango, o lista de celdas), según el tipo de carga
 function construirRegistroExtraccion(){
   if(opcionCargaSeleccionada === 'tag-hoja'){
+    // Importante: guardamos también a qué columna de la base corresponde cada celda (antes no
+    // se guardaba, así que "Actualizar documento" no tenía forma de saber qué era cada dato)
     const celdas = hojasSeleccionadasParaCarga.flatMap(hoja =>
-      camposDefinidosConfirmados.map(campo => ({ hoja, r: campo.celda.r, c: campo.celda.c }))
+      camposDefinidosConfirmados.map(campo => ({ hoja, r: campo.celda.r, c: campo.celda.c, columna: campo.nombre }))
     );
     return { tipo: 'celdas', celdas };
   }
