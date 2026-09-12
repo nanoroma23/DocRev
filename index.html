@@ -1741,11 +1741,11 @@
     box-shadow: inset 0 0 0 2px var(--green) !important;
   }
   table.sheet-grid tr.fila-titulo-elegida td.cell{
-    background:rgba(70,120,180,0.16) !important;
-    box-shadow: inset 0 1px 0 #4A9CC4, inset 0 -1px 0 #4A9CC4;
+    background:rgba(47,93,69,0.28) !important;
+    box-shadow: inset 0 1px 0 var(--green), inset 0 -1px 0 var(--green);
   }
   table.sheet-grid tr.fila-titulo-elegida td.row-head{
-    background:#4A9CC4;
+    background:var(--green);
     color:#fff;
     font-weight:700;
   }
@@ -3130,7 +3130,8 @@
         </div>
       </div>
 
-      <!-- Paso 2: selección de rango — la primera fila del rango elegido es siempre el título -->
+      <!-- Paso 2: selección de rango — la primera fila del rango elegido es siempre el título,
+           salvo que se tilde "título en fila aparte" -->
       <div id="float-step-rango" style="display:none;">
         <div class="float-file-name" id="float-file-name-rango">Documento.xlsx</div>
         <div class="tipo-carga-legend" id="tipo-carga-legend">Documento tipo tabla</div>
@@ -3138,7 +3139,18 @@
           <label>Hoja</label>
           <select class="field-select" id="select-hoja-rango"></select>
         </div>
-        <p class="rango-label">Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):</p>
+
+        <label class="filter-option" style="margin:10px 0; border:1px solid var(--line); border-radius:6px; padding:8px 9px;">
+          <input type="checkbox" id="chk-titulo-separado">
+          <span>El título está en una fila aparte del rango de datos</span>
+        </label>
+
+        <div id="fila-titulo-separada-wrap" style="display:none; margin-bottom:10px;">
+          <p class="rango-label" style="margin-top:0;">Fila de título (tocá el número de fila en la hoja, o escribilo):</p>
+          <input type="text" id="fila-titulo-input" class="field-input" placeholder="Ej: 3" style="width:100px;">
+        </div>
+
+        <p class="rango-label" id="rango-label-datos">Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):</p>
         <div class="rango-field" id="rango-field">
           <input type="text" id="rango-field-text" class="rango-field-input" placeholder="Ej: A1:F50" autocomplete="off" autocapitalize="characters">
         </div>
@@ -10983,6 +10995,7 @@ function cerrarFlujoCarga(){
   rangoConfirmadoObj = null;
   tablaData = [];
   filaTituloIdx = null;
+  filaTituloRawSeparada = null;
   mergedColumns = [];
   columnasMarcadasEliminar = new Set();
   colsSeleccionadas = new Set();
@@ -10998,6 +11011,10 @@ function cerrarFlujoCarga(){
   columnasParaMapear = [];
   mapeoActualizarColumnas = {};
   celdasDiferentesActualizar = new Set();
+  document.getElementById('chk-titulo-separado').checked = false;
+  document.getElementById('fila-titulo-separada-wrap').style.display = 'none';
+  document.getElementById('fila-titulo-input').value = '';
+  document.getElementById('rango-label-datos').textContent = 'Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):';
   mostrarPasoFloat('tipo');
   document.getElementById('float-backdrop').classList.remove('open');
 }
@@ -11045,6 +11062,7 @@ let rangoConfirmadoObj = null; // {r1,r2,c1,c2} numérico
 // ---- Modelo de datos de la tabla ya recortada al rango elegido ----
 let tablaData = [];               // tablaData[fila][columna] = valor
 let filaTituloIdx = null;         // índice (0-based) de la fila marcada como título
+let filaTituloRawSeparada = null; // fila real del Excel para el título, cuando está aparte del rango de datos
 let mergedColumns = [];           // [{ posicion, cols, originalColumnsData, nombre }]
 let columnasMarcadasEliminar = new Set();
 let colsSeleccionadas = new Set();
@@ -11133,6 +11151,7 @@ function resetearCampoRango(){
   selEnd = null;
   document.getElementById('rango-field').classList.remove('filled');
   document.getElementById('rango-field-text').value = '';
+  document.getElementById('fila-titulo-input').value = '';
   document.getElementById('continuar-rango').disabled = true;
   limpiarSeleccionVisual();
 }
@@ -11193,11 +11212,33 @@ function actualizarBotonContinuarRango(){
   document.getElementById('continuar-rango').disabled = !hayRango;
 }
 
+// "título en fila aparte": mientras el campo de fila de título tiene el foco, un click en la
+// grilla elige esa fila entera (se pinta verde) y pasa el foco al campo de rango, para seguir
+// directo con la selección del rango de datos — igual mecánica que "Un TAG, una hoja"
+let modoSeleccionRango = 'rango'; // 'titulo' | 'rango' — a cuál de los dos campos afecta el próximo click en la grilla
+
+function seleccionarFilaTitulo(r){
+  document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
+  const tr = document.querySelector(`tr[data-r-fila="${r}"]`);
+  if(tr) tr.classList.add('fila-titulo-elegida');
+  document.getElementById('fila-titulo-input').value = r;
+  document.getElementById('rango-field-text').focus();
+}
+
+document.getElementById('fila-titulo-input').addEventListener('focus', ()=>{ modoSeleccionRango = 'titulo'; });
+document.getElementById('rango-field-text').addEventListener('focus', ()=>{ modoSeleccionRango = 'rango'; });
+
 gridEl.addEventListener('mousedown', (e)=>{
   const td = e.target.closest('td.cell');
   if(!td || modoGrilla !== 'libre') return;
   e.preventDefault();
   const r = Number(td.dataset.r), c = Number(td.dataset.c);
+
+  if(document.getElementById('chk-titulo-separado').checked && modoSeleccionRango === 'titulo'){
+    seleccionarFilaTitulo(r);
+    return;
+  }
+
   if(e.shiftKey && selAnchor){
     selEnd = { r, c };
     pintarSeleccion();
@@ -11303,6 +11344,23 @@ document.getElementById('atras-rango').addEventListener('click', ()=>{
   mostrarPasoFloat('tipo');
 });
 
+// Checkbox "título en fila aparte": cambia el texto de ayuda, muestra el campo de fila y
+// arranca apuntando al título (para que el primer click en la grilla elija esa fila)
+document.getElementById('chk-titulo-separado').addEventListener('change', (e)=>{
+  const activo = e.target.checked;
+  document.getElementById('fila-titulo-separada-wrap').style.display = activo ? 'block' : 'none';
+  document.getElementById('rango-label-datos').textContent = activo
+    ? 'Rango de datos (sin la fila de título, arrastrá sobre la hoja o escribí, ej: A5:F50):'
+    : 'Rango de datos, incluyendo la fila de título como primera fila (arrastrá sobre la hoja, o escribí, ej: A1:F50):';
+  if(activo){
+    document.getElementById('fila-titulo-input').focus();
+  } else {
+    document.getElementById('fila-titulo-input').value = '';
+    document.querySelectorAll('tr.fila-titulo-elegida').forEach(tr => tr.classList.remove('fila-titulo-elegida'));
+    modoSeleccionRango = 'rango';
+  }
+});
+
 document.getElementById('cancel-rango').addEventListener('click', ()=>{
   overlayCancelarDoc.classList.add('open');
 });
@@ -11324,6 +11382,32 @@ function construirTablaData(){
       fila.push(cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '');
     }
     data.push(fila);
+  }
+  return data;
+}
+
+// Igual que construirTablaData, pero la primera fila de la tabla resultante viene de una fila
+// del Excel completamente aparte (no del rango de datos), para cuando el título no está pegado
+// arriba de los datos — ej: título en la fila 3, datos recién arrancan en la fila 5
+function construirTablaDataConTituloSeparado(filaTitulo){
+  const hoja = workbookActual.Sheets[hojaActivaSeleccionada()];
+  const { c1, c2 } = rangoConfirmadoObj;
+  const nCols = c2 - c1 + 1;
+
+  const leerFilaExcel = (rExcel) => {
+    const fila = [];
+    for(let c=0; c<nCols; c++){
+      const cellRef = XLSX.utils.encode_cell({ r: rExcel - 1, c: c1 + c });
+      const cell = hoja[cellRef];
+      fila.push(cell ? normalizarEspacios(XLSX.utils.format_cell(cell)) : '');
+    }
+    return fila;
+  };
+
+  const data = [leerFilaExcel(filaTitulo)];
+  const { r1, r2 } = rangoConfirmadoObj;
+  for(let r = r1; r <= r2; r++){
+    data.push(leerFilaExcel(r));
   }
   return data;
 }
@@ -11428,11 +11512,27 @@ function avanzarAFinalDesdeRango(){
     return;
   }
 
+  const tituloSeparado = document.getElementById('chk-titulo-separado').checked;
+  let filaTitulo = null;
+  if(tituloSeparado){
+    filaTitulo = Number(document.getElementById('fila-titulo-input').value.trim());
+    if(!filaTitulo || filaTitulo < 1){
+      alert('Escribí (o tocá en la hoja) un número de fila válido para el título. Ejemplo: 3');
+      return;
+    }
+  }
+
   rangoConfirmadoObj = rango;
   rangoConfirmado = `${letraCol(rango.c1)}${rango.r1}:${letraCol(rango.c2)}${rango.r2}`;
 
-  tablaData = construirTablaData();
-  filaTituloIdx = 0; // siempre la primera fila del rango elegido
+  if(tituloSeparado){
+    filaTituloRawSeparada = filaTitulo;
+    tablaData = construirTablaDataConTituloSeparado(filaTitulo);
+  } else {
+    filaTituloRawSeparada = null;
+    tablaData = construirTablaData();
+  }
+  filaTituloIdx = 0; // siempre la primera fila de tablaData (venga del rango o puesta aparte)
   mergedColumns = [];
   columnasMarcadasEliminar = new Set();
   colsSeleccionadas = new Set();
@@ -11847,17 +11947,26 @@ document.getElementById('confirmar-renombrar').addEventListener('click', ()=>{
 function filtrarAutocompleteRenombrar(texto, mostrarTodos = false){
   const dropdown = document.getElementById('autocomplete-dropdown-renombrar');
 
+  // No repetir un título que ya quedó puesto en otra columna de esta misma tabla (las
+  // marcadas para eliminar no cuentan, ya que no van a llegar a subirse)
+  const usadosPorOtrasColumnas = new Set(
+    tablaData[filaTituloIdx]
+      .filter((_, idx) => idx !== colRenombrando && !columnasMarcadasEliminar.has(idx))
+      .filter(v => v)
+  );
+  const disponibles = COLUMNAS.filter(col => !usadosPorOtrasColumnas.has(col));
+
   const textoLower = texto.toLowerCase();
   let opciones;
 
   if(mostrarTodos){
-    opciones = COLUMNAS;
+    opciones = disponibles;
   } else if(!texto.trim()){
     dropdown.style.display = 'none';
     autocompleteRenombrarSelectedIndex = -1;
     return;
   } else {
-    opciones = COLUMNAS.filter(col => col.toLowerCase().includes(textoLower));
+    opciones = disponibles.filter(col => col.toLowerCase().includes(textoLower));
   }
 
   let html = '';
@@ -11869,7 +11978,7 @@ function filtrarAutocompleteRenombrar(texto, mostrarTodos = false){
 
   // Opción "Crear nuevo"
   if(texto.trim()){
-    const coincideExacto = COLUMNAS.some(col => col.toLowerCase() === textoLower);
+    const coincideExacto = disponibles.some(col => col.toLowerCase() === textoLower);
     if(!coincideExacto){
       html += `<div class="autocomplete-option crear-nuevo" data-value="${texto}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto}"</div>`;
     }
@@ -12454,16 +12563,16 @@ function construirRegistroExtraccion(){
     );
     return { tipo: 'celdas', celdas };
   }
-  // Guardamos también la fila de título real (siempre la primera del rango elegido) y el mapeo
-  // posición-dentro-del-rango → nombre de columna en la base, para poder reconstruir más
-  // adelante exactamente qué celda del archivo original corresponde a cada dato
-  // (lo usa "Actualizar documento" para pisar solo lo que cambió, sin volver a preguntar nada).
+  // Guardamos también la fila de título real (la primera del rango elegido, o la fila aparte
+  // si se usó esa opción) y el mapeo posición-dentro-del-rango → nombre de columna en la base,
+  // para poder reconstruir más adelante exactamente qué celda del archivo original corresponde
+  // a cada dato (lo usa "Actualizar documento" para pisar solo lo que cambió, sin preguntar nada).
   const mapaColumnas = colsIdxASubir.map((idx, i) => ({ posicion: idx, columna: nombresASubir[i] }));
   return {
     tipo: 'rango',
     hoja: hojaActivaSeleccionada(),
     ...rangoConfirmadoObj,
-    filaTituloRaw: rangoConfirmadoObj.r1,
+    filaTituloRaw: filaTituloRawSeparada !== null ? filaTituloRawSeparada : rangoConfirmadoObj.r1,
     mapaColumnas,
   };
 }
