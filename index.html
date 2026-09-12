@@ -1733,12 +1733,12 @@
   }
   .campo-chip .quitar-campo:hover{ opacity:1; background:rgba(0,0,0,0.08); }
   table.sheet-grid td.cell.selected{
-    background:rgba(47,93,69,0.16);
+    background:rgba(47,93,69,0.14);
     box-shadow: inset 0 0 0 1px var(--green);
   }
-  table.sheet-grid td.cell.selected-pending{
-    background:rgba(47,93,69,0.08);
-    box-shadow: inset 0 0 0 1px dashed var(--green);
+  table.sheet-grid td.cell.celda-activa{
+    background:rgba(47,93,69,0.32) !important;
+    box-shadow: inset 0 0 0 2px var(--green) !important;
   }
   table.sheet-grid tr.fila-titulo-elegida td.cell{
     background:rgba(70,120,180,0.16) !important;
@@ -3230,14 +3230,17 @@
         </div>
       </div>
 
-      <!-- Paso 9 (Un TAG, una hoja): selección de celdas con autocompletado -->
+      <!-- Paso 9 (Un TAG, una hoja): lista de filas celda+nombre, se agrega una vacía sola -->
       <div id="float-step-campo" style="display:none;">
         <div class="sheet-select-row">
           <label>Hoja</label>
           <select class="field-select" id="select-hoja-campo"></select>
         </div>
 
-        <p class="rango-label" style="margin-top:16px;">Campos a extraer:</p>
+        <p class="rango-label" style="margin-top:16px;">Campo actual:</p>
+        <div class="campos-list" id="campo-actual-fijo"></div>
+
+        <p class="rango-label" style="margin-top:16px;">Ya definidos:</p>
         <div class="campos-list-scroll" style="max-height:300px; overflow-y:auto; margin-bottom:12px;">
           <div class="campos-list" id="celdas-seleccionadas-list"></div>
         </div>
@@ -3248,27 +3251,6 @@
             <button class="btn" id="atras-campo">Atrás</button>
             <button class="btn btn-primary" id="confirmar-celdas" disabled>Continuar</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Mini ventana: asignar nombre a una celda con autocompletado -->
-      <div id="float-step-nombre-celda" style="display:none;">
-        <p class="rango-label" style="margin-top:0;">Nombre del campo para <span id="nombre-celda-coord" style="font-weight:600; color:var(--green-dark);"></span>:</p>
-        <div style="position:relative;">
-          <div style="position:relative; display:flex; align-items:center; margin-top:6px;">
-            <input type="text" id="input-nombre-celda-autocomplete" class="field-input" placeholder="Escribí o elegí un nombre" autocomplete="off" style="margin:0; padding-right:36px; flex:1;">
-            <button id="btn-toggle-dropdown" type="button" style="position:absolute; right:8px; background:none; border:none; cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-muted);">
-                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          <div id="autocomplete-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:200px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;">
-          </div>
-        </div>
-        <div class="modal-actions modal-actions-split" style="margin-top:14px;">
-          <button class="btn" id="cancel-nombre-celda">Cancelar</button>
-          <button class="btn btn-primary" id="confirmar-nombre-celda" disabled>Confirmar</button>
         </div>
       </div>
 
@@ -11010,9 +10992,8 @@ function cerrarFlujoCarga(){
   hojaPrevisualizada = null;
   hojasIncluidas = new Set();
   hojasSeleccionadasParaCarga = [];
-  celdasSeleccionadas.clear();
-  celdaEditandoNombre = null;
-  camposDefinidos = [];
+  filasCampos = [];
+  filaCeldaFocoIdx = null;
   modoActualizarDoc = false;
   columnasParaMapear = [];
   mapeoActualizarColumnas = {};
@@ -11083,16 +11064,19 @@ function mostrarPasoFloat(paso){
   floatStepRenombrar.style.display = paso==='renombrar' ? 'block' : 'none';
   floatStepHojas.style.display = paso==='hojas' ? 'block' : 'none';
   floatStepCampo.style.display = paso==='campo' ? 'block' : 'none';
-  document.getElementById('float-step-nombre-celda').style.display = paso==='nombre-celda' ? 'block' : 'none';
   document.getElementById('float-step-mapeo-actualizar').style.display = paso==='mapeo-actualizar' ? 'block' : 'none';
 
+  // Este paso tiene más contenido (fila fija + lista con scroll), le damos más aire arriba
+  if(paso === 'campo') floatWindow.style.top = '55px';
+  else if(floatWindow.style.top === '55px') floatWindow.style.top = '110px';
+
   // El fondo se oscurece y bloquea la hoja, salvo en los pasos donde hay que tocarla de verdad
-  const pasosConHojaInteractiva = ['rango', 'campo', 'nombre-celda', 'unir', 'sacar'];
+  const pasosConHojaInteractiva = ['rango', 'campo', 'unir', 'sacar'];
   document.getElementById('float-backdrop').classList.toggle('open', !pasosConHojaInteractiva.includes(paso));
 
   // Cambiar modo de grilla según el paso
   if(paso === 'rango') modoGrilla = 'libre';
-  else if(paso === 'campo' || paso === 'nombre-celda') modoGrilla = 'celda-multi';
+  else if(paso === 'campo') modoGrilla = 'celda-multi';
   else if(paso === 'unir') modoGrilla = 'unir-columnas';
   else if(paso === 'sacar') modoGrilla = 'sacar-columnas';
   else modoGrilla = 'ninguno';
@@ -11223,6 +11207,17 @@ gridEl.addEventListener('mousedown', (e)=>{
   selEnd = { r, c };
   arrastrandoSeleccion = true;
   pintarSeleccion();
+});
+
+// "Un TAG, una hoja" - paso de asignar nombres: un click asigna esa celda a la fila activa
+// (la que tenga el foco, o la última vacía si ninguna lo tiene)
+gridEl.addEventListener('click', (e)=>{
+  if(modoGrilla !== 'celda-multi') return;
+  const td = e.target.closest('td.cell');
+  if(!td) return;
+  const r = Number(td.dataset.r), c = Number(td.dataset.c);
+  const idx = filaCeldaFocoIdx !== null ? filaCeldaFocoIdx : filasCampos.length - 1;
+  asignarCeldaAFila(idx, r, c);
 });
 document.addEventListener('mousemove', (e)=>{
   if(modoGrilla !== 'libre' || !arrastrandoSeleccion) return;
@@ -12017,9 +12012,8 @@ document.getElementById('continuar-hojas').addEventListener('click', ()=>{
   poblarSelectorHojaCampo();
   renderGridHoja(hojaPrevisualizada);
 
-  camposDefinidos = [];
-  celdasSeleccionadas.clear();
-  celdaEditandoNombre = null;
+  filasCampos = [];
+  filaCeldaFocoIdx = null;
   renderCeldasYCamposList();
   actualizarBotonConfirmarCeldas();
   mostrarPasoFloat('campo');
@@ -12034,285 +12028,228 @@ function poblarSelectorHojaCampo(){
 document.getElementById('select-hoja-campo').addEventListener('change', (e)=>{
   hojaPrevisualizada = e.target.value;
   renderGridHoja(hojaPrevisualizada);
+  repintarCeldasCampo();
 });
 
-// ---- "Un TAG, una hoja": paso 2 -> seleccionar celdas libremente, luego asignar nombres ----
+// ---- "Un TAG, una hoja" - paso 2: lista de filas celda+nombre ----
+// Cada fila tiene una celda (se llena tocando la grilla, o escribiéndola directo, ej "A3")
+// y un nombre (con autocompletado de títulos ya existentes). En cuanto la última fila queda
+// completa (celda + nombre), se agrega sola una fila vacía nueva abajo. Los títulos que ya
+// se usaron en otra fila desaparecen de las sugerencias, para no repetirlos sin querer.
 let hojasSeleccionadasParaCarga = [];
-let celdasSeleccionadas = new Set(); // Set de strings "r,c" - celdas marcadas sin nombre aún
-let celdaEditandoNombre = null; // {r, c, key} - celda cuyo nombre se está editando ahora
-let camposDefinidos = []; // [{ nombre, celda:{r,c} }] - celdas con nombre confirmado
+let filasCampos = []; // [{ r, c, nombre }] - r/c en null y nombre '' = fila vacía todavía
+let filaCeldaFocoIdx = null; // qué fila recibe el próximo click en la grilla
+let camposDefinidosConfirmados = []; // copia de los campos ya confirmados, usada más adelante en el flujo (subir a la base)
 
-function abrirAsignarNombreCelda(r, c){
-  const key = `${r},${c}`;
-  celdaEditandoNombre = { r, c, key };
-
-  document.getElementById('nombre-celda-coord').textContent = letraColSegura(c) + r;
-
-  const input = document.getElementById('input-nombre-celda-autocomplete');
-  input.value = '';
-  document.getElementById('confirmar-nombre-celda').disabled = true;
-  document.getElementById('autocomplete-dropdown').style.display = 'none';
-
-  mostrarPasoFloat('nombre-celda');
-
-  setTimeout(() => input.focus(), 100);
+function agregarFilaCampoSiHaceFalta(){
+  const ultima = filasCampos[filasCampos.length - 1];
+  if(!ultima || (ultima.r !== null && ultima.nombre)){
+    filasCampos.push({ r: null, c: null, nombre: '' });
+    filaCeldaFocoIdx = filasCampos.length - 1;
+  }
 }
 
-let autocompleteSelectedIndex = -1;
+// Vuelve a pintar, sobre la grilla actual, qué celdas ya están asignadas (marca suave y
+// permanente) y cuál es la fila activa ahora mismo (marca fuerte) — hace falta llamarla
+// después de cualquier renderGridHoja(), porque redibuja la tabla entera desde cero
+function repintarCeldasCampo(){
+  document.querySelectorAll('td.cell.selected, td.cell.celda-activa').forEach(td=>{
+    td.classList.remove('selected', 'celda-activa');
+  });
+  filasCampos.forEach((fila, idx)=>{
+    if(fila.r === null) return;
+    const td = document.querySelector(`td.cell[data-r="${fila.r}"][data-c="${fila.c}"]`);
+    if(!td) return;
+    td.classList.add(idx === filaCeldaFocoIdx ? 'celda-activa' : 'selected');
+  });
+}
 
-function filtrarAutocomplete(texto, mostrarTodos = false){
-  const dropdown = document.getElementById('autocomplete-dropdown');
+function letraColSegura(c){ return XLSX.utils.encode_col(c); }
 
+// Interpreta algo escrito a mano como "A3" -> {r, c}. Devuelve null si no es válido
+function parsearCeldaEscrita(texto){
+  const m = texto.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if(!m) return null;
+  let c = 0;
+  for(let i = 0; i < m[1].length; i++) c = c * 26 + (m[1].charCodeAt(i) - 64);
+  c -= 1;
+  const r = Number(m[2]);
+  if(r < 1) return null;
+  return { r, c };
+}
+
+function asignarCeldaAFila(idx, r, c){
+  filasCampos[idx].r = r;
+  filasCampos[idx].c = c;
+  renderCeldasYCamposList();
+  repintarCeldasCampo();
+  actualizarBotonConfirmarCeldas();
+}
+
+function asignarNombreAFila(idx, nombre){
+  filasCampos[idx].nombre = nombre.trim();
+  renderCeldasYCamposList();
+  actualizarBotonConfirmarCeldas();
+}
+
+// Sugerencias de título para una fila puntual: no repite los que ya están usados en otras filas
+function filtrarAutocompleteFila(idx, texto, mostrarTodos = false){
+  const dropdown = document.querySelector(`.autocomplete-dropdown-fila[data-idx="${idx}"]`);
+  if(!dropdown) return;
+
+  const usadosEnOtras = new Set(filasCampos.filter((f, i) => i !== idx).map(f => f.nombre).filter(n => n));
+  const disponibles = COLUMNAS.filter(col => !usadosEnOtras.has(col));
   const textoLower = texto.toLowerCase();
-  let opciones;
 
+  let opciones;
   if(mostrarTodos){
-    // Mostrar todos los títulos existentes
-    opciones = COLUMNAS;
+    opciones = disponibles;
   } else if(!texto.trim()){
     dropdown.style.display = 'none';
-    autocompleteSelectedIndex = -1;
     return;
   } else {
-    // Filtrar por texto
-    opciones = COLUMNAS.filter(col => col.toLowerCase().includes(textoLower));
+    opciones = disponibles.filter(col => col.toLowerCase().includes(textoLower));
   }
 
-  let html = '';
+  let html = opciones.slice(0, 10).map(col => `<div class="autocomplete-option" data-value="${col}" style="padding:8px 12px; cursor:pointer; font-size:13px;">${col}</div>`).join('');
 
-  // Mostrar opciones filtradas (máximo 10)
-  opciones.slice(0, 10).forEach(col => {
-    html += `<div class="autocomplete-option" data-value="${col}" style="padding:8px 12px; cursor:pointer; font-size:13px;">${col}</div>`;
-  });
-
-  // Opción "Crear nuevo" si el texto no coincide exactamente con ninguna existente
   if(texto.trim()){
-    const coincideExacto = COLUMNAS.some(col => col.toLowerCase() === textoLower);
+    const coincideExacto = disponibles.some(col => col.toLowerCase() === textoLower);
     if(!coincideExacto){
-      html += `<div class="autocomplete-option crear-nuevo" data-value="${texto}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto}"</div>`;
+      html += `<div class="autocomplete-option crear-nuevo" data-value="${texto.trim()}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear "${texto.trim()}"</div>`;
     }
   } else if(mostrarTodos){
-    // Si se abrió con la flecha y no hay texto, mostrar opción de crear
     html += `<div class="autocomplete-option crear-nuevo" data-value="" style="padding:8px 12px; cursor:pointer; font-size:13px; color:var(--green-dark); font-weight:500; border-top:1px solid var(--line);">+ Crear nuevo título</div>`;
   }
 
   if(html){
     dropdown.innerHTML = html;
     dropdown.style.display = 'block';
-    autocompleteSelectedIndex = -1;
-
-    // Event listeners para las opciones
-    dropdown.querySelectorAll('.autocomplete-option').forEach((opt, idx) => {
-      opt.addEventListener('mouseenter', () => {
-        dropdown.querySelectorAll('.autocomplete-option').forEach(o => o.style.background = '');
-        opt.style.background = 'var(--green-soft)';
-        autocompleteSelectedIndex = idx;
+    dropdown.querySelectorAll('.autocomplete-option').forEach(opt=>{
+      // mousedown (no click) para que dispare antes del blur del input
+      opt.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        const valor = opt.dataset.value || document.querySelector(`.campo-nombre-input[data-idx="${idx}"]`).value.trim();
+        if(valor) asignarNombreAFila(idx, valor);
+        dropdown.style.display = 'none';
       });
-      opt.addEventListener('mouseleave', () => {
-        opt.style.background = '';
-      });
-      opt.addEventListener('click', () => seleccionarOpcionAutocomplete(opt.dataset.value));
     });
   } else {
     dropdown.style.display = 'none';
-    autocompleteSelectedIndex = -1;
   }
 }
 
-function seleccionarOpcionAutocomplete(valor){
-  const input = document.getElementById('input-nombre-celda-autocomplete');
-  const dropdown = document.getElementById('autocomplete-dropdown');
-
-  if(valor){
-    input.value = valor;
-    document.getElementById('confirmar-nombre-celda').disabled = false;
-  } else {
-    // Opción "Crear nuevo título" - mantener el foco en el input
-    input.focus();
-  }
-  dropdown.style.display = 'none';
-  autocompleteSelectedIndex = -1;
-}
-
-function navegarAutocompleteConTeclas(direccion){
-  const dropdown = document.getElementById('autocomplete-dropdown');
-  if(dropdown.style.display === 'none') return;
-
-  const opciones = dropdown.querySelectorAll('.autocomplete-option');
-  if(opciones.length === 0) return;
-
-  // Quitar highlight actual
-  opciones.forEach(o => o.style.background = '');
-
-  // Mover índice
-  if(direccion === 'down'){
-    autocompleteSelectedIndex = Math.min(autocompleteSelectedIndex + 1, opciones.length - 1);
-  } else if(direccion === 'up'){
-    autocompleteSelectedIndex = Math.max(autocompleteSelectedIndex - 1, 0);
-  }
-
-  // Highlight nueva opción
-  if(autocompleteSelectedIndex >= 0 && autocompleteSelectedIndex < opciones.length){
-    opciones[autocompleteSelectedIndex].style.background = 'var(--green-soft)';
-    opciones[autocompleteSelectedIndex].scrollIntoView({ block: 'nearest' });
-  }
-}
-
-function confirmarNombreCelda(){
-  if(!celdaEditandoNombre) return;
-
-  const nombre = document.getElementById('input-nombre-celda-autocomplete').value.trim();
-  if(!nombre){
-    alert('Escribí un nombre para el campo.');
-    return;
-  }
-
-  // Verificar si estamos editando un campo existente
-  const idxExistente = camposDefinidos.findIndex(c =>
-    c.celda.r === celdaEditandoNombre.r && c.celda.c === celdaEditandoNombre.c
-  );
-
-  // Verificar que no exista ya un campo con ese nombre (excepto si estamos editando el mismo)
-  const nombreDuplicado = camposDefinidos.some((c, idx) =>
-    c.nombre === nombre && idx !== idxExistente
-  );
-
-  if(nombreDuplicado){
-    alert(`Ya existe un campo con el nombre "${nombre}".`);
-    return;
-  }
-
-  if(idxExistente >= 0){
-    // Estamos editando: actualizar el nombre
-    camposDefinidos[idxExistente].nombre = nombre;
-  } else {
-    // Es nuevo: agregar a campos definidos
-    camposDefinidos.push({
-      nombre,
-      celda: { r: celdaEditandoNombre.r, c: celdaEditandoNombre.c }
-    });
-
-    // Marcar visualmente como confirmada
-    const td = document.querySelector(`td.cell[data-r="${celdaEditandoNombre.r}"][data-c="${celdaEditandoNombre.c}"]`);
-    if(td){
-      td.classList.remove('selected-pending');
-      td.classList.add('selected');
-    }
-  }
-
-  // Quitar de celdas seleccionadas si estaba ahí
-  celdasSeleccionadas.delete(celdaEditandoNombre.key);
-
-  celdaEditandoNombre = null;
-  document.getElementById('autocomplete-dropdown').style.display = 'none';
-
-  renderCeldasYCamposList();
-  actualizarBotonConfirmarCeldas();
-  mostrarPasoFloat('campo');
+function filaEditableHTML(fila, idx){
+  return `
+    <div class="campo-fila-editable" data-idx="${idx}" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+      <input type="text" class="field-input campo-celda-input" data-idx="${idx}" placeholder="Celda" value="${fila.r !== null ? letraColSegura(fila.c) + fila.r : ''}" style="width:64px; text-align:center; font-family:var(--font-mono); font-weight:600; margin:0; padding:8px 4px;">
+      <div style="position:relative; flex:1;">
+        <input type="text" class="field-input campo-nombre-input" data-idx="${idx}" placeholder="Buscar o crear título..." value="${fila.nombre}" autocomplete="off" style="margin:0;">
+        <div class="autocomplete-dropdown-fila" data-idx="${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:6px; margin-top:4px; max-height:180px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:1000;"></div>
+      </div>
+      <button type="button" class="quitar-fila-campo" data-idx="${idx}" title="Quitar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px; flex-shrink:0; ${filasCampos.length <= 1 ? 'visibility:hidden;' : ''}">×</button>
+    </div>
+  `;
 }
 
 function renderCeldasYCamposList(){
-  const cont = document.getElementById('celdas-seleccionadas-list');
+  agregarFilaCampoSiHaceFalta();
 
-  const totalItems = celdasSeleccionadas.size + camposDefinidos.length;
-  if(totalItems === 0){
-    cont.innerHTML = '<div style="color:var(--text-muted); font-size:13px; padding:8px;">Ninguna celda seleccionada</div>';
-    return;
-  }
+  const idxActual = filasCampos.length - 1; // la última fila es siempre la que se está armando ahora
+  const contActual = document.getElementById('campo-actual-fijo');
+  const contDefinidos = document.getElementById('celdas-seleccionadas-list');
 
-  let html = '';
+  contActual.innerHTML = filaEditableHTML(filasCampos[idxActual], idxActual);
 
-  // Celdas sin nombre (pendientes)
-  const celdasPendientes = Array.from(celdasSeleccionadas).map(key => {
-    const [r, c] = key.split(',').map(Number);
-    return { r, c, key };
-  }).sort((a, b) => a.r - b.r || a.c - b.c);
+  contDefinidos.innerHTML = filasCampos.length > 1
+    ? filasCampos.slice(0, -1).map((fila, idx) => filaEditableHTML(fila, idx)).join('')
+    : '<div style="color:var(--text-muted); font-size:13px; padding:8px;">Todavía no hay ninguno confirmado</div>';
 
-  celdasPendientes.forEach(celda => {
-    html += `
-      <div class="campo-chip campo-chip-pendiente" style="display:flex; align-items:center; gap:8px; opacity:0.6;">
-        <span style="font-style:italic; color:var(--text-muted); flex:1; font-size:13px;">(sin nombre)</span>
-        <span style="font-weight:600; color:var(--text-muted); min-width:50px;">${letraColSegura(celda.c)}${celda.r}</span>
-        <button class="quitar-celda-pendiente" data-key="${celda.key}" title="Quitar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px;">×</button>
-      </div>
-    `;
-  });
-
-  // Campos con nombre (confirmados)
-  camposDefinidos.forEach((campo, idx) => {
-    html += `
-      <div class="campo-chip" style="display:flex; align-items:center; gap:8px;">
-        <span style="flex:1; font-size:13px; font-weight:500;">${campo.nombre}</span>
-        <span style="font-weight:600; color:var(--text-muted); min-width:50px;">${letraColSegura(campo.celda.c)}${campo.celda.r}</span>
-        <button class="editar-campo" data-idx="${idx}" title="Editar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0 4px;">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:block;">
-            <path d="M11.333 2.00004C11.5081 1.82494 11.716 1.68605 11.9447 1.59129C12.1735 1.49653 12.4187 1.44775 12.6663 1.44775C12.914 1.44775 13.1592 1.49653 13.3879 1.59129C13.6167 1.68605 13.8246 1.82494 13.9997 2.00004C14.1748 2.17513 14.3137 2.383 14.4084 2.61178C14.5032 2.84055 14.552 3.08575 14.552 3.33337C14.552 3.58099 14.5032 3.82619 14.4084 4.05497C14.3137 4.28374 14.1748 4.49161 13.9997 4.66671L5.33301 13.3334L1.99967 14L2.66634 10.6667L11.333 2.00004Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="quitar-campo" data-idx="${idx}" title="Quitar" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px;">×</button>
-      </div>
-    `;
-  });
-
-  cont.innerHTML = html;
-
-  // Event listeners para celdas pendientes
-  cont.querySelectorAll('.quitar-celda-pendiente').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.key;
-      celdasSeleccionadas.delete(key);
-      const [r, c] = key.split(',').map(Number);
-      const td = document.querySelector(`td.cell[data-r="${r}"][data-c="${c}"]`);
-      if(td) td.classList.remove('selected-pending');
-      renderCeldasYCamposList();
-      actualizarBotonConfirmarCeldas();
+  [contActual, contDefinidos].forEach(cont => {
+    cont.querySelectorAll('.campo-celda-input').forEach(input=>{
+      const idx = Number(input.dataset.idx);
+      input.addEventListener('focus', ()=>{
+        filaCeldaFocoIdx = idx;
+        repintarCeldasCampo();
+      });
+      input.addEventListener('change', ()=>{
+        const texto = input.value.trim();
+        if(!texto){
+          filasCampos[idx].r = null;
+          filasCampos[idx].c = null;
+          renderCeldasYCamposList();
+          repintarCeldasCampo();
+          actualizarBotonConfirmarCeldas();
+          return;
+        }
+        const parsed = parsearCeldaEscrita(texto);
+        if(parsed) asignarCeldaAFila(idx, parsed.r, parsed.c);
+        else input.value = filasCampos[idx].r !== null ? letraColSegura(filasCampos[idx].c) + filasCampos[idx].r : '';
+      });
     });
-  });
 
-  // Event listeners para editar campos confirmados
-  cont.querySelectorAll('.editar-campo').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.idx);
-      const campo = camposDefinidos[idx];
-
-      // Abrir ventana de edición para esa celda
-      abrirAsignarNombreCelda(campo.celda.r, campo.celda.c);
-
-      // Pre-llenar el input con el nombre actual
-      setTimeout(() => {
-        const input = document.getElementById('input-nombre-celda-autocomplete');
-        input.value = campo.nombre;
-        document.getElementById('confirmar-nombre-celda').disabled = false;
-        input.select(); // Seleccionar el texto para facilitar edición
-      }, 100);
+    cont.querySelectorAll('.campo-nombre-input').forEach(input=>{
+      const idx = Number(input.dataset.idx);
+      input.addEventListener('input', ()=>{
+        filasCampos[idx].nombre = input.value.trim();
+        actualizarBotonConfirmarCeldas();
+        filtrarAutocompleteFila(idx, input.value);
+      });
+      input.addEventListener('focus', ()=>{
+        filtrarAutocompleteFila(idx, input.value, !input.value.trim());
+      });
+      input.addEventListener('blur', ()=>{
+        setTimeout(()=>{
+          // Si quedó un título repetido (escrito a mano, sin pasar por el desplegable), se avisa
+          const repetido = filasCampos.some((f, i) => i !== idx && f.nombre && f.nombre === filasCampos[idx].nombre);
+          if(repetido){
+            alert(`Ya usaste el título "${filasCampos[idx].nombre}" en otra fila. Elegí uno distinto.`);
+            filasCampos[idx].nombre = '';
+          }
+          renderCeldasYCamposList();
+          actualizarBotonConfirmarCeldas();
+        }, 150);
+      });
+      input.addEventListener('keydown', (e)=>{
+        const dropdown = document.querySelector(`.autocomplete-dropdown-fila[data-idx="${idx}"]`);
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          input.blur();
+        } else if(e.key === 'Escape'){
+          if(dropdown) dropdown.style.display = 'none';
+        }
+      });
     });
-  });
 
-  // Event listeners para quitar campos confirmados
-  cont.querySelectorAll('.quitar-campo').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.idx);
-      const campo = camposDefinidos[idx];
-
-      // Desmarcar celda
-      const td = document.querySelector(`td.cell[data-r="${campo.celda.r}"][data-c="${campo.celda.c}"]`);
-      if(td) td.classList.remove('selected');
-
-      // Quitar de la lista
-      camposDefinidos.splice(idx, 1);
-      renderCeldasYCamposList();
-      actualizarBotonConfirmarCeldas();
+    cont.querySelectorAll('.quitar-fila-campo').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = Number(btn.dataset.idx);
+        filasCampos.splice(idx, 1);
+        if(filaCeldaFocoIdx === idx) filaCeldaFocoIdx = null;
+        renderCeldasYCamposList();
+        repintarCeldasCampo();
+        actualizarBotonConfirmarCeldas();
+      });
     });
   });
 }
 
 function actualizarBotonConfirmarCeldas(){
-  document.getElementById('confirmar-celdas').disabled = camposDefinidos.length === 0;
+  const completos = filasCampos.filter(f => f.r !== null && f.nombre);
+  document.getElementById('confirmar-celdas').disabled = completos.length === 0;
 }
 
-// letraCol depende de GRID_COLS de la hoja que se esté viendo; para los chips ya confirmados
-// usamos el mismo helper por si GRID_COLS cambió al navegar de hoja mientras tanto
-function letraColSegura(c){ return XLSX.utils.encode_col(c); }
+// Selector de hoja del paso "campo": solo muestra las hojas que quedaron tildadas
+function poblarSelectorHojaCampo(){
+  const sel = document.getElementById('select-hoja-campo');
+  sel.innerHTML = hojasSeleccionadasParaCarga.map(n => `<option value="${n}">${n}</option>`).join('');
+  sel.value = hojaPrevisualizada;
+}
+document.getElementById('select-hoja-campo').addEventListener('change', (e)=>{
+  hojaPrevisualizada = e.target.value;
+  renderGridHoja(hojaPrevisualizada);
+  repintarCeldasCampo();
+});
 
 // Event listeners para el paso de selección de celdas
 document.getElementById('cancel-campo').addEventListener('click', ()=>{
@@ -12320,110 +12257,29 @@ document.getElementById('cancel-campo').addEventListener('click', ()=>{
 });
 
 document.getElementById('atras-campo').addEventListener('click', ()=>{
-  celdasSeleccionadas.clear();
-  celdaEditandoNombre = null;
-  camposDefinidos = [];
+  filasCampos = [];
+  filaCeldaFocoIdx = null;
   limpiarSeleccionVisual();
   renderListaHojas();
   mostrarPasoFloat('hojas');
 });
 
 document.getElementById('confirmar-celdas').addEventListener('click', ()=>{
-  if(camposDefinidos.length === 0){
-    alert('Asigná nombres a las celdas seleccionadas antes de continuar.');
+  const completos = filasCampos.filter(f => f.r !== null && f.nombre);
+  if(completos.length === 0){
+    alert('Asigná celda y nombre a al menos un campo antes de continuar.');
     return;
   }
-
   limpiarSeleccionVisual();
   continuarAlFinalDesdeTagHoja();
 });
 
-// Event listeners para el paso de asignar nombre
-document.getElementById('cancel-nombre-celda').addEventListener('click', ()=>{
-  // Al cancelar, desmarcar la celda pendiente
-  if(celdaEditandoNombre){
-    const td = document.querySelector(`td.cell[data-r="${celdaEditandoNombre.r}"][data-c="${celdaEditandoNombre.c}"]`);
-    if(td) td.classList.remove('selected-pending');
-    celdasSeleccionadas.delete(celdaEditandoNombre.key);
-  }
-  celdaEditandoNombre = null;
-  document.getElementById('autocomplete-dropdown').style.display = 'none';
-  renderCeldasYCamposList();
-  actualizarBotonConfirmarCeldas();
-  mostrarPasoFloat('campo');
-});
-
-document.getElementById('confirmar-nombre-celda').addEventListener('click', ()=>{
-  confirmarNombreCelda();
-});
-
-// Input de autocompletado
-document.getElementById('input-nombre-celda-autocomplete').addEventListener('input', (e)=>{
-  const texto = e.target.value.trim();
-  document.getElementById('confirmar-nombre-celda').disabled = !texto;
-  filtrarAutocomplete(e.target.value);
-});
-
-document.getElementById('input-nombre-celda-autocomplete').addEventListener('keydown', (e)=>{
-  const dropdown = document.getElementById('autocomplete-dropdown');
-
-  if(e.key === 'ArrowDown'){
-    e.preventDefault();
-    if(dropdown.style.display === 'none'){
-      // Abrir dropdown si está cerrado
-      const input = document.getElementById('input-nombre-celda-autocomplete');
-      filtrarAutocomplete(input.value, true);
-    } else {
-      navegarAutocompleteConTeclas('down');
-    }
-  } else if(e.key === 'ArrowUp'){
-    e.preventDefault();
-    navegarAutocompleteConTeclas('up');
-  } else if(e.key === 'Enter'){
-    e.preventDefault();
-    if(dropdown.style.display !== 'none' && autocompleteSelectedIndex >= 0){
-      // Si hay una opción seleccionada, usarla
-      const opciones = dropdown.querySelectorAll('.autocomplete-option');
-      if(opciones[autocompleteSelectedIndex]){
-        seleccionarOpcionAutocomplete(opciones[autocompleteSelectedIndex].dataset.value);
-      }
-    } else {
-      // Si no hay dropdown o no hay selección, confirmar directamente
-      confirmarNombreCelda();
-    }
-  } else if(e.key === 'Escape'){
-    dropdown.style.display = 'none';
-    autocompleteSelectedIndex = -1;
-  }
-});
-
-// Botón de flecha para desplegar todos los títulos
-document.getElementById('btn-toggle-dropdown').addEventListener('click', (e)=>{
-  e.preventDefault();
-  e.stopPropagation();
-  const dropdown = document.getElementById('autocomplete-dropdown');
-  const input = document.getElementById('input-nombre-celda-autocomplete');
-
-  if(dropdown.style.display === 'block'){
-    dropdown.style.display = 'none';
-  } else {
-    filtrarAutocomplete(input.value, true);
-  }
-});
-
-// Cerrar dropdown al hacer click fuera
-document.addEventListener('click', (e)=>{
-  const input = document.getElementById('input-nombre-celda-autocomplete');
-  const dropdown = document.getElementById('autocomplete-dropdown');
-  const btn = document.getElementById('btn-toggle-dropdown');
-  if(!input.contains(e.target) && !dropdown.contains(e.target) && !btn.contains(e.target)){
-    dropdown.style.display = 'none';
-  }
-});
 
 // Continuar (paso campo): arma la tabla final leyendo todos los campos definidos en todas las hojas elegidas
 function continuarAlFinalDesdeTagHoja(){
+  const camposDefinidos = filasCampos.filter(f => f.r !== null && f.nombre).map(f => ({ nombre: f.nombre, celda: { r: f.r, c: f.c } }));
   if(camposDefinidos.length === 0) return;
+  camposDefinidosConfirmados = camposDefinidos;
 
   tablaData = [camposDefinidos.map(c => c.nombre)];
   hojasSeleccionadasParaCarga.forEach(nombreHoja=>{
@@ -12594,7 +12450,7 @@ function fusionarFilaConDocumento(filaExistente, datosNuevos, documento){
 function construirRegistroExtraccion(){
   if(opcionCargaSeleccionada === 'tag-hoja'){
     const celdas = hojasSeleccionadasParaCarga.flatMap(hoja =>
-      camposDefinidos.map(campo => ({ hoja, r: campo.celda.r, c: campo.celda.c }))
+      camposDefinidosConfirmados.map(campo => ({ hoja, r: campo.celda.r, c: campo.celda.c }))
     );
     return { tipo: 'celdas', celdas };
   }
