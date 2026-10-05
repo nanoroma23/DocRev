@@ -2825,6 +2825,7 @@
             <div class="seg-crear-preview-header">
               <h3>Vista previa</h3>
               <span class="seg-preview-count" id="seg-preview-count">0 filas</span>
+              <button type="button" class="btn-mini" id="seg-limpiar-filtros" style="margin-left:auto; display:none;" onclick="limpiarFiltrosSeguimientoTemp()">Quitar todos los filtros</button>
             </div>
             <div class="seg-crear-preview-wrap">
               <table class="datatable seg-preview-table">
@@ -5353,7 +5354,21 @@ document.getElementById('seguimiento-tarjetas').addEventListener('click', (e)=>{
 // ---- Crear seguimiento - Nueva lógica (también se reutiliza para "Editar criterios") ----
 let editandoSeguimientoExistente = null; // null = creando uno nuevo; si no, el seguimiento que se está editando
 
+function escAttrSeg(v){
+  return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function limpiarFiltrosSeguimientoTemp(){
+  filtrosSeguimientoTemp = {};
+  filtroSeguimientoColActivo = null;
+  document.querySelectorAll('.filter-popup.open').forEach(p => p.classList.remove('open'));
+  actualizarColumnasDisponibles();
+  actualizarPreviewSeguimiento();
+}
+
 function abrirModalCrearSeguimiento(segExistente = null){
+  filtroSeguimientoColActivo = null;
+  document.querySelectorAll('.filter-popup.open').forEach(p => p.classList.remove('open'));
   editandoSeguimientoExistente = segExistente;
 
   // Cambiar a la vista de crear/editar seguimiento (oculta las otras dos, sea cual sea
@@ -5456,6 +5471,8 @@ function calcularColumnaPrincipalAutomatica(columnas, filtros){
 }
 
 function actualizarPreviewSeguimiento(){
+  const btnLimpiar = document.getElementById('seg-limpiar-filtros');
+  if(btnLimpiar) btnLimpiar.style.display = Object.values(filtrosSeguimientoTemp).some(f => f) ? '' : 'none';
   const thead = document.getElementById('seg-preview-thead');
   const tbody = document.getElementById('seg-preview-tbody');
 
@@ -5594,9 +5611,9 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
         <span>Seleccionar todo</span>
       </label>
       ${valores.map(v => `
-        <label class="filter-option filter-option-valor-seg" data-valor="${v}">
-          <input type="checkbox" class="chk-valor-seg-col" value="${v}" ${seleccion.has(v) ? 'checked':''}>
-          <span>${v || '(vacío)'}</span>
+        <label class="filter-option filter-option-valor-seg" data-valor="${escAttrSeg(v)}">
+          <input type="checkbox" class="chk-valor-seg-col" data-v="${escAttrSeg(v)}" ${seleccion.has(v) ? 'checked':''}>
+          <span>${escAttrSeg(v) || '(vacío)'}</span>
         </label>
       `).join('')}
     </div>
@@ -5681,8 +5698,11 @@ function aplicarFiltroSeguimientoCol(col){
   });
   const valores = [...new Set(filasCascada.map(f => (f[col] ?? '').toString()))];
 
-  const marcados = chksValor.filter(c=>c.checked).map(c=>c.value);
-  filtrosSeguimientoTemp[col] = marcados.length === valores.length ? null : new Set(marcados);
+  const marcados = chksValor.filter(c=>c.checked).map(c=>c.dataset.v);
+  const setMarcados = new Set(marcados);
+  filtrosSeguimientoTemp[col] = valores.every(v => setMarcados.has(v)) ? null : setMarcados;
+  // Limpiar filtros que ya no restringen nada
+  Object.keys(filtrosSeguimientoTemp).forEach(c => { if(!filtrosSeguimientoTemp[c]) delete filtrosSeguimientoTemp[c]; });
 
   // Actualizar visual de todos los botones para esta columna
   document.querySelectorAll(`[data-seg-filtro-col="${col}"], [data-seg-preview-filtro="${col}"]`).forEach(btn => {
