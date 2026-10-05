@@ -5724,12 +5724,8 @@ function aplicarFiltroSeguimientoCol(col){
 }
 
 function cerrarFiltroSeguimientoCol(){
-  if(filtroSeguimientoColActivo){
-    const popupId = 'popup-seg-col-' + filtroSeguimientoColActivo.replace(/[^a-zA-Z0-9]/g, '_');
-    const popup = document.getElementById(popupId);
-    popup.classList.remove('open');
-    filtroSeguimientoColActivo = null;
-  }
+  document.querySelectorAll('.filter-popup.open').forEach(p => p.classList.remove('open'));
+  filtroSeguimientoColActivo = null;
 }
 
 // Cerrar popup al hacer click fuera - con setTimeout para evitar conflictos
