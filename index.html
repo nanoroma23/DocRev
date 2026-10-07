@@ -2861,6 +2861,9 @@
           <button class="btn-col" id="seg-graficos" title="Gráficos adicionales">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="4" width="4" height="17"/><rect x="17" y="14" width="4" height="7"/></svg>
           </button>
+          <button class="btn-col" id="seg-quitar-filtros" title="Quitar todos los filtros de la tabla" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/><line x1="4" y1="20" x2="20" y2="4" stroke="#A6483B"/></svg>
+          </button>
           <button class="btn-col" id="seg-gestionar-columnas" title="Columnas">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
           </button>
@@ -5459,7 +5462,7 @@ function actualizarColumnasDisponibles(){
 
 // Entre las columnas seleccionadas, la "principal" se elige sola: es la que, ya aplicados
 // los filtros, termina con más valores distintos (típicamente la única sin repetidos, como
-// TAG). Si hay empate, gana la que se seleccionó primero. Si dos o más instrumentos comparten
+// TAG). Si hay empate, gana TAG (si está seleccionada) o la que se seleccionó primero. Si dos o más instrumentos comparten
 // el mismo valor en esa columna, esas filas se agrupan solas en el seguimiento.
 function calcularColumnaPrincipalAutomatica(columnas, filtros){
   if(!columnas || !columnas.size) return null;
@@ -5473,8 +5476,9 @@ function calcularColumnaPrincipalAutomatica(columnas, filtros){
   });
   let mejorCol = null, mejorCantidad = -1;
   columnas.forEach(col => {
-    const distintos = new Set(filasFiltradas.map(f => (f[col] ?? '').toString())).size;
-    if(distintos > mejorCantidad){
+    // Los vacíos no cuentan: una fila sin valor en la principal no forma parte del seguimiento
+    const distintos = new Set(filasFiltradas.map(f => (f[col] ?? '').toString()).filter(v => v !== '')).size;
+    if(distintos > mejorCantidad || (distintos === mejorCantidad && col === 'TAG')){
       mejorCantidad = distintos;
       mejorCol = col;
     }
@@ -5521,11 +5525,35 @@ function actualizarPreviewSeguimiento(){
   });
 
   // Obtener filas filtradas
-  const filasFiltradas = filasDeSeguimientoTemp();
-  document.getElementById('seg-preview-count').textContent = `${filasFiltradas.length} filas`;
+  const filasInstrumentos = filasDeSeguimientoTemp();
+  // Igual que el seguimiento real: una fila por valor distinto de la columna principal,
+  // y sin las filas que no tienen valor en esa columna
+  const vistosPrincipal = new Set();
+  const filasFiltradas = [];
+  let sinValorPrincipal = 0;
+  filasInstrumentos.forEach(f => {
+    const clave = (f[colPrincipal] ?? '').toString();
+    if(!clave){ sinValorPrincipal++; return; }
+    if(vistosPrincipal.has(clave)) return;
+    vistosPrincipal.add(clave);
+    filasFiltradas.push(f);
+  });
+  const contador = document.getElementById('seg-preview-count');
+  contador.textContent = `${filasFiltradas.length} filas`;
+  contador.title = '';
+  if(sinValorPrincipal){
+    contador.textContent += ` · ${sinValorPrincipal} sin ${colPrincipal} (no se incluyen)`;
+  }
+  if(filasInstrumentos.length !== filasFiltradas.length + sinValorPrincipal){
+    contador.title = `${filasInstrumentos.length} instrumentos agrupados por ${colPrincipal}`;
+  }
 
-  // Mostrar primeras 50 filas
-  const filasParaMostrar = filasFiltradas.slice(0, 50);
+  // Se muestran todas las filas (con un tope de seguridad para no trabar el navegador)
+  const TOPE_PREVIEW = 5000;
+  const filasParaMostrar = filasFiltradas.slice(0, TOPE_PREVIEW);
+  if(filasFiltradas.length > TOPE_PREVIEW){
+    contador.title = `Se muestran las primeras ${TOPE_PREVIEW} filas de ${filasFiltradas.length}`;
+  }
   if(filasParaMostrar.length === 0){
     tbody.innerHTML = '<tr class="empty-row"><td colspan="' + colsArray.length + '">No hay filas con los filtros seleccionados</td></tr>';
   } else {
@@ -6083,6 +6111,8 @@ function filasDeSeguimientoVista(seg){
 
 function renderTablaSeguimiento(){
   const seg = seguimientoActivo;
+  const btnQuitarFiltros = document.getElementById('seg-quitar-filtros');
+  if(btnQuitarFiltros) btnQuitarFiltros.style.display = Object.values(seg.filtrosVista || {}).some(f => f) ? '' : 'none';
   const filas = filasDeSeguimientoVista(seg);
 
   // La columna principal puede estar oculta, así que verificamos
@@ -6565,12 +6595,22 @@ function abrirFiltroSeguimientoTabla(col){
 
   popup.querySelector('#apply-seg-tabla').addEventListener('click', ()=>{
     const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
-    seg.filtrosVista[col] = marcados.length === valores.length ? null : new Set(marcados);
+    const setMarc = new Set(marcados);
+    seg.filtrosVista[col] = valores.every(v => setMarc.has(v)) ? null : setMarc;
+    Object.keys(seg.filtrosVista).forEach(k => { if(!seg.filtrosVista[k]) delete seg.filtrosVista[k]; });
     cerrarFiltros();
     renderTablaSeguimiento();
     guardarSeguimientoEnSupabase(seg);
   });
 }
+
+document.getElementById('seg-quitar-filtros').addEventListener('click', ()=>{
+  const seg = seguimientoActivo;
+  if(!seg) return;
+  seg.filtrosVista = {};
+  renderTablaSeguimiento();
+  guardarSeguimientoEnSupabase(seg);
+});
 
 // ---- Gestionar columnas del seguimiento ----
 document.getElementById('seg-gestionar-columnas').addEventListener('click', ()=>{
