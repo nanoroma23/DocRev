@@ -4830,7 +4830,7 @@ function abrirFiltro(col){
       </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
-          <input type="checkbox" class="chk-valor" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor" value="${encValorChk(v)}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
@@ -4888,7 +4888,7 @@ function abrirFiltro(col){
   actualizarEstadoTodos();
 
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
-    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
     FILTROS[col] = marcados.length === valores.length ? null : new Set(marcados);
     FILTROS_CONFLICTO_COL[col] = popup.querySelector('.chk-solo-conflicto-popup').checked || null;
     FILTROS_SOLUCIONADO_COL[col] = popup.querySelector('.chk-solo-solucionado-popup').checked || null;
@@ -5361,6 +5361,11 @@ document.getElementById('seguimiento-tarjetas').addEventListener('click', (e)=>{
 // ---- Crear seguimiento - Nueva lógica (también se reutiliza para "Editar criterios") ----
 let editandoSeguimientoExistente = null; // null = creando uno nuevo; si no, el seguimiento que se está editando
 
+// Los valores de los checkboxes de filtro se codifican para que ningún carácter raro
+// (saltos de línea, comillas, espacios al final) se altere al pasar por el HTML
+function encValorChk(v){ return encodeURIComponent(String(v)); }
+function decValorChk(v){ try{ return decodeURIComponent(v); }catch(e){ return v; } }
+
 function escAttrSeg(v){
   return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -5576,6 +5581,7 @@ document.getElementById('cancel-crear-seguimiento-nuevo').addEventListener('clic
 
 // Filtro opcional de valores para una columna puntual, mientras se arma el seguimiento
 let filtroSeguimientoColActivo = null;
+let valoresPopupSeg = null; // { col, valores } del popup de filtro abierto
 
 function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPreview = false, esColPrincipal = false){
   // Cerrar cualquier filtro abierto
@@ -5617,9 +5623,9 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
         <input type="checkbox" class="chk-todos-seg-col">
         <span>Seleccionar todo</span>
       </label>
-      ${valores.map(v => `
+      ${valores.map((v, i) => `
         <label class="filter-option filter-option-valor-seg" data-valor="${escAttrSeg(v)}">
-          <input type="checkbox" class="chk-valor-seg-col" data-v="${escAttrSeg(v)}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor-seg-col" data-i="${i}" ${seleccion.has(v) ? 'checked':''}>
           <span>${escAttrSeg(v) || '(vacío)'}</span>
         </label>
       `).join('')}
@@ -5627,6 +5633,8 @@ function abrirFiltroSeguimientoCol(col, btnElement, esNuevaVista = false, esPrev
   `;
 
   filtroSeguimientoColActivo = col;
+  // Los valores se guardan acá (no en el HTML): así no se alteran saltos de línea ni espacios
+  valoresPopupSeg = { col, valores };
 
   // Funcionalidad checkbox "todos"
   const chkTodos = popup.querySelector('.chk-todos-seg-col');
@@ -5705,7 +5713,9 @@ function aplicarFiltroSeguimientoCol(col){
   });
   const valores = [...new Set(filasCascada.map(f => (f[col] ?? '').toString()))];
 
-  const marcados = chksValor.filter(c=>c.checked).map(c=>c.dataset.v);
+  // Valores exactos tal como están en los datos (por índice, sin pasar por el HTML)
+  const valoresOfrecidos = (valoresPopupSeg && valoresPopupSeg.col === col) ? valoresPopupSeg.valores : valores;
+  const marcados = chksValor.filter(c=>c.checked).map(c=>valoresOfrecidos[+c.dataset.i]);
   const setMarcados = new Set(marcados);
   filtrosSeguimientoTemp[col] = valores.every(v => setMarcados.has(v)) ? null : setMarcados;
   // Limpiar filtros que ya no restringen nada
@@ -6499,7 +6509,7 @@ function abrirFiltroSeguimientoTabla(col){
       </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
-          <input type="checkbox" class="chk-valor-seg-tabla" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor-seg-tabla" value="${encValorChk(v)}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
@@ -6554,7 +6564,7 @@ function abrirFiltroSeguimientoTabla(col){
   actualizarEstadoTodos();
 
   popup.querySelector('#apply-seg-tabla').addEventListener('click', ()=>{
-    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
     seg.filtrosVista[col] = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
     renderTablaSeguimiento();
@@ -7090,7 +7100,7 @@ function abrirValoresFiltroGeneral(seg, col){
     <div class="filter-list">
       ${valores.map(v => `
         <label class="filter-option">
-          <input type="checkbox" class="chk-valor-filtro-general" value="${v}">
+          <input type="checkbox" class="chk-valor-filtro-general" value="${encValorChk(v)}">
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
@@ -7103,7 +7113,7 @@ function abrirValoresFiltroGeneral(seg, col){
   document.getElementById('btn-agregar-filtro-general').parentElement.appendChild(popup);
 
   const aplicar = ()=>{
-    const marcados = [...popup.querySelectorAll('.chk-valor-filtro-general')].filter(c => c.checked).map(c => c.value);
+    const marcados = [...popup.querySelectorAll('.chk-valor-filtro-general')].filter(c => c.checked).map(c => decValorChk(c.value));
     if(marcados.length) filtrosGraficoGeneral[col] = new Set(marcados);
     popup.remove();
     renderChipsFiltroGeneral(seg);
@@ -8240,7 +8250,7 @@ function abrirFiltroComparar(col){
       </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
-          <input type="checkbox" class="chk-valor" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor" value="${encValorChk(v)}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v || '(vacío)'}</span>
         </label>
       `).join('')}
@@ -8283,7 +8293,7 @@ function abrirFiltroComparar(col){
   actualizarEstadoTodos();
 
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
-    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
     filtrosComparar[col] = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltrosComparar();
     renderTablaCompararBase();
@@ -8757,7 +8767,7 @@ function abrirFiltroDocCampo(campo){
       </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${v.toLowerCase()}">
-          <input type="checkbox" class="chk-valor-popup" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor-popup" value="${encValorChk(v)}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v}</span>
         </label>
       `).join('')}
@@ -8802,7 +8812,7 @@ function abrirFiltroDocCampo(campo){
   actualizarEstadoTodos();
 
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
-    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
     filtrosDocsProyecto[campo] = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
     document.querySelector(`[data-campo-doc="${campo}"]`).classList.toggle('active', !!filtrosDocsProyecto[campo]);
@@ -8886,7 +8896,7 @@ function abrirFiltroDocOtrosFiltros(){
       </label>
       ${valores.map(v => `
         <label class="filter-option" data-valor="${(v==='__sin_documento__' ? 'Sin documento' : v).toLowerCase()}">
-          <input type="checkbox" class="chk-valor-popup" value="${v}" ${seleccion.has(v) ? 'checked':''}>
+          <input type="checkbox" class="chk-valor-popup" value="${encValorChk(v)}" ${seleccion.has(v) ? 'checked':''}>
           <span>${v==='__sin_documento__' ? 'Sin documento' : v}</span>
         </label>
       `).join('')}
@@ -8931,7 +8941,7 @@ function abrirFiltroDocOtrosFiltros(){
   actualizarEstadoTodos();
 
   popup.querySelector('.btn-aplicar-popup').addEventListener('click', ()=>{
-    const marcados = chksValor().filter(c=>c.checked).map(c=>c.value);
+    const marcados = chksValor().filter(c=>c.checked).map(c=>decValorChk(c.value));
     filtroDocumentos = marcados.length === valores.length ? null : new Set(marcados);
     cerrarFiltros();
     document.getElementById('btn-doc-otros-filtros').classList.toggle('active', !!filtroDocumentos);
